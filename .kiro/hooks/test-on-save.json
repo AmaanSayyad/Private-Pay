@@ -1,0 +1,13 @@
+{
+  "name": "Run Tests on Save",
+  "description": "Automatically run tests when JavaScript/TypeScript files are saved",
+  "trigger": {
+    "type": "onFileSave",
+    "filePattern": "**/*.{js,jsx,ts,tsx}"
+  },
+  "action": {
+    "type": "sendMessage",
+    "message": "A file was just saved. Please run the relevant tests for the changed file to ensure nothing broke. Focus on unit tests and property-based tests related to this file."
+  },
+  "enabled": true
+}

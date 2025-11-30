@@ -1,0 +1,13 @@
+{
+  "name": "Validate Cryptographic Operations",
+  "description": "Validate cryptographic code changes for security best practices",
+  "trigger": {
+    "type": "onFileSave",
+    "filePattern": "**/lib/aptos/stealthAddress.js"
+  },
+  "action": {
+    "type": "sendMessage",
+    "message": "The stealth address cryptography file was modified. Please review the changes for:\n1. Proper key validation (32 bytes for private, 33 bytes compressed for public)\n2. Secure random number generation using crypto.getRandomValues\n3. Correct ECDH implementation\n4. Proper error handling for invalid inputs\n5. No exposure of private keys in logs or errors\n\nRun the property-based tests for key generation, ECDH symmetry, and stealth address derivation."
+  },
+  "enabled": true
+}

@@ -1,0 +1,16 @@
+# SQUIDL Aptos - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# secp256k1 cryptography library (choose one)
+coincurve>=18.0.0  # Recommended: easier to use
+# OR
+# secp256k1>=0.14.0  # Alternative
+
+# Standard library (usually included)
+# hashlib - built-in
+# secrets - built-in
+
+
+
+
+

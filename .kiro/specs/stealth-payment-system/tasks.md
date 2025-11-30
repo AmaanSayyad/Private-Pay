@@ -1,0 +1,326 @@
+# Implementation Plan - Stealth Payment System
+
+- [x] 1. Set up cryptographic foundation and key generation
+  - [x] 1.1 Implement secure random private key generation using crypto.getRandomValues
+    - Validate that generated keys are 32 bytes and non-zero
+    - _Requirements: 1.1, 10.1_
+  - [x] 1.2 Implement public key derivation from private keys using @noble/secp256k1
+    - Ensure compressed format (33 bytes) with valid compression flag
+    - _Requirements: 1.2, 10.2_
+  - [x] 1.3 Implement public key validation function
+    - Check 33-byte length and compression flag (0x02 or 0x03)
+    - Return detailed error messages for invalid keys
+    - _Requirements: 1.5, 10.5_
+  - [x] 1.4 Implement meta address key pair generation
+    - Generate both spend and viewing key pairs
+    - Return structured object with private and public keys
+    - _Requirements: 1.1, 1.2, 1.3_
+  - [x]* 1.5 Write property test for key generation validity
+    - **Property 1: Key Generation Validity**
+    - **Validates: Requirements 1.1, 1.2, 10.2**
+
+- [x] 2. Implement ECDH and stealth address generation
+  - [x] 2.1 Implement ECDH shared secret computation
+    - Support both Uint8Array and hex string inputs
+    - Use point multiplication for shared secret derivation
+    - _Requirements: 2.2, 10.6_
+  - [x] 2.2 Implement tweak derivation from shared secret
+    - Hash shared secret concatenated with index k using SHA-256
+    - Convert hash to bigint for elliptic curve operations
+    - _Requirements: 2.3_
+  - [x] 2.3 Implement stealth public key computation
+    - Add spend public key to tweak * G
+    - Use point addition on secp256k1 curve
+    - _Requirements: 2.4_
+  - [x] 2.4 Implement Aptos address derivation from stealth public key
+    - Hash stealth public key with SHA3-256
+    - Take first 16 bytes and pad to 32 bytes
+    - Format as 0x-prefixed hex string
+    - _Requirements: 2.5_
+  - [x] 2.5 Implement view hint generation
+    - Extract first byte of shared secret
+    - Convert to hex string
+    - _Requirements: 2.6_
+  - [x] 2.6 Integrate all components into generateStealthAddress function
+    - Accept spend public key, viewing public key, ephemeral private key, and index k
+    - Return stealth address, ephemeral public key, view hint, and k
+    - _Requirements: 2.7_
+  - [x]* 2.7 Write property test for ECDH shared secret symmetry
+    - **Property 4: ECDH Shared Secret Symmetry**
+    - **Validates: Requirements 2.2, 10.6**
+  - [x]* 2.8 Write property test for stealth address uniqueness
+    - **Property 2: Stealth Address Uniqueness**
+    - **Validates: Requirements 2.1, 2.7**
+  - [x]* 2.9 Write property test for stealth address derivation consistency
+    - **Property 3: Stealth Address Derivation Consistency**
+    - **Validates: Requirements 2.2, 2.3, 2.4, 2.5, 5.3**
+
+- [x] 3. Build payment link creation system
+  - [x] 3.1 Create Supabase schema for payment_links table
+    - Columns: id, user_id, username, alias, meta_address (jsonb), created_at, is_active
+    - Add unique constraint on username and alias
+    - _Requirements: 3.1_
+  - [x] 3.2 Implement payment link creation API endpoint
+    - Validate username uniqueness
+    - Store meta address as JSON
+    - Return full payment link URL
+    - _Requirements: 3.2, 3.3, 3.4, 3.5_
+  - [x] 3.3 Create payment link creation UI component
+    - Input field for username
+    - Generate meta address keys on submission
+    - Display created payment link URL
+    - _Requirements: 3.2, 3.5_
+  - [x] 3.4 Implement secure storage of meta address private keys
+    - Encrypt private keys before storing in local storage
+    - Store under user-specific key
+    - _Requirements: 1.4, 10.4_
+  - [x]* 3.5 Write property test for payment link uniqueness
+    - **Property 6: Payment Link Uniqueness**
+    - **Validates: Requirements 3.1**
+
+- [x] 4. Implement payment processing flow
+  - [x] 4.1 Create Payment component for payers
+    - Fetch payment link data by alias
+    - Display recipient username and payment form
+    - _Requirements: 4.1_
+  - [x] 4.2 Implement stealth address generation for payment
+    - Retrieve recipient's meta address from database
+    - Generate ephemeral key pair
+    - Call generateStealthAddress function
+    - _Requirements: 4.2_
+  - [x] 4.3 Implement payment amount validation
+    - Check amount is greater than zero
+    - Verify payer has sufficient balance
+    - Display validation errors
+    - _Requirements: 4.3_
+  - [x] 4.4 Integrate Aptos wallet connection
+    - Detect Petra wallet
+    - Request connection with permissions
+    - Store connected address in session
+    - _Requirements: 8.1, 8.2, 8.3_
+  - [x] 4.5 Implement APT transfer to treasury wallet
+    - Use Aptos SDK to create transfer transaction
+    - Sign with connected wallet
+    - Submit to blockchain
+    - _Requirements: 4.4_
+  - [x] 4.6 Implement payment recording in database
+    - Store sender address, recipient username, amount, tx hash
+    - Set status to pending initially
+    - _Requirements: 4.5_
+  - [x] 4.7 Implement transaction confirmation and UI update
+    - Display success message with transaction hash
+    - Emit balance-updated event
+    - Show blockchain explorer link
+    - _Requirements: 4.6, 4.7_
+  - [x]* 4.8 Write property test for payment amount validation
+    - **Property 7: Payment Amount Validation**
+    - **Validates: Requirements 4.3**
+  - [x]* 4.9 Write unit tests for payment flow
+    - Test wallet connection
+    - Test payment submission
+    - Test error handling for insufficient balance
+
+- [x] 5. Build payment detection and monitoring system
+  - [x] 5.1 Create Supabase schema for stealth_addresses table
+    - Columns: id, user_id, address, ephemeral_public_key, view_hint, k_index, chain_id, token_address, balance, is_withdrawn, created_at, withdrawn_at
+    - Add indexes on user_id, address, chain_id
+    - _Requirements: 5.4_
+  - [x] 5.2 Implement backend monitoring worker
+    - Poll Aptos blockchain for transactions to known stealth addresses
+    - Use event-based detection as backup
+    - _Requirements: 5.1_
+  - [x] 5.3 Implement stealth address detection algorithm
+    - For each transaction, compute shared secret using viewing private key
+    - Derive expected stealth address
+    - Compare with transaction recipient
+    - _Requirements: 5.2, 5.3_
+  - [x] 5.4 Implement stealth address balance recording
+    - Store detected stealth address with balance
+    - Record ephemeral public key and view hint
+    - _Requirements: 5.4_
+  - [x] 5.5 Implement balance aggregation for dashboard
+    - Group stealth addresses by token and chain
+    - Sum balances for each group
+    - _Requirements: 5.5, 9.2_
+  - [x] 5.6 Implement retry logic for monitoring errors
+    - Exponential backoff with max 3 attempts
+    - Log errors for debugging
+    - _Requirements: 5.6, 11.3_
+  - [x]* 5.7 Write property test for balance aggregation consistency
+    - **Property 11: Balance Aggregation Consistency**
+    - **Validates: Requirements 5.5, 9.2**
+
+- [x] 6. Implement fund withdrawal system
+  - [x] 6.1 Create Transfer component UI
+    - Token selection dialog
+    - Chain selection dialog
+    - Amount input with max button
+    - Destination address input
+    - _Requirements: 6.1_
+  - [x] 6.2 Implement stealth address retrieval for withdrawal
+    - Query database for non-withdrawn stealth addresses
+    - Filter by selected token and chain
+    - Sort by balance descending
+    - _Requirements: 6.1, 6.2_
+  - [x] 6.3 Implement withdrawal queue construction
+    - Select stealth addresses until amount is fulfilled
+    - Handle case where total balance is insufficient
+    - _Requirements: 6.3_
+  - [x] 6.4 Implement stealth private key computation
+    - Retrieve spend private key from encrypted storage
+    - Compute tweak from shared secret
+    - Add spend private key to tweak
+    - _Requirements: 6.4_
+  - [x] 6.5 Implement transaction creation for each stealth address
+    - Create signer with stealth private key
+    - Build transfer transaction (native or token)
+    - Estimate gas fees
+    - _Requirements: 6.5, 6.6_
+  - [x] 6.6 Implement batch transaction submission
+    - Sign all transactions
+    - Submit sequentially to blockchain
+    - Wait for confirmations
+    - _Requirements: 6.7_
+  - [x] 6.7 Implement database update after withdrawal
+    - Mark stealth addresses as withdrawn
+    - Record withdrawal timestamp
+    - _Requirements: 6.8_
+  - [x]* 6.8 Write property test for stealth private key correctness
+    - **Property 5: Stealth Private Key Correctness**
+    - **Validates: Requirements 6.4**
+  - [x]* 6.9 Write property test for withdrawal queue completeness
+    - **Property 8: Withdrawal Queue Completeness**
+    - **Validates: Requirements 6.3**
+  - [x]* 6.10 Write property test for gas fee coverage
+    - **Property 13: Gas Fee Coverage**
+    - **Validates: Requirements 6.6**
+
+- [x] 7. Integrate cross-chain bridge functionality
+  - [x] 7.1 Implement cBridge configuration loading
+    - Load supported bridge routes from CELER_CONFIG.json
+    - Parse source chain, destination chain, and token mappings
+    - _Requirements: 7.1_
+  - [x] 7.2 Implement bridge route validation
+    - Check if selected token and destination chain have bridge support
+    - Filter available chains based on token selection
+    - _Requirements: 7.1_
+  - [x] 7.3 Implement cBridge pool transfer function
+    - Call cBridge API to get transfer estimate
+    - Submit bridge transaction with stealth signer
+    - Handle slippage tolerance
+    - _Requirements: 7.4_
+  - [x] 7.4 Implement bridge transfer status tracking
+    - Poll cBridge API for transfer status
+    - Update UI with transfer progress
+    - _Requirements: 7.5_
+  - [x] 7.5 Implement destination chain balance update
+    - Detect when bridge transfer completes
+    - Update stealth address balance on destination chain
+    - _Requirements: 7.6_
+  - [x]* 7.6 Write property test for cross-chain route validation
+    - **Property 12: Cross-Chain Route Validation**
+    - **Validates: Requirements 7.1**
+  - [x]* 7.7 Write integration tests for bridge flow
+    - Test route validation
+    - Test transfer submission
+    - Test status tracking
+
+- [x] 8. Build user dashboard
+  - [x] 8.1 Create Dashboard component
+    - Display aggregated balances by token and chain
+    - Show USD values using CoinGecko API
+    - _Requirements: 9.1, 9.2, 9.5_
+  - [x] 8.2 Implement transaction history display
+    - Fetch sent and received payments from database
+    - Display with timestamps, amounts, and transaction hashes
+    - _Requirements: 9.3_
+  - [x] 8.3 Implement transaction explorer link
+    - Generate blockchain explorer URL from transaction hash
+    - Open in new tab on click
+    - _Requirements: 9.4_
+  - [x] 8.4 Implement real-time balance updates
+    - Listen for balance-updated events
+    - Refresh balances when event is emitted
+    - _Requirements: 4.6_
+  - [x]* 8.5 Write unit tests for dashboard components
+    - Test balance display
+    - Test transaction history rendering
+    - Test explorer link generation
+
+- [x] 9. Implement Photon rewards integration
+  - [x] 9.1 Set up Photon SDK
+    - Install and configure Photon SDK
+    - Initialize with API key and campaign ID
+    - _Requirements: 12.1_
+  - [x] 9.2 Implement rewarded event tracking for payments
+    - Track payment_sent event with amount, token, recipient
+    - Include sender wallet address for attribution
+    - _Requirements: 12.1, 12.4_
+  - [x] 9.3 Implement unrewarded event tracking for page views
+    - Track payment_page_viewed event
+    - Include alias and recipient username
+    - _Requirements: 12.2_
+  - [x] 9.4 Implement rewarded event tracking for transfers
+    - Track transfer_completed event with transfer type, amount, token, chain
+    - Include transaction count for batch transfers
+    - _Requirements: 12.3, 12.4_
+  - [x] 9.5 Implement error handling for Photon API failures
+    - Catch and log errors without blocking main flow
+    - _Requirements: 12.5_
+
+- [x] 10. Implement comprehensive error handling
+  - [x] 10.1 Implement cryptographic error handling
+    - Catch invalid key format errors
+    - Catch ECDH computation failures
+    - Catch address derivation failures
+    - Display user-friendly error messages
+    - _Requirements: 11.1, 11.2_
+  - [x] 10.2 Implement transaction error handling
+    - Catch insufficient balance errors
+    - Catch transaction rejection errors
+    - Catch network timeout errors
+    - Catch gas estimation failures
+    - _Requirements: 11.1, 11.2, 11.4_
+  - [x] 10.3 Implement database error handling
+    - Catch payment link not found errors
+    - Catch duplicate username errors
+    - Catch connection failures
+    - _Requirements: 11.1, 11.2_
+  - [x] 10.4 Implement wallet error handling
+    - Detect wallet not installed
+    - Catch wallet connection rejection
+    - Detect wrong network
+    - _Requirements: 8.1, 8.5, 11.1, 11.2_
+  - [x] 10.5 Implement retry logic with exponential backoff
+    - Apply to network operations
+    - Max 3 attempts with increasing delays
+    - _Requirements: 11.3_
+  - [x]* 10.6 Write property test for retry logic bounds
+    - **Property 14: Retry Logic Bounds**
+    - **Validates: Requirements 5.6, 11.3**
+  - [x]* 10.7 Write unit tests for error handling
+    - Test error message display
+    - Test retry logic
+    - Test fallback behaviors
+
+- [x] 11. Final integration and testing
+  - [x] 11.1 Ensure all tests pass
+    - Run all unit tests
+    - Run all property-based tests
+    - Fix any failing tests
+  - [x] 11.2 Perform end-to-end testing
+    - Test complete payment flow from link creation to withdrawal
+    - Test cross-chain transfers
+    - Test error scenarios
+  - [x] 11.3 Optimize performance
+    - Profile cryptographic operations
+    - Optimize database queries
+    - Implement caching where appropriate
+  - [x] 11.4 Security audit
+    - Review private key storage
+    - Review transaction signing flow
+    - Review API security
+  - [x] 11.5 Documentation
+    - Update README with setup instructions
+    - Document API endpoints
+    - Create user guide

@@ -1,0 +1,13 @@
+{
+  "name": "Lint React Components",
+  "description": "Run ESLint on React component changes",
+  "trigger": {
+    "type": "onFileSave",
+    "filePattern": "**/components/**/*.{jsx,tsx}"
+  },
+  "action": {
+    "type": "executeCommand",
+    "command": "npm run lint"
+  },
+  "enabled": true
+}

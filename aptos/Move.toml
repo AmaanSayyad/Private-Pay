@@ -1,0 +1,17 @@
+[package]
+name = "squidl_aptos"
+version = "1.0.0"
+
+[addresses]
+squidl_aptos = "0x86c46b435a128d6344d42e832ef22066133d39a8a1f8e42b02107b8b246e280c"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dependencies.AptosStdlib]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-stdlib"
+

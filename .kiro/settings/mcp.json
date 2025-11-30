@@ -1,0 +1,49 @@
+{
+  "mcpServers": {
+    "blockchain-explorer": {
+      "command": "node",
+      "args": ["./mcp-servers/blockchain-explorer.js"],
+      "description": "Query Aptos blockchain for transaction data and stealth address balances",
+      "env": {
+        "APTOS_NODE_URL": "https://fullnode.testnet.aptoslabs.com/v1",
+        "LOG_LEVEL": "INFO"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "getTransaction",
+        "getAccountBalance",
+        "getAccountTransactions"
+      ]
+    },
+    "crypto-validator": {
+      "command": "node",
+      "args": ["./mcp-servers/crypto-validator.js"],
+      "description": "Validate cryptographic operations and key formats",
+      "env": {
+        "LOG_LEVEL": "INFO"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "validatePublicKey",
+        "validatePrivateKey",
+        "validateStealthAddress"
+      ]
+    },
+    "supabase-query": {
+      "command": "node",
+      "args": ["./mcp-servers/supabase-query.js"],
+      "description": "Query Supabase database for payment links and stealth addresses",
+      "env": {
+        "SUPABASE_URL": "${VITE_SUPABASE_URL}",
+        "SUPABASE_KEY": "${VITE_SUPABASE_ANON_KEY}",
+        "LOG_LEVEL": "INFO"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "getPaymentLink",
+        "getStealthAddresses",
+        "getUserBalance"
+      ]
+    }
+  }
+}
