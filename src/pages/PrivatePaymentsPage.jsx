@@ -16,7 +16,7 @@ import {
   getFeePoolAccAddressSafe,
   getMempoolAccAddressSafe,
   awaitComputationFinalizationSafe,
-} from "../lib/arcium/env.js";
+} from "@/lib/arcium/env.js";
 import { Icons } from "../components/shared/Icons.jsx";
 
 // Browser-compatible random bytes generator

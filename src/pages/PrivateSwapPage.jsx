@@ -48,7 +48,7 @@ import {
   getClockAccAddressSafe,
   getComputationAccAddressSafe,
   awaitComputationFinalizationSafe,
-} from "../lib/arcium/env.js";
+} from "@/lib/arcium/env.js";
 
 // Arcium client functions will be imported dynamically
 let arciumClientLib = null;
