@@ -3,7 +3,7 @@
  * Handles Aptos wallet connections and transactions
  */
 
-import { Aptos, AptosConfig, Network, Account, Ed25519PrivateKey } from "@aptos-labs/ts-sdk";
+import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 
 // Re-export stealth address functions for convenience
 export {
@@ -26,58 +26,16 @@ export const getAptosClient = (isTestnet = true) => {
   return new Aptos(config);
 };
 
-/**
- * Connect to Aptos wallet (Petra, Martian, etc.)
- * Returns account address
- */
-export const connectAptosWallet = async () => {
-  try {
-    if (typeof window === "undefined" || !window.aptos) {
-      throw new Error("Aptos wallet not found. Please install Petra wallet.");
-    }
-
-    const response = await window.aptos.connect();
-    return response.address;
-  } catch (error) {
-    console.error("Error connecting Aptos wallet:", error);
-    throw error;
-  }
-};
-
-/**
- * Disconnect Aptos wallet
- */
-export const disconnectAptosWallet = async () => {
-  try {
-    if (typeof window !== "undefined" && window.aptos) {
-      await window.aptos.disconnect();
-    }
-  } catch (error) {
-    console.error("Error disconnecting Aptos wallet:", error);
-  }
-};
-
-/**
- * Get Aptos account address
- */
-export const getAptosAccountAddress = async () => {
-  try {
-    if (typeof window === "undefined" || !window.aptos) {
-      return null;
-    }
-
-    const account = await window.aptos.account();
-    return account.address;
-  } catch (error) {
-    console.error("Error getting Aptos account:", error);
-    return null;
-  }
-};
+// NOTE: connectAptosWallet, disconnectAptosWallet, getAptosAccountAddress removed.
+// Use 'useAptos()' hook in components instead.
 
 /**
  * Sign and submit transaction
+ * @param {Object} params
+ * @param {Function} params.signer - signAndSubmitTransaction from useWallet()
  */
 export const signAndSubmitTransaction = async ({
+  signer,
   accountAddress,
   functionName,
   functionArguments,
@@ -85,8 +43,8 @@ export const signAndSubmitTransaction = async ({
   isTestnet = true,
 }) => {
   try {
-    if (typeof window === "undefined" || !window.aptos) {
-      throw new Error("Aptos wallet not found");
+    if (!signer) {
+      throw new Error("Wallet signer not provided");
     }
 
     // Use provided typeArguments or default based on function name
@@ -96,16 +54,20 @@ export const signAndSubmitTransaction = async ({
           ? ["0x1::aptos_coin::AptosCoin"]
           : []);
 
-    const transaction = {
-      type: "entry_function_payload",
-      function: `${APTOS_MODULE_ADDRESS}::${functionName}`,
-      arguments: functionArguments,
-      type_arguments: typeArgs,
+    // Construct transaction payload for Aptos Wallet Adapter
+    // Uses InputEntryFunctionData format
+    const payload = {
+      data: {
+        function: `${APTOS_MODULE_ADDRESS}::${functionName}`,
+        functionArguments: functionArguments,
+        typeArguments: typeArgs,
+      }
     };
 
-    console.log("Transaction payload:", JSON.stringify(transaction, null, 2));
+    console.log("Transaction payload:", JSON.stringify(payload, null, 2));
     
-    const response = await window.aptos.signAndSubmitTransaction(transaction);
+    // Execute transaction via wallet adapter
+    const response = await signer({ data: payload.data });
     
     // Wait for transaction
     const aptos = getAptosClient(isTestnet);
@@ -128,6 +90,7 @@ export const signAndSubmitTransaction = async ({
  * Register meta address on Aptos
  */
 export const registerAptosMetaAddress = async ({
+  signer,
   accountAddress,
   spendPubKey,
   viewingPubKey,
@@ -138,6 +101,7 @@ export const registerAptosMetaAddress = async ({
   const viewingPubKeyBytes = hexToBytes(viewingPubKey);
 
   return await signAndSubmitTransaction({
+    signer,
     accountAddress,
     functionName: "payment_manager::register_for_payments",
     functionArguments: [spendPubKeyBytes, viewingPubKeyBytes],
@@ -149,6 +113,7 @@ export const registerAptosMetaAddress = async ({
  * Send stealth payment on Aptos
  */
 export const sendAptosStealthPayment = async ({
+  signer,
   accountAddress,
   recipientAddress,
   recipientMetaIndex,
@@ -168,12 +133,13 @@ export const sendAptosStealthPayment = async ({
     : `0x${stealthAddress}`;
 
   return await signAndSubmitTransaction({
+    signer,
     accountAddress,
     functionName: "payment_manager::send_private_payment",
     functionArguments: [
       recipientAddress,        // address (string)
-      recipientMetaIndex,       // u64 (number)
-      amount,                   // u64 (number)
+      recipientMetaIndex.toString(), // u64 needs to be string for SDK often, but number works if small. Safe to use string? adapter expects string for u64.
+      amount.toString(),       // u64
       k,                        // u32 (number)
       ephemeralPubKeyBytes,     // vector<u8> (Uint8Array/Array)
       stealthAddressStr,        // address (string)
@@ -258,29 +224,30 @@ export const getAptosMetaAddressFromChain = async ({
  * Send normal APT transfer (to treasury or any address)
  */
 export const sendAptTransfer = async ({
-  accountAddress,
+  signer,
   recipientAddress,
   amount,
   isTestnet = true,
 }) => {
   try {
-    if (typeof window === "undefined" || !window.aptos) {
-      throw new Error("Aptos wallet not found");
+    if (!signer) {
+      throw new Error("Wallet signer not provided");
     }
 
     // Convert amount to octas (1 APT = 100000000 octas)
     const amountInOctas = Math.floor(amount * 100000000);
 
-    const transaction = {
-      type: "entry_function_payload",
-      function: "0x1::coin::transfer",
-      type_arguments: ["0x1::aptos_coin::AptosCoin"],
-      arguments: [recipientAddress, amountInOctas.toString()],
+    const payload = {
+      data: {
+        function: "0x1::coin::transfer",
+        typeArguments: ["0x1::aptos_coin::AptosCoin"],
+        functionArguments: [recipientAddress, amountInOctas.toString()],
+      }
     };
 
-    console.log("Transfer transaction:", JSON.stringify(transaction, null, 2));
+    console.log("Transfer transaction:", JSON.stringify(payload, null, 2));
     
-    const response = await window.aptos.signAndSubmitTransaction(transaction);
+    const response = await signer({ data: payload.data });
     
     // Wait for transaction
     const aptos = getAptosClient(isTestnet);
@@ -298,4 +265,3 @@ export const sendAptTransfer = async ({
     throw error;
   }
 };
-

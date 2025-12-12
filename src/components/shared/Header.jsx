@@ -23,6 +23,34 @@ export default function Header() {
       </div>
 
       <div className="flex gap-4 items-center justify-center">
+        <Link to="/mina">
+          <Button
+            className="bg-orange-100 text-orange-600 font-bold h-12 rounded-[24px] px-6"
+          >
+            Mina ZK
+          </Button>
+        </Link>
+        <Link to="/zcash">
+          <Button
+            className="bg-yellow-100 text-yellow-600 font-bold h-12 rounded-[24px] px-6"
+          >
+            Zcash
+          </Button>
+        </Link>
+        <Link to="/bridge">
+          <Button
+            className="bg-purple-100 text-purple-600 font-bold h-12 rounded-[24px] px-6"
+          >
+            Bridge
+          </Button>
+        </Link>
+        <Link to="/zcash-mina-bridge">
+          <Button
+            className="bg-green-100 text-green-600 font-bold h-12 rounded-[24px] px-6"
+          >
+            PoC
+          </Button>
+        </Link>
         <Button
           onClick={() => setCreateLinkModal(true)}
           className={"bg-primary h-12 rounded-[24px] px-4"}

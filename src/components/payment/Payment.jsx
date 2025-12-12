@@ -13,7 +13,7 @@ const TREASURY_WALLET = import.meta.env.VITE_TREASURY_WALLET_ADDRESS;
 export default function Payment() {
   const loaderData = useLoaderData();
   const { alias_url } = useParams();
-  const { account, isConnected, connect } = useAptos();
+  const { account, isConnected, connect, signAndSubmitTransaction } = useAptos();
 
   const alias = loaderData ? loaderData.subdomain : alias_url;
 
@@ -41,10 +41,10 @@ export default function Payment() {
       try {
         // First, try to get payment link by alias
         const paymentLink = await getPaymentLinkByAlias(alias);
-        
+
         if (paymentLink) {
           setPaymentLinkData(paymentLink);
-          
+
           // Get recipient user data
           const recipient = await getUserByUsername(paymentLink.username);
           setRecipientData(recipient);
@@ -95,7 +95,7 @@ export default function Payment() {
     }
 
     const recipientUsername = paymentLinkData?.username || alias;
-    
+
     if (!recipientUsername) {
       toast.error("Recipient not found");
       return;
@@ -105,6 +105,7 @@ export default function Payment() {
     try {
       // Send APT to treasury wallet
       const result = await sendAptTransfer({
+        signer: signAndSubmitTransaction,
         accountAddress: account,
         recipientAddress: TREASURY_WALLET,
         amount: parseFloat(amount),
@@ -127,10 +128,10 @@ export default function Payment() {
       window.dispatchEvent(new Event('balance-updated'));
 
       const shortHash = result.hash.slice(0, 6) + "..." + result.hash.slice(-4);
-      
+
       toast.success(
         (t) => (
-          <div 
+          <div
             onClick={() => {
               window.open(result.explorerUrl, '_blank');
               toast.dismiss(t.id);
@@ -148,11 +149,11 @@ export default function Payment() {
         type: "PRIVATE_TRANSFER",
         amount: parseFloat(amount),
         chain: { name: "Aptos", id: "aptos" },
-        token: { 
-          nativeToken: { 
-            symbol: "APT", 
-            logo: "/assets/aptos-logo.png" 
-          } 
+        token: {
+          nativeToken: {
+            symbol: "APT",
+            logo: "/assets/aptos-logo.png"
+          }
         },
         destinationAddress: `${alias}.privatepay.me`,
         txHashes: [result.hash],
@@ -227,7 +228,7 @@ export default function Payment() {
                   {paymentLinkData?.username || alias}
                 </span>
               </h1>
-              
+
               <p className="text-sm text-gray-500 mb-6">
                 {alias}.privatepay.me
               </p>

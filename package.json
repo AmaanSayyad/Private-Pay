@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@aptos-labs/ts-sdk": "^5.1.5",
+    "@aptos-labs/wallet-adapter-react": "^7.2.6",
     "@arcium-hq/client": "^0.5.1",
     "@coingecko/cryptoformat": "^0.8.2",
     "@coral-xyz/anchor": "^0.28.0",
@@ -31,8 +32,11 @@
     "@solana/wallet-adapter-wallets": "^0.19.32",
     "@solana/web3.js": "^1.95.0",
     "@supabase/supabase-js": "^2.86.0",
+    "@telegram-apps/bridge": "^2.11.0",
     "@uidotdev/usehooks": "^2.4.1",
+    "aptos": "^1.22.1",
     "axios": "^1.7.7",
+    "bip39": "^3.1.0",
     "bn.js": "^5.2.1",
     "bs58": "^6.0.0",
     "buffer": "^6.0.3",
@@ -46,6 +50,8 @@
     "lucide-react": "^0.443.0",
     "nanoid": "^5.0.7",
     "npm": "^10.9.0",
+    "o1js": "^2.12.0",
+    "petra-plugin-wallet-adapter": "^0.4.5",
     "react": "^18.3.1",
     "react-cookie": "^7.2.0",
     "react-dom": "^18.3.1",
@@ -58,7 +64,8 @@
     "recharts": "^2.13.0-alpha.5",
     "swr": "^2.2.5",
     "tailwind-merge": "^2.5.2",
-    "viem": "^2.21.37"
+    "viem": "^2.21.37",
+    "zcash-bitcore-lib": "^0.13.20-rc3"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",

@@ -1,17 +1,19 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import {
-  connectAptosWallet,
-  disconnectAptosWallet,
-  getAptosAccountAddress,
-  getAptosClient,
-} from "../lib/aptos";
+import { createContext, useContext, useMemo } from "react";
+import { AptosWalletAdapterProvider, useWallet } from "@aptos-labs/wallet-adapter-react";
+import { PetraWallet } from "petra-plugin-wallet-adapter";
+import { getAptosClient } from "../lib/aptos";
 
+// Initialize wallets
+const wallets = [new PetraWallet()];
+
+// Create a context wrapper to maintain backward compatibility with existing code
 const AptosContext = createContext({
   account: null,
   isConnected: false,
-  connect: async () => {},
-  disconnect: async () => {},
+  connect: async () => { },
+  disconnect: async () => { },
   client: null,
+  signAndSubmitTransaction: async () => { }, // Added for signature delegation
 });
 
 export const useAptos = () => {
@@ -22,81 +24,44 @@ export const useAptos = () => {
   return context;
 };
 
-export default function AptosProvider({ children, isTestnet = true }) {
-  const [account, setAccount] = useState(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [client] = useState(() => getAptosClient(isTestnet));
+// Internal component to consume useWallet and expose it via our custom context
+function InternalAptosProvider({ children, isTestnet }) {
+  const { account, connected, connect, disconnect, signAndSubmitTransaction } = useWallet();
+  const client = useMemo(() => getAptosClient(isTestnet), [isTestnet]);
 
-  useEffect(() => {
-    // Check if wallet is already connected
-    const checkConnection = async () => {
-      try {
-        const address = await getAptosAccountAddress();
-        if (address) {
-          setAccount(address);
-          setIsConnected(true);
-        }
-      } catch (error) {
-        // Petra wallet not installed or not available - this is OK
-        if (error.message?.includes("PetraApiError") || error.message?.includes("not found")) {
-          console.log("Aptos wallet (Petra) not installed. User can install it to use Aptos features.");
-        } else {
-          console.error("Error checking Aptos connection:", error);
-        }
-      }
-    };
-
-    checkConnection();
-
-    // Listen for wallet events
-    if (typeof window !== "undefined" && window.aptos) {
-      window.aptos.onAccountChange((newAccount) => {
-        if (newAccount) {
-          setAccount(newAccount.address);
-          setIsConnected(true);
-        } else {
-          setAccount(null);
-          setIsConnected(false);
-        }
-      });
-    }
-  }, []);
-
-  const connect = async () => {
+  // Wrapper to match old connect() signature (no args) -> defaults to Petra
+  const handleConnect = async () => {
     try {
-      const address = await connectAptosWallet();
-      setAccount(address);
-      setIsConnected(true);
-      return address;
+      // Connect to Petra by default if no argument
+      await connect("Petra");
     } catch (error) {
-      console.error("Error connecting Aptos wallet:", error);
+      console.error("Failed to connect to Petra:", error);
       throw error;
     }
   };
 
-  const disconnect = async () => {
-    try {
-      await disconnectAptosWallet();
-      setAccount(null);
-      setIsConnected(false);
-    } catch (error) {
-      console.error("Error disconnecting Aptos wallet:", error);
-    }
+  const value = {
+    account: account?.address ? account.address.toString() : null, // Adapter returns object, we need string
+    isConnected: connected,
+    connect: handleConnect,
+    disconnect,
+    client,
+    signAndSubmitTransaction,
   };
 
   return (
-    <AptosContext.Provider
-      value={{
-        account,
-        isConnected,
-        connect,
-        disconnect,
-        client,
-      }}
-    >
+    <AptosContext.Provider value={value}>
       {children}
     </AptosContext.Provider>
   );
 }
 
-
+export default function AptosProvider({ children, isTestnet = true }) {
+  return (
+    <AptosWalletAdapterProvider plugins={wallets} autoConnect={true}>
+      <InternalAptosProvider isTestnet={isTestnet}>
+        {children}
+      </InternalAptosProvider>
+    </AptosWalletAdapterProvider>
+  );
+}

@@ -54,12 +54,22 @@ export default defineConfig(({ mode }) => {
         "buffer",
       ],
       esbuildOptions: {
+        target: "esnext",
         define: {
           global: "globalThis",
         },
       },
     },
+    // o1js requires headers for SharedArrayBuffer
+    server: {
+      ...serverConfig,
+      headers: {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+      },
+    },
     build: {
+      target: "esnext",
       commonjsOptions: {
         transformMixedEsModules: true,
         include: [/node_modules/],

@@ -11,7 +11,7 @@ import { Copy, Check } from "lucide-react";
  * Handles Aptos wallet connection and stealth payments
  */
 export default function AptosPayment() {
-  const { account, isConnected, connect, disconnect } = useAptos();
+  const { account, isConnected, connect, disconnect, signAndSubmitTransaction } = useAptos();
   const [isLoading, setIsLoading] = useState(false);
   const [spendPubKey, setSpendPubKey] = useState("");
   const [viewingPubKey, setViewingPubKey] = useState("");
@@ -75,6 +75,7 @@ export default function AptosPayment() {
     try {
       // Register on-chain (directly to Aptos blockchain)
       const result = await registerAptosMetaAddress({
+        signer: signAndSubmitTransaction,
         accountAddress: account,
         spendPubKey,
         viewingPubKey,
@@ -84,12 +85,12 @@ export default function AptosPayment() {
       // Extract transaction hash for display
       const txHash = result.hash || result.explorerUrl?.split('/txn/')[1]?.split('?')[0] || '';
       const shortHash = txHash.length > 10 ? `${txHash.slice(0, 6)}...${txHash.slice(-4)}` : txHash;
-      
+
       if (result.explorerUrl) {
         const explorerUrl = result.explorerUrl;
         toast.success(
           (t) => (
-            <div 
+            <div
               onClick={() => {
                 window.open(explorerUrl, '_blank');
                 toast.dismiss(t.id);
@@ -106,7 +107,7 @@ export default function AptosPayment() {
       } else {
         toast.success("Meta address registered!", { duration: 5000 });
       }
-      
+
       setIsRegistered(true);
     } catch (error) {
       toast.error("Failed to register meta address");
@@ -179,7 +180,7 @@ export default function AptosPayment() {
           <p className="text-sm text-neutral-600">
             Connect your wallet and register your meta address on the blockchain.
           </p>
-          
+
           <Input
             label="Spend Public Key"
             placeholder="0x..."
@@ -208,7 +209,7 @@ export default function AptosPayment() {
               )
             }
           />
-          
+
           <Input
             label="Viewing Public Key"
             placeholder="0x..."
@@ -392,7 +393,7 @@ export default function AptosPayment() {
 
                 <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-2xl">
                   <p className="text-xs text-yellow-800">
-                    <strong>Security Warning:</strong> Private keys are shown only once. Make sure to save them in a secure location. 
+                    <strong>Security Warning:</strong> Private keys are shown only once. Make sure to save them in a secure location.
                     If you lose your private keys, you will not be able to access funds sent to your stealth addresses.
                   </p>
                 </div>

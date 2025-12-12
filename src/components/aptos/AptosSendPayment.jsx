@@ -11,7 +11,7 @@ import SuccessDialog from "../dialogs/SuccessDialog.jsx";
  * Sends stealth payments on Aptos network
  */
 export default function AptosSendPayment({ recipientAddress, recipientMetaIndex = 0 }) {
-  const { account, isConnected } = useAptos();
+  const { account, isConnected, signAndSubmitTransaction } = useAptos();
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [amount, setAmount] = useState("");
@@ -138,6 +138,7 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
       });
 
       const result = await sendAptosStealthPayment({
+        signer: signAndSubmitTransaction,
         accountAddress: account,
         recipientAddress: recipientAddress || account,
         recipientMetaIndex,
@@ -151,12 +152,12 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
       // Extract transaction hash for display
       const txHash = result.hash || result.explorerUrl?.split('/txn/')[1]?.split('?')[0] || '';
       const shortHash = txHash.length > 10 ? `${txHash.slice(0, 6)}...${txHash.slice(-4)}` : txHash;
-      
+
       if (result.explorerUrl) {
         const explorerUrl = result.explorerUrl;
         toast.success(
           (t) => (
-            <div 
+            <div
               onClick={() => {
                 window.open(explorerUrl, '_blank');
                 toast.dismiss(t.id);
@@ -179,11 +180,11 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
         type: "PRIVATE_TRANSFER",
         amount: parseFloat(amount),
         chain: { name: "Aptos", id: "aptos" },
-        token: { 
-          nativeToken: { 
-            symbol: "APT", 
-            logo: "/assets/aptos-logo.png" 
-          } 
+        token: {
+          nativeToken: {
+            symbol: "APT",
+            logo: "/assets/aptos-logo.png"
+          }
         },
         destinationAddress: stealthAddress,
         txHashes: [txHash],
@@ -222,184 +223,184 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
         botButtonTitle={"Done"}
         successData={successData}
       />
-    <div className="flex flex-col gap-4 w-full">
+      <div className="flex flex-col gap-4 w-full">
 
-      <div className="flex flex-col gap-4">
-        <Input
-          label="Recipient Address"
-          value={recipientAddress || account}
-          disabled
-          description="Aptos account address"
-          classNames={{
-            input: "rounded-full",
-            inputWrapper: "rounded-full",
-          }}
-        />
+        <div className="flex flex-col gap-4">
+          <Input
+            label="Recipient Address"
+            value={recipientAddress || account}
+            disabled
+            description="Aptos account address"
+            classNames={{
+              input: "rounded-full",
+              inputWrapper: "rounded-full",
+            }}
+          />
 
-        <Input
-          label="Amount (APT)"
-          type="number"
-          placeholder="0.01"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          description="Amount in APT (will be converted to octas)"
-          classNames={{
-            input: "rounded-full",
-            inputWrapper: "rounded-full",
-          }}
-        />
+          <Input
+            label="Amount (APT)"
+            type="number"
+            placeholder="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            description="Amount in APT (will be converted to octas)"
+            classNames={{
+              input: "rounded-full",
+              inputWrapper: "rounded-full",
+            }}
+          />
 
-        {/* Generate Stealth Address Section */}
-        {!stealthAddress && (
-          <div className="p-4 border rounded-3xl bg-neutral-50">
-            {!showGenerateForm ? (
-              <div className="flex flex-col gap-2">
-                <p className="text-sm text-gray-600">
-                  Generate stealth address from recipient's meta address
-                </p>
-                <Button
-                  color="secondary"
-                  variant="bordered"
-                  onClick={() => setShowGenerateForm(true)}
-                  className="w-full h-14 rounded-full"
-                  size="lg"
-                >
-                  Generate Stealth Address
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4">
-                <h3 className="text-lg font-semibold">Generate Stealth Address</h3>
-                
-                <Input
-                  label="Recipient Spend Public Key"
-                  placeholder="0x..."
-                  value={recipientSpendPubKey}
-                  onChange={(e) => setRecipientSpendPubKey(e.target.value)}
-                  description="33 bytes compressed secp256k1 public key"
-                  classNames={{
-                    input: "rounded-full",
-                    inputWrapper: "rounded-full",
-                  }}
-                />
-
-                <Input
-                  label="Recipient Viewing Public Key"
-                  placeholder="0x..."
-                  value={recipientViewingPubKey}
-                  onChange={(e) => setRecipientViewingPubKey(e.target.value)}
-                  description="33 bytes compressed secp256k1 public key"
-                  classNames={{
-                    input: "rounded-full",
-                    inputWrapper: "rounded-full",
-                  }}
-                />
-
-                <div className="flex gap-2">
+          {/* Generate Stealth Address Section */}
+          {!stealthAddress && (
+            <div className="p-4 border rounded-3xl bg-neutral-50">
+              {!showGenerateForm ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-gray-600">
+                    Generate stealth address from recipient's meta address
+                  </p>
                   <Button
-                    color="primary"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log("Generate button clicked!", {
-                        spendKey: recipientSpendPubKey,
-                        viewingKey: recipientViewingPubKey,
-                        isGenerating
-                      });
-                      handleGenerateStealthAddress();
-                    }}
-                    isLoading={isGenerating}
-                    disabled={!recipientSpendPubKey || !recipientViewingPubKey || isGenerating}
-                    className="flex-1 h-14 rounded-full"
+                    color="secondary"
+                    variant="bordered"
+                    onClick={() => setShowGenerateForm(true)}
+                    className="w-full h-14 rounded-full"
                     size="lg"
                   >
-                    Generate
-                  </Button>
-                  <Button
-                    color="default"
-                    variant="light"
-                    onClick={() => {
-                      setShowGenerateForm(false);
-                      setRecipientSpendPubKey("");
-                      setRecipientViewingPubKey("");
-                    }}
-                    className="h-14 rounded-full"
-                    size="lg"
-                  >
-                    Cancel
+                    Generate Stealth Address
                   </Button>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              ) : (
+                <div className="flex flex-col gap-4">
+                  <h3 className="text-lg font-semibold">Generate Stealth Address</h3>
 
-        {/* Manual Input (if stealth address already generated) */}
-        {stealthAddress && (
-          <>
-            <Input
-              label="Stealth Address"
-              placeholder="0x..."
-              value={stealthAddress}
-              onChange={(e) => setStealthAddress(e.target.value)}
-              description="Generated stealth address"
-              classNames={{
-                input: "rounded-full",
-                inputWrapper: "rounded-full",
-              }}
-              endContent={
-                <Button
-                  size="sm"
-                  variant="light"
-                  onClick={() => {
-                    setStealthAddress("");
-                    setEphemeralPubKey("");
-                  }}
-                  className="rounded-full"
-                >
-                  Clear
-                </Button>
-              }
-            />
+                  <Input
+                    label="Recipient Spend Public Key"
+                    placeholder="0x..."
+                    value={recipientSpendPubKey}
+                    onChange={(e) => setRecipientSpendPubKey(e.target.value)}
+                    description="33 bytes compressed secp256k1 public key"
+                    classNames={{
+                      input: "rounded-full",
+                      inputWrapper: "rounded-full",
+                    }}
+                  />
 
-            <Input
-              label="Ephemeral Public Key"
-              placeholder="0x..."
-              value={ephemeralPubKey}
-              onChange={(e) => setEphemeralPubKey(e.target.value)}
-              description="Ephemeral public key"
-              classNames={{
-                input: "rounded-full",
-                inputWrapper: "rounded-full",
-              }}
-            />
-          </>
-        )}
+                  <Input
+                    label="Recipient Viewing Public Key"
+                    placeholder="0x..."
+                    value={recipientViewingPubKey}
+                    onChange={(e) => setRecipientViewingPubKey(e.target.value)}
+                    description="33 bytes compressed secp256k1 public key"
+                    classNames={{
+                      input: "rounded-full",
+                      inputWrapper: "rounded-full",
+                    }}
+                  />
 
-        <Button
-          color="primary"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log("Send Stealth Payment button clicked!", {
-              stealthAddress,
-              ephemeralPubKey,
-              amount,
-              isLoading,
-              isConnected,
-              account
-            });
-            handleSendPayment();
-          }}
-          isLoading={isLoading}
-          disabled={!stealthAddress || !ephemeralPubKey || !amount || isLoading}
-          className="w-full h-14 rounded-full"
-          size="lg"
-        >
-          Send Stealth Payment
-        </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      color="primary"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log("Generate button clicked!", {
+                          spendKey: recipientSpendPubKey,
+                          viewingKey: recipientViewingPubKey,
+                          isGenerating
+                        });
+                        handleGenerateStealthAddress();
+                      }}
+                      isLoading={isGenerating}
+                      disabled={!recipientSpendPubKey || !recipientViewingPubKey || isGenerating}
+                      className="flex-1 h-14 rounded-full"
+                      size="lg"
+                    >
+                      Generate
+                    </Button>
+                    <Button
+                      color="default"
+                      variant="light"
+                      onClick={() => {
+                        setShowGenerateForm(false);
+                        setRecipientSpendPubKey("");
+                        setRecipientViewingPubKey("");
+                      }}
+                      className="h-14 rounded-full"
+                      size="lg"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Manual Input (if stealth address already generated) */}
+          {stealthAddress && (
+            <>
+              <Input
+                label="Stealth Address"
+                placeholder="0x..."
+                value={stealthAddress}
+                onChange={(e) => setStealthAddress(e.target.value)}
+                description="Generated stealth address"
+                classNames={{
+                  input: "rounded-full",
+                  inputWrapper: "rounded-full",
+                }}
+                endContent={
+                  <Button
+                    size="sm"
+                    variant="light"
+                    onClick={() => {
+                      setStealthAddress("");
+                      setEphemeralPubKey("");
+                    }}
+                    className="rounded-full"
+                  >
+                    Clear
+                  </Button>
+                }
+              />
+
+              <Input
+                label="Ephemeral Public Key"
+                placeholder="0x..."
+                value={ephemeralPubKey}
+                onChange={(e) => setEphemeralPubKey(e.target.value)}
+                description="Ephemeral public key"
+                classNames={{
+                  input: "rounded-full",
+                  inputWrapper: "rounded-full",
+                }}
+              />
+            </>
+          )}
+
+          <Button
+            color="primary"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log("Send Stealth Payment button clicked!", {
+                stealthAddress,
+                ephemeralPubKey,
+                amount,
+                isLoading,
+                isConnected,
+                account
+              });
+              handleSendPayment();
+            }}
+            isLoading={isLoading}
+            disabled={!stealthAddress || !ephemeralPubKey || !amount || isLoading}
+            className="w-full h-14 rounded-full"
+            size="lg"
+          >
+            Send Stealth Payment
+          </Button>
+        </div>
       </div>
-    </div>
     </>
   );
 }

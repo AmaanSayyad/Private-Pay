@@ -12,6 +12,7 @@ dist-ssr
 *.local
 .env
 
+
 # Solana build artifacts
 solana/target/
 solana/build/
