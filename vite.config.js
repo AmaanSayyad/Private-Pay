@@ -84,9 +84,8 @@ export default defineConfig(({ mode }) => {
               'ethers',
               '@oasisprotocol/sapphire-ethers-v6',
             ],
-            'viem-vendor': [
-              'viem',
-            ],
+            // Don't create separate viem chunk - let it be bundled with its consumers
+            // This avoids circular dependency issues
             'blockchain-vendor': [
               '@aptos-labs/ts-sdk',
               '@solana/web3.js',
