@@ -48,8 +48,8 @@ import {
 import toast from "react-hot-toast";
 import * as anchor from "@coral-xyz/anchor";
 import { randomBytes } from "crypto";
-import { useArciumClient, getPrivatePayProgram } from "../lib/arcium/index.js";
-import { PRIVATE_PAY_PROGRAM_ID, ARCIUM_PROGRAM_ID } from "../lib/arcium/constants.js";
+import { useArciumClient, getPrivatePayProgram } from "@/lib/arcium/index.js";
+import { PRIVATE_PAY_PROGRAM_ID, ARCIUM_PROGRAM_ID } from "@/lib/arcium/constants.js";
 import {
   getArciumEnvSafe,
   getCompDefAccOffsetSafe,
@@ -60,7 +60,7 @@ import {
   getClockAccAddressSafe,
   getComputationAccAddressSafe,
   awaitComputationFinalizationSafe,
-} from "../lib/arcium/env.js";
+} from "@/lib/arcium/env.js";
 
 // Arcium client functions will be imported dynamically
 let arciumClientLib = null;
