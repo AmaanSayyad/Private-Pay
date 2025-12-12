@@ -51,15 +51,8 @@ export default function Web3Provider({ children }) {
 
   const oasis = customEvmNetworks.find((chain) => chain.group === "oasis");
 
-  async function init() {
+  async function init(forceSapphire = false) {
     if (isInitiating.current || !primaryWallet) return;
-    
-    // Check if contract address is configured
-    if (!CONTRACT_ADDRESS) {
-      console.warn("Contract address not configured. Set VITE_SQUIDL_STEALTHSIGNER_CONTRACT_ADDRESS environment variable.");
-      setLoaded(false);
-      return;
-    }
     
     isInitiating.current = true;
     try {
@@ -79,28 +72,44 @@ export default function Web3Provider({ children }) {
             throw new Error("Provider chainId is not available");
           }
         }
-        console.log("[Web3Provider] Provider initialized with chainId:", network.chainId);
+        console.log("[Web3Provider] Provider initialized with chainId:", network.chainId.toString());
+        
+        // Only wrap with Sapphire if we're on Sapphire network
+        const isSapphire = network.chainId === oasis.chainId;
+        if (isSapphire) {
+          const wrappedProvider = wrapEthersProvider(_provider);
+          const wrappedSigner = wrapEthersSigner(_signer);
+          
+          // Only create contract if we have contract address
+          if (CONTRACT_ADDRESS) {
+            const contract = new ethers.Contract(
+              CONTRACT_ADDRESS,
+              ContractABI.abi,
+              wrappedSigner
+            );
+            setContract(contract);
+          } else {
+            console.warn("Contract address not configured. Set VITE_SQUIDL_STEALTHSIGNER_CONTRACT_ADDRESS environment variable.");
+            setContract(null);
+          }
+          
+          setProvider(wrappedProvider);
+          setSigner(wrappedSigner);
+        } else {
+          // On other networks, use unwrapped provider/signer
+          // Contract will be null until user switches to Sapphire
+          console.log("[Web3Provider] Not on Sapphire network, using unwrapped provider. User can switch network later.");
+          setProvider(_provider);
+          setSigner(_signer);
+          setContract(null);
+        }
+        
+        setLoaded(true);
+        monitorNetworkChange();
       } catch (networkError) {
         console.error("Error getting network from provider:", networkError);
         throw new Error("Provider network not available. Please ensure your wallet is connected.");
       }
-      
-      const wrappedProvider = wrapEthersProvider(_provider);
-      const wrappedSigner = wrapEthersSigner(_signer);
-      
-      // Create contract with validated address
-      const contract = new ethers.Contract(
-        CONTRACT_ADDRESS,
-        ContractABI.abi,
-        wrappedSigner
-      );
-
-      setProvider(wrappedProvider);
-      setSigner(wrappedSigner);
-      setContract(contract);
-      setLoaded(true);
-
-      monitorNetworkChange();
     } catch (e) {
       console.error("Error initializing web3 provider", e);
       setLoaded(false);
@@ -176,8 +185,20 @@ export default function Web3Provider({ children }) {
 
   useEffect(() => {
     // Only initialize if we have a primary wallet
+    // Don't force network switch during initial connection - let user choose network first
     if (primaryWallet && primaryWallet.address) {
-      switchNetworkIfNeeded(false);
+      // Delay network switching to allow user to choose network
+      // Only switch if user is already signed in (not during initial login)
+      const isSignedIn = localStorage.getItem("auth_signer") !== null;
+      if (isSignedIn) {
+        // User is already signed in, check network
+        switchNetworkIfNeeded(false);
+      } else {
+        // During initial login, just initialize without forcing network switch
+        // This allows users to connect on any network first
+        // Don't wrap with Sapphire yet - that will happen when user switches network
+        init(false);
+      }
     } else {
       // Reset state if no wallet
       setProvider(null);

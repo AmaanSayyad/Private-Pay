@@ -20,6 +20,7 @@ const PrivateSwapPage = lazy(() => import("./pages/PrivateSwapPage.jsx"));
 const DarkPoolPage = lazy(() => import("./pages/DarkPoolPage.jsx"));
 const PrivatePaymentsPage = lazy(() => import("./pages/PrivatePaymentsPage.jsx"));
 // Zcash-Aztec Integration Pages
+const AztecDashboard = lazy(() => import("./pages/AztecDashboard.jsx"));
 const BridgePage = lazy(() => import("./pages/BridgePage.jsx"));
 const StablecoinPage = lazy(() => import("./pages/StablecoinPage.jsx"));
 
@@ -141,6 +142,10 @@ export const router = createBrowserRouter([
         element: <LazyRoute Component={PrivatePaymentsPage} />,
       },
       // Zcash-Aztec Integration Routes
+      {
+        path: "/aztec",
+        element: <LazyRoute Component={AztecDashboard} />,
+      },
       {
         path: "/bridge",
         element: <LazyRoute Component={BridgePage} />,

@@ -1,4 +1,5 @@
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
+import { getSigner, getWeb3Provider } from "@dynamic-labs/ethers-v6";
 import { createContext, useContext, useEffect, useState } from "react";
 import { squidlAPI, squidlPublicAPI } from "../api/squidl";
 import { isGetStartedDialogAtom } from "../store/dialog-store";
@@ -97,19 +98,33 @@ export default function AuthProvider({ children }) {
         id: "signing",
       });
 
-      // Ensure provider is ready and has chainId
-      if (!provider) {
-        throw new Error("Provider not initialized");
+      // Get provider and signer - use direct provider if Web3Provider isn't ready
+      // This allows login on any network, not just Sapphire
+      let authProvider = provider;
+      let authSigner = signer;
+      let chainId;
+      
+      if (!authProvider || !authSigner) {
+        // Web3Provider might not be ready (e.g., network switch in progress)
+        // Get provider directly from Dynamic wallet - works on any network
+        console.log("[AuthProvider] Web3Provider not ready, using direct provider from wallet");
+        authProvider = await getWeb3Provider(primaryWallet);
+        authSigner = await getSigner(primaryWallet);
       }
       
-      const network = await provider.getNetwork();
+      if (!authProvider || !authSigner) {
+        throw new Error("Provider not initialized. Please ensure your wallet is connected.");
+      }
+      
+      const network = await authProvider.getNetwork();
       if (!network || network.chainId === undefined || network.chainId === null) {
         throw new Error("Provider chainId is not available. Please ensure your wallet is connected to a supported network.");
       }
       
-      const chainId = network.chainId;
+      chainId = network.chainId;
+      console.log("[AuthProvider] Signing auth token on network:", network.name, "chainId:", chainId.toString());
 
-      const auth = await signAuthToken(signer, CONTRACT_ADDRESS, chainId);
+      const auth = await signAuthToken(authSigner, CONTRACT_ADDRESS, chainId);
 
       toast.loading("Verifying data, please wait...", {
         id: "signing",
@@ -203,6 +218,7 @@ export default function AuthProvider({ children }) {
   useEffect(() => {
     if (isSignedIn || isLoading) return;
     if (isReadyToSign && user) {
+      // Allow login on any network - don't require Sapphire for authentication
       login(user);
     }
   }, [isReadyToSign, isSignedIn, isLoading, user]);
