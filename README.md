@@ -1,10 +1,8 @@
 # PrivatePay 🐙
 
-> **The first on-chain untraceable, unidentifiable private payments on Aptos**
+> **The first on-chain untraceable, unidentifiable private payments on Arcium + Aztec + Mina**
 
-[![Aptos](https://img.shields.io/badge/Aptos-Blockchain-blue)](https://aptoslabs.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Move](https://img.shields.io/badge/Move-Smart%20Contracts-red)](https://move-language.github.io/)
 [![Built with Kiro](https://img.shields.io/badge/Built%20with-Kiro%20AI-purple)](https://kiro.ai/)
 
 **Simply means:** Stealth Crypto Payments using multilayer forks
@@ -71,27 +69,6 @@ Powered by ECDH + secp256k1 + BIP 0352/EIP 5564 + ROFL DarkPool Mixer
 
 ---
 
-## 🚀 How It Works
-
-### Three-Step Process
-
-#### 1. Create Payment Link 🔗
-- User creates static payment link (e.g., `amaan.privatepay.me`)
-- System generates meta address (static identifier)
-- Link can be shared publicly without privacy risk
-
-#### 2. Receive Payment 💸
-- Payer accesses link → generates unique stealth address
-- Payment sent to stealth address on Aptos
-- Transaction is unlinkable to recipient's identity
-
-#### 3. Manage Funds 💰
-- Recipient monitors stealth addresses automatically
-- Funds can be withdrawn to main wallet
-- Full transaction history in private dashboard
-
----
-
 ## 🔧 Technology Stack
 
 ### Privacy Infrastructure
@@ -125,13 +102,11 @@ Powered by ECDH + secp256k1 + BIP 0352/EIP 5564 + ROFL DarkPool Mixer
 
 ### Built With
 
-- **Blockchain**: Aptos (Move smart contracts)
+- **Blockchain**: Aztec + Arcium + Mina
 - **Frontend**: React + TypeScript + Vite
 - **Backend**: Node.js + Express
 - **Database**: Supabase (PostgreSQL)
 - **Cryptography**: @noble/secp256k1, @noble/hashes
-- **Wallet**: Petra (Aptos wallet)
-- **Rewards**: Photon SDK integration
 
 ---
 
@@ -169,7 +144,6 @@ Powered by ECDH + secp256k1 + BIP 0352/EIP 5564 + ROFL DarkPool Mixer
 - ✅ Stealth address generation
 - ✅ Payment link system
 - ✅ Dashboard and monitoring
-- ✅ Aptos wallet integration
 
 ### Phase 2: Enhanced Privacy 🚧
 - 🚧 Zero-knowledge proofs (Plonky2)
@@ -195,40 +169,6 @@ Powered by ECDH + secp256k1 + BIP 0352/EIP 5564 + ROFL DarkPool Mixer
 - Privacy for everyone, everywhere
 
 ---
-
-## 🏗️ Architecture
-
-### System Overview
-
-```
-┌─────────────────┐
-│   User Wallet   │
-│  (Petra/Aptos)  │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐      ┌──────────────────┐
-│    Frontend     │◄────►│   Backend API    │
-│  (React + TS)   │      │  (Node.js)       │
-└────────┬────────┘      └────────┬─────────┘
-         │                        │
-         ▼                        ▼
-┌─────────────────┐      ┌──────────────────┐
-│ Stealth Address │      │   Supabase DB    │
-│    Generator    │      │  (PostgreSQL)    │
-└────────┬────────┘      └──────────────────┘
-         │
-         ▼
-┌─────────────────────────────────┐
-│      Aptos Blockchain           │
-│  ┌──────────────────────────┐   │
-│  │   Move Smart Contracts   │   │
-│  │  - StealthSigner         │   │
-│  │  - Payment Manager       │   │
-│  │  - Event System          │   │
-│  └──────────────────────────┘   │
-└─────────────────────────────────┘
-```
 
 ### Cryptographic Flow
 
@@ -257,77 +197,6 @@ Powered by ECDH + secp256k1 + BIP 0352/EIP 5564 + ROFL DarkPool Mixer
    └─ Transfer funds to main wallet
 ```
 
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- Aptos CLI
-- Petra Wallet
-- Supabase account
-
-### Installation
-
-1. **Clone the repository**
-```bash
-git clone https://github.com/AmaanSayyad/PrivatePay.git
-cd PrivatePay
-```
-
-2. **Install dependencies**
-```bash
-# Frontend
-cd squidl-frontend
-npm install
-
-# Backend
-cd ../squidl-backend
-npm install
-```
-
-3. **Configure environment variables**
-
-Frontend (`.env`):
-```env
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_key
-VITE_TREASURY_WALLET_ADDRESS=your_treasury_wallet
-VITE_WEBSITE_HOST=privatepay.me
-VITE_PHOTON_API_KEY=your_photon_api_key
-VITE_PHOTON_CAMPAIGN_ID=your_campaign_id
-```
-
-Backend (`.env`):
-```env
-DATABASE_URL=your_database_url
-JWT_SECRET=your_jwt_secret
-PORT=3000
-```
-
-4. **Run the application**
-```bash
-# Frontend (port 5173)
-cd squidl-frontend
-npm run dev
-
-# Backend (port 3000)
-cd squidl-backend
-npm run dev
-```
-
-5. **Access the app**
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3000
-
----
-
-## 📚 Documentation
-
-- [Architecture Diagrams](./SQUIDL_DIAGRAMS.md) - System architecture and flows"
-
----
 
 ## 🤖 Built with Kiro AI
 
