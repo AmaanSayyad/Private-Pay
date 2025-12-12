@@ -12,13 +12,19 @@ export default function DynamicProvider({ children }) {
   const [, setSignedIn] = useAtom(isSignedInAtom);
   const dynamicEnvId = import.meta.env.VITE_DYNAMIC_ENV_ID;
 
+  // Log Dynamic configuration for debugging
+  console.log("[DynamicProvider] Initializing with env ID:", dynamicEnvId ? `${dynamicEnvId.substring(0, 10)}...` : "NOT SET");
+
   // If Dynamic environment ID is not set or is placeholder, skip Dynamic provider
   if (!dynamicEnvId || dynamicEnvId === "your_dynamic_environment_id" || dynamicEnvId === "") {
-    console.log("[DynamicProvider] Dynamic.xyz not configured. Skipping Dynamic provider - app will work without authentication.");
+    console.warn("[DynamicProvider] ⚠️ Dynamic.xyz environment ID not configured!");
+    console.warn("[DynamicProvider] To enable authentication, set VITE_DYNAMIC_ENV_ID in your environment variables.");
+    console.warn("[DynamicProvider] App will work without authentication, but login screen will be skipped.");
     return <>{children}</>;
   }
 
   try {
+    console.log("[DynamicProvider] ✅ Initializing DynamicContextProvider...");
     return (
       <DynamicContextProvider
         settings={{
@@ -42,8 +48,12 @@ export default function DynamicProvider({ children }) {
       </DynamicContextProvider>
     );
   } catch (error) {
-    console.error("[DynamicProvider] Error initializing Dynamic Labs:", error);
-    console.log("[DynamicProvider] Falling back to app without Dynamic authentication.");
+    console.error("[DynamicProvider] ❌ Error initializing Dynamic Labs:", error);
+    console.error("[DynamicProvider] Error details:", {
+      message: error.message,
+      stack: error.stack,
+    });
+    console.warn("[DynamicProvider] Falling back to app without Dynamic authentication.");
     return <>{children}</>;
   }
 }

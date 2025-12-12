@@ -19,6 +19,13 @@ export default function AuthLayout() {
   const dynamicEnvId = import.meta.env.VITE_DYNAMIC_ENV_ID;
   const hasDynamic = dynamicEnvId && dynamicEnvId !== "your_dynamic_environment_id" && dynamicEnvId !== "";
 
+  // Log Dynamic configuration status for debugging
+  console.log("[AuthLayout] Dynamic configuration:", {
+    hasDynamic,
+    dynamicEnvId: dynamicEnvId ? `${dynamicEnvId.substring(0, 10)}...` : "Not set",
+    isSignedIn,
+  });
+
   if (subdomain) {
     return (
       <PaymentLayout>
@@ -31,6 +38,7 @@ export default function AuthLayout() {
 
   // If Dynamic is not configured, skip authentication and go directly to dashboard
   if (!hasDynamic) {
+    console.warn("[AuthLayout] Dynamic.xyz not configured. Skipping authentication screen.");
     return (
       <AuthProvider>
         {/* <EngowlWatermark /> */}
@@ -45,6 +53,7 @@ export default function AuthLayout() {
   }
 
   if (!isSignedIn) {
+    console.log("[AuthLayout] User not signed in. Showing login screen with Dynamic widget.");
     return (
       <div className="flex min-h-screen w-full items-center justify-center px-5 md:px-10 bg-primary-50">
         <AsciiFlame />
@@ -52,18 +61,21 @@ export default function AuthLayout() {
 
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center text-center mb-4">
-            <img src="/assets/squidl-only.svg" className="w-36" />
+            <img src="/assets/squidl-only.svg" className="w-36" alt="PrivatePay Logo" />
             <div className="text-md font-medium opacity-50 mt-2">
               Stealth Addresses for Untraceable Payments.
             </div>
           </div>
 
-          <DynamicEmbeddedWidget background="with-border" />
+          {/* Wrap DynamicEmbeddedWidget in error boundary */}
+          <div id="dynamic-widget-container">
+            <DynamicEmbeddedWidget background="with-border" />
+          </div>
 
           <div className="flex flex-col items-center mt-2">
             <div className="mt-8 opacity-60">Powered by</div>
             <div className="mt-1">
-              <img src="/assets/oasis-long-logo.svg" className="w-32" />
+              <img src="/assets/oasis-long-logo.svg" className="w-32" alt="Oasis Logo" />
             </div>
           </div>
         </div>
