@@ -19,6 +19,14 @@ export const useSession = () => {
   const [isLoading, setIsLoading] = useState(false);
   const access_token = Cookies.get("access_token");
 
+  // Log session state for debugging
+  console.log("[useSession] Session state:", {
+    isLoggedIn,
+    isSignedIn,
+    hasAccessToken: !!access_token,
+    hasAuthSigner: !!localStorage.getItem("auth_signer"),
+  });
+
   useEffect(() => {
     let timeout;
     const auth_signer = localStorage.getItem("auth_signer");
