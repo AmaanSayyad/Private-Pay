@@ -136,3 +136,4 @@ For Vercel deployment:
 - `docs/SECURITY_AUDIT.md` - Security information
 - `.env.example` - Complete variable template
 
+
