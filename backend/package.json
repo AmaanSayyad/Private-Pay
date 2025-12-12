@@ -1,0 +1,17 @@
+{
+  "name": "privatepay-bridge-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Bridge operator and oracle services for PrivatePay",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.7"
+  }
+}
+
+
+

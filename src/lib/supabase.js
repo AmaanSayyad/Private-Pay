@@ -1,11 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Validate Supabase configuration
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Supabase configuration missing!', {
+  console.warn('⚠️ Supabase configuration missing! App will work but database features will be disabled.', {
     hasUrl: !!supabaseUrl,
     hasKey: !!supabaseAnonKey
   });
@@ -14,19 +14,23 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Validate that URL doesn't look like an error message
 if (supabaseUrl && (supabaseUrl.includes('<') || supabaseUrl.includes('Per anonym'))) {
   console.error('❌ Supabase URL appears to be corrupted HTML:', supabaseUrl.substring(0, 100));
-  throw new Error('Supabase URL is corrupted. Please check environment variables.');
+  // Don't throw - allow app to continue without Supabase
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  db: { schema: 'public' },
-  auth: { persistSession: false },
-  global: {
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-    },
-  },
-});
+// Create Supabase client with fallback values if missing
+// This allows the app to load even without Supabase configured
+export const supabase = (supabaseUrl && supabaseAnonKey) 
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      db: { schema: 'public' },
+      auth: { persistSession: false },
+      global: {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      },
+    })
+  : null; // Return null if not configured - functions will handle this
 
 // Helper function to validate Supabase responses
 const validateSupabaseResponse = (data, error, operation) => {
@@ -60,6 +64,10 @@ const validateSupabaseResponse = (data, error, operation) => {
  * Register or get user
  */
 export async function registerUser(walletAddress, username) {
+  if (!supabase) {
+    console.warn('Supabase not configured. Skipping user registration.');
+    return null;
+  }
   try {
     // Check if user exists
     const { data: existingUser } = await supabase
@@ -113,6 +121,10 @@ export async function registerUser(walletAddress, username) {
  * Record incoming payment
  */
 export async function recordPayment(senderAddress, recipientUsername, amount, txHash) {
+  if (!supabase) {
+    console.warn('Supabase not configured. Skipping payment recording.');
+    return null;
+  }
   try {
     // Record payment
     const { data: payment, error: paymentError } = await supabase
@@ -168,6 +180,10 @@ export async function recordPayment(senderAddress, recipientUsername, amount, tx
  * Get user balance
  */
 export async function getUserBalance(username) {
+  if (!supabase) {
+    console.warn('Supabase not configured. Returning default balance.');
+    return { available_balance: 0 };
+  }
   try {
     const { data, error } = await supabase
       .from('balances')
@@ -187,6 +203,10 @@ export async function getUserBalance(username) {
  * Get user payments (received and sent)
  */
 export async function getUserPayments(username) {
+  if (!supabase) {
+    console.warn('Supabase not configured. Returning empty payments list.');
+    return [];
+  }
   try {
     // Get received payments
     const { data: receivedPayments, error: receivedError } = await supabase
@@ -237,6 +257,10 @@ export async function getUserPayments(username) {
  * Withdraw funds
  */
 export async function withdrawFunds(username, amount, destinationAddress, txHash) {
+  if (!supabase) {
+    console.warn('Supabase not configured. Cannot withdraw funds.');
+    throw new Error('Supabase not configured');
+  }
   try {
     // Get current balance
     const { data: balance, error: balanceError } = await supabase
@@ -316,6 +340,10 @@ export async function withdrawFunds(username, amount, destinationAddress, txHash
  * Get user by username
  */
 export async function getUserByUsername(username) {
+  if (!supabase) {
+    console.warn('Supabase not configured. Cannot get user.');
+    return null;
+  }
   try {
     const { data, error } = await supabase
       .from('users')
@@ -349,6 +377,10 @@ export async function getUserByUsername(username) {
  * Create payment link
  */
 export async function createPaymentLink(walletAddress, username, alias) {
+  if (!supabase) {
+    console.warn('Supabase not configured. Cannot create payment link.');
+    throw new Error('Supabase not configured');
+  }
   try {
     const { data, error } = await supabase
       .from('payment_links')
@@ -372,6 +404,10 @@ export async function createPaymentLink(walletAddress, username, alias) {
  * Get payment links by wallet address
  */
 export async function getPaymentLinks(walletAddress) {
+  if (!supabase) {
+    console.warn('Supabase not configured. Returning empty payment links.');
+    return [];
+  }
   try {
     const { data, error } = await supabase
       .from('payment_links')
@@ -391,6 +427,10 @@ export async function getPaymentLinks(walletAddress) {
  * Get payment link by alias
  */
 export async function getPaymentLinkByAlias(alias) {
+  if (!supabase) {
+    console.warn('Supabase not configured. Cannot get payment link.');
+    return null;
+  }
   try {
     const { data, error } = await supabase
       .from('payment_links')
