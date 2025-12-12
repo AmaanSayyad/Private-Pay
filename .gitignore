@@ -10,6 +10,7 @@ node_modules
 dist
 dist-ssr
 *.local
+arcium/
 .env
 
 # Solana build artifacts
@@ -30,3 +31,4 @@ solana/criterion-*/
 *.sln
 *.sw?
 .vercel
+.cursor/

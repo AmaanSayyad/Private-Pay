@@ -4,8 +4,8 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import toast from "react-hot-toast";
 import * as anchor from "@coral-xyz/anchor";
 import { useNavigate } from "react-router-dom";
-import { ARCIUM_PROGRAM_ID, PRIVATE_PAY_PROGRAM_ID } from "../lib/arcium/constants.js";
-import { useArciumClient, getPrivatePayProgram } from "../lib/arcium/index.js";
+import { ARCIUM_PROGRAM_ID, PRIVATE_PAY_PROGRAM_ID } from "@/lib/arcium/constants.js";
+import { useArciumClient, getPrivatePayProgram } from "@/lib/arcium/index.js";
 import {
   getArciumEnvSafe,
   getClockAccAddressSafe,
@@ -16,7 +16,7 @@ import {
   getFeePoolAccAddressSafe,
   getMempoolAccAddressSafe,
   awaitComputationFinalizationSafe,
-} from "../lib/arcium/env.js";
+} from "@/lib/arcium/env.js";
 import { Icons } from "../components/shared/Icons.jsx";
 
 // Browser-compatible random bytes generator
@@ -317,7 +317,7 @@ export default function PrivatePaymentsPage() {
                 <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg space-y-1">
                   <div className="font-medium mb-2">Debug Info:</div>
                   <div>Connected: {connected ? "✓" : "✗"}</div>
-                  <div>Public Key: {publicKey?.toBase58()?.slice(0, 8) + "..." ?? "N/A"}</div>
+                  <div>Public Key: {publicKey ? (publicKey.toBase58().slice(0, 8) + "...") : "N/A"}</div>
                   <div>Arcium Client: {arciumClient ? "✓" : "✗"}</div>
                   <div>Program: {program ? "✓" : "✗"}</div>
                   <div className="mt-2 pt-2 border-t border-gray-200">
