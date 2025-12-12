@@ -10,7 +10,7 @@ node_modules
 dist
 dist-ssr
 *.local
-arcium/
+/arcium/
 .env
 
 # Solana build artifacts
