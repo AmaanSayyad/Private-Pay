@@ -8,7 +8,7 @@ import "hardhat-tracer";
 import dotenv from 'dotenv';
 dotenv.config();
 
-console.log('PRIVATE_KEY:', process.env.PRIVATE_KEY);
+// Debug line removed for security
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -23,7 +23,6 @@ const config: HardhatUserConfig = {
   },
   networks: {
     'sapphire-testnet': {
-      // This is Testnet! If you want Mainnet, add a new network config item.
       url: "https://testnet.sapphire.oasis.io",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 0x5aff,
@@ -32,6 +31,42 @@ const config: HardhatUserConfig = {
       url: 'http://localhost:8545',
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 0x5afd,
+    },
+    // Axelar supported testnets for cross-chain stealth payments
+    'ethereum-sepolia': {
+      url: process.env.SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 11155111,
+    },
+    'polygon-amoy': {
+      url: process.env.POLYGON_AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 80002,
+    },
+    'avalanche-fuji': {
+      url: process.env.AVALANCHE_FUJI_RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 43113,
+    },
+    'arbitrum-sepolia': {
+      url: process.env.ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 421614,
+    },
+    'optimism-sepolia': {
+      url: process.env.OPTIMISM_SEPOLIA_RPC_URL || "https://sepolia.optimism.io",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 11155420,
+    },
+    'base-sepolia': {
+      url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 84532,
+    },
+    'bnb-testnet': {
+      url: process.env.BNB_TESTNET_RPC_URL || "https://data-seed-prebsc-1-s1.binance.org:8545",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 97,
     },
   },
   etherscan: {

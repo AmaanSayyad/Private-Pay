@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { DollarSign, LayoutDashboard, Wallet, Shield, Lock } from "lucide-react";
+import { DollarSign, LayoutDashboard, Wallet, Shield, Lock, ArrowLeftRight } from "lucide-react";
 import { cnm } from "../../utils/style.js";
 
 export default function Navbar() {
@@ -110,6 +110,17 @@ export default function Navbar() {
         >
           <Shield className="size-3" />
           Stablecoin
+        </Link>
+
+        <Link
+          to={"/cross-chain"}
+          className={cnm(
+            "px-3 py-2 rounded-full flex items-center gap-1 transition-all duration-300",
+            `${location.pathname === "/cross-chain" ? "bg-primary text-white" : ""}`
+          )}
+        >
+          <ArrowLeftRight className="size-3" />
+          Axelar
         </Link>
       </div>
     </div>

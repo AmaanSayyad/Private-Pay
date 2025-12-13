@@ -1,0 +1,24 @@
+{
+  "ethereum-sepolia": {
+    "network": "ethereum-sepolia",
+    "chainId": 11155111,
+    "axelarChainName": "ethereum-sepolia",
+    "contractAddress": "0x1764681c26D04f0E9EBb305368cfda808A9F6f8f",
+    "gateway": "0xe432150cce91c13a887f7D836923d5597adD8E31",
+    "gasService": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
+    "deployer": "0xD25a9d413285Ed8963C46397c6f36C844330Fe3B",
+    "timestamp": "2025-12-12T06:18:50.831Z",
+    "txHash": "0xbc961a9197ebb3b3730c01a95caf873093be4388f3a69c1adadda4ae0ca595d8"
+  },
+  "polygon-amoy": {
+    "network": "polygon-amoy",
+    "chainId": 80002,
+    "axelarChainName": "polygon-amoy",
+    "contractAddress": "0x1764681c26D04f0E9EBb305368cfda808A9F6f8f",
+    "gateway": "0xe432150cce91c13a887f7D836923d5597adD8E31",
+    "gasService": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
+    "deployer": "0xD25a9d413285Ed8963C46397c6f36C844330Fe3B",
+    "timestamp": "2025-12-12T06:19:19.770Z",
+    "txHash": "0xb784dc144579a58ffdedadc2077bee14d6ed272b543bda518967388c06b3ebf5"
+  }
+}
