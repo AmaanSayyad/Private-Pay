@@ -39,17 +39,24 @@ export default function GetStartedDialog() {
 
   const [step, setStep] = useState("one");
 
+  const handleClose = () => {
+    // Mark that user has skipped username setup
+    localStorage.setItem("username_setup_skipped", "true");
+    setOpen(false);
+  };
+
   return (
     <Modal
       isOpen={isOpen}
-      isDismissable={false}
-      isKeyboardDismissDisabled={true}
-      hideCloseButton
+      isDismissable={true}
+      isKeyboardDismissDisabled={false}
+      hideCloseButton={false}
+      onClose={handleClose}
       placement="center"
     >
       <ModalContent className="bg-white rounded-4xl p-8 max-w-[562px] flex flex-col items-start relative">
         {step === "one" ? (
-          <StepOne setStep={setStep} />
+          <StepOne setStep={setStep} setOpen={setOpen} />
         ) : (
           <StepTwo setOpen={setOpen} />
         )}
@@ -58,7 +65,7 @@ export default function GetStartedDialog() {
   );
 }
 
-function StepOne({ setStep }) {
+function StepOne({ setStep, setOpen }) {
   const [username, setUsername] = useState("");
   const [isUsernameAvailable, setIsUsernameAvailable] = useState(false);
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
@@ -171,6 +178,42 @@ function StepOne({ setStep }) {
         throw new Error(errorMessage);
       }
 
+      // Check paymaster balance before attempting transaction
+      toast.loading("Checking paymaster balance...", {
+        id: 'loading-meta-address',
+      });
+      
+      const paymasterBalance = await sapphireProvider.getBalance(paymasterWallet.address);
+      const minBalance = ethers.parseEther("0.01"); // Minimum 0.01 ROSE needed
+      
+      if (paymasterBalance < minBalance) {
+        const balanceFormatted = ethers.formatEther(paymasterBalance);
+        const errorMsg = `Paymaster wallet has insufficient balance (${balanceFormatted} ROSE). Please fund the wallet at: ${paymasterWallet.address}`;
+        toast.error(
+          (t) => (
+            <div className="flex flex-col gap-2">
+              <p className="font-semibold">Insufficient Paymaster Balance</p>
+              <p className="text-sm">Balance: {balanceFormatted} ROSE</p>
+              <p className="text-sm">Required: 0.01 ROSE minimum</p>
+              <p className="text-xs mt-2">Fund at: <span className="font-mono">{paymasterWallet.address}</span></p>
+              <p className="text-xs">
+                <a 
+                  href={`https://faucet.sapphire.oasis.dev/`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-500 underline"
+                  onClick={() => toast.dismiss(t.id)}
+                >
+                  Get testnet tokens from faucet
+                </a>
+              </p>
+            </div>
+          ),
+          { duration: 10000 }
+        );
+        throw new Error(errorMsg);
+      }
+
       const contract = new ethers.Contract(
         sapphireTestnet.stealthSignerContract.address,
         sapphireTestnet.stealthSignerContract.abi.abi,
@@ -223,12 +266,87 @@ function StepOne({ setStep }) {
         }
       }
 
+      // Clear skip flag since user successfully created username
+      localStorage.removeItem("username_setup_skipped");
       setStep("two");
     } catch (e) {
       console.error('Error creating username', e)
-      toast.error("Error creating your username", {
-        id: 'loading-meta-address',
-      })
+      
+      // Check for specific error types and provide helpful messages
+      let errorMessage = "Error creating your username";
+      let showDetailedError = false;
+      
+      // Check for insufficient balance errors
+      const isInsufficientBalance = 
+        e?.message?.includes("insufficient balance") ||
+        e?.message?.includes("insufficient balance to pay fees") ||
+        e?.code === -32000 ||
+        (e?.error?.message?.includes("insufficient balance"));
+      
+      if (isInsufficientBalance) {
+        // Get paymaster wallet address for error message
+        try {
+          const paymasterPK = import.meta.env.VITE_PAYMASTER_PK;
+          if (paymasterPK) {
+            const tempProvider = new ethers.JsonRpcProvider(sapphireTestnet.rpcUrls[0]);
+            const tempWallet = new ethers.Wallet(paymasterPK, tempProvider);
+            const balance = await tempProvider.getBalance(tempWallet.address);
+            const balanceFormatted = ethers.formatEther(balance);
+            
+            errorMessage = `Paymaster wallet has insufficient balance (${balanceFormatted} ROSE). Please fund the wallet.`;
+            showDetailedError = true;
+            
+            toast.error(
+              (t) => (
+                <div className="flex flex-col gap-2 max-w-md">
+                  <p className="font-semibold text-red-600">⚠️ Insufficient Paymaster Balance</p>
+                  <p className="text-sm">Current Balance: <span className="font-mono">{balanceFormatted} ROSE</span></p>
+                  <p className="text-sm">Required: <span className="font-mono">0.01 ROSE</span> minimum</p>
+                  <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
+                    <p className="font-semibold mb-1">Paymaster Address:</p>
+                    <p className="font-mono break-all">{tempWallet.address}</p>
+                  </div>
+                  <div className="mt-2">
+                    <a 
+                      href="https://faucet.sapphire.oasis.dev/" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline text-sm font-semibold"
+                      onClick={() => toast.dismiss(t.id)}
+                    >
+                      → Get testnet tokens from faucet
+                    </a>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Copy the address above and request tokens from the faucet, then try again.
+                  </p>
+                </div>
+              ),
+              { 
+                id: 'loading-meta-address',
+                duration: 15000 
+              }
+            );
+          } else {
+            errorMessage = "Paymaster wallet has insufficient balance. Please fund the paymaster wallet with ROSE tokens.";
+          }
+        } catch (balanceError) {
+          errorMessage = "Paymaster wallet has insufficient balance to pay gas fees. Please fund the wallet with ROSE tokens.";
+        }
+      } else if (e?.message?.includes("Paymaster wallet has insufficient balance")) {
+        // Already handled above with detailed toast, don't show again
+        return; // Exit early, error already shown
+      } else if (e?.message) {
+        errorMessage = e.message;
+      }
+      
+      // Only show generic error if we haven't shown a detailed one
+      if (!showDetailedError) {
+        toast.error(errorMessage, {
+          id: 'loading-meta-address',
+          duration: 8000,
+        });
+      }
     } finally {
       toast.dismiss('loading-meta-address');
       setLoading(false);
@@ -275,14 +393,28 @@ function StepOne({ setStep }) {
           Username is already taken
         </div>
       }
-      <Button
-        onClick={handleUpdate}
-        loading={loading || isCheckingUsername}
-        isDisabled={loading || !isUsernameAvailable || isCheckingUsername}
-        className="h-16 rounded-full text-white flex items-center justify-center w-full mt-4 bg-primary-600"
-      >
-        Continue
-      </Button>
+      <div className="w-full mt-4 flex flex-col gap-3">
+        <Button
+          onClick={handleUpdate}
+          loading={loading || isCheckingUsername}
+          isDisabled={loading || !isUsernameAvailable || isCheckingUsername}
+          className="h-16 rounded-full text-white flex items-center justify-center w-full bg-primary-600"
+        >
+          Continue
+        </Button>
+        <Button
+          onClick={() => {
+            // Mark that user has skipped username setup
+            localStorage.setItem("username_setup_skipped", "true");
+            setOpen(false);
+            toast.success("You can set up your username later from your profile");
+          }}
+          variant="light"
+          className="h-12 rounded-full text-gray-600 flex items-center justify-center w-full"
+        >
+          Skip for now
+        </Button>
+      </div>
     </>
   );
 }

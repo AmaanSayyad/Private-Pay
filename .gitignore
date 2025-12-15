@@ -32,12 +32,3 @@ solana/criterion-*/
 *.sw?
 .vercel
 .cursor/
-
-# Kiro AI artifacts (optional - remove if you want to track them)
-.kiro/
-
-# Backup files
-*.bak
-*.bak2
-*.backup
-*~

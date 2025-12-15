@@ -31,6 +31,7 @@ export default function AuthProvider({ children }) {
   const { handleLogOut, user, primaryWallet } = useDynamicContextSafe();
   const [isReadyToSign, setIsReadyToSign] = useState(false);
   const [isSigningIn, setSigningIn] = useState(false);
+  const [hasAttemptedLogin, setHasAttemptedLogin] = useState(false);
   const [, setOpen] = useAtom(isGetStartedDialogAtom);
   const [, setSignedIn] = useAtom(isSignedInAtom);
   const { isSignedIn, isLoading } = useSession();
@@ -216,33 +217,75 @@ export default function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    if (isSignedIn || isLoading) return;
-    if (isReadyToSign && user) {
-      // Allow login on any network - don't require Sapphire for authentication
-      login(user);
+    if (isSignedIn || isLoading || isSigningIn || hasAttemptedLogin) return;
+    
+    // Only trigger login if:
+    // 1. User is ready to sign
+    // 2. User exists
+    // 3. Provider has a valid chainId (network has been selected)
+    if (isReadyToSign && user && provider) {
+      // Check if provider has a valid network/chainId
+      provider.getNetwork()
+        .then((network) => {
+          if (network && network.chainId !== undefined && network.chainId !== null) {
+            console.log("[AuthProvider] Network selected, triggering login on chainId:", network.chainId.toString());
+            // Mark that we've attempted login to prevent duplicate calls
+            setHasAttemptedLogin(true);
+            // Network is selected, proceed with login
+            login(user);
+          } else {
+            console.log("[AuthProvider] Waiting for network selection...");
+          }
+        })
+        .catch((error) => {
+          console.warn("[AuthProvider] Error getting network, waiting for network selection:", error);
+        });
     }
-  }, [isReadyToSign, isSignedIn, isLoading, user]);
+  }, [isReadyToSign, isSignedIn, isLoading, user, provider, isSigningIn, hasAttemptedLogin]);
 
   useEffect(() => {
-    if (user && isLoaded) {
-      console.log("is ready to sign");
-      setIsReadyToSign(true);
+    // Only set ready to sign when user is loaded AND provider has a valid network
+    if (user && isLoaded && provider) {
+      provider.getNetwork()
+        .then((network) => {
+          if (network && network.chainId !== undefined && network.chainId !== null) {
+            console.log("[AuthProvider] User and network ready, setting isReadyToSign");
+            setIsReadyToSign(true);
+          } else {
+            console.log("[AuthProvider] User loaded but network not selected yet");
+            setIsReadyToSign(false);
+          }
+        })
+        .catch((error) => {
+          console.warn("[AuthProvider] Error checking network:", error);
+          setIsReadyToSign(false);
+        });
+    } else if (user && isLoaded && !provider) {
+      // If provider is not ready yet, wait for it
+      console.log("[AuthProvider] User loaded but provider not ready yet");
+      setIsReadyToSign(false);
+    } else if (!user || !isLoaded) {
+      // Reset ready state if user or provider is not loaded
+      setIsReadyToSign(false);
+      setHasAttemptedLogin(false);
     }
-  }, [user, isLoaded]);
+  }, [user, isLoaded, provider]);
 
   useEffect(() => {
     if (userData) {
-      // Only open dialog if username is empty AND dialog is not already open
-      // This prevents reopening after successful signup
+      // Only open dialog if username is empty AND user hasn't skipped it
+      // This prevents reopening after successful signup or if user skipped
       const username = userData.user?.username || userData.username;
-      if (username === "" || !username) {
+      const hasSkipped = localStorage.getItem("username_setup_skipped") === "true";
+      
+      if ((username === "" || !username) && !hasSkipped) {
         // Small delay to avoid race condition with signup completion
         const timer = setTimeout(() => {
           setOpen(true);
         }, 500);
         return () => clearTimeout(timer);
       } else {
-        // If username exists, make sure dialog is closed
+        // If username exists or user skipped, make sure dialog is closed
         setOpen(false);
       }
     }

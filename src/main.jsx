@@ -8,64 +8,6 @@ if (typeof window !== "undefined") {
   window.Buffer = window.Buffer || Buffer;
   globalThis.Buffer = globalThis.Buffer || Buffer;
 }
-
-// Suppress WalletConnect WebSocket errors in console
-if (typeof window !== "undefined") {
-  const originalError = console.error;
-  const originalWarn = console.warn;
-  const originalLog = console.log;
-  
-  const shouldSuppress = (args) => {
-    // Check all arguments for WalletConnect-related content and Dynamic SDK chainId errors
-    const fullMessage = args
-      .map(arg => {
-        if (typeof arg === 'string') return arg;
-        if (typeof arg === 'object' && arg !== null) {
-          // Check object properties
-          if (arg.message) return arg.message;
-          if (arg.context) return arg.context;
-          if (arg.stack) return arg.stack;
-          return JSON.stringify(arg);
-        }
-        return String(arg);
-      })
-      .join(' ')
-      .toLowerCase();
-    
-    return (
-      fullMessage.includes('socket stalled') ||
-      fullMessage.includes('walletconnect') ||
-      fullMessage.includes('relay.walletconnect') ||
-      fullMessage.includes('websocket connection') ||
-      fullMessage.includes('wss://relay.walletconnect') ||
-      fullMessage.includes('cannot convert undefined to a bigint') ||
-      fullMessage.includes('hextobigint') ||
-      fullMessage.includes('getchainid') ||
-      (fullMessage.includes('dynamicsdk') && fullMessage.includes('chainid'))
-    );
-  };
-  
-  console.error = function(...args) {
-    if (!shouldSuppress(args)) {
-      originalError.apply(console, args);
-    }
-  };
-  
-  console.warn = function(...args) {
-    if (!shouldSuppress(args)) {
-      originalWarn.apply(console, args);
-    }
-  };
-  
-  // Also suppress WalletConnect errors in console.log (but be selective)
-  console.log = function(...args) {
-    // Only suppress if it's clearly a WalletConnect error
-    if (!shouldSuppress(args)) {
-      originalLog.apply(console, args);
-    }
-  };
-}
-
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import "./index.css";
 

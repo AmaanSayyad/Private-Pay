@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import AuthLayout from "./layouts/AuthLayout.jsx";
 import ErrorPage from "./pages/ErrorPage.jsx";
@@ -20,7 +20,6 @@ const PrivateSwapPage = lazy(() => import("./pages/PrivateSwapPage.jsx"));
 const DarkPoolPage = lazy(() => import("./pages/DarkPoolPage.jsx"));
 const PrivatePaymentsPage = lazy(() => import("./pages/PrivatePaymentsPage.jsx"));
 // Zcash-Aztec Integration Pages
-const AztecDashboard = lazy(() => import("./pages/AztecDashboard.jsx"));
 const BridgePage = lazy(() => import("./pages/BridgePage.jsx"));
 const StablecoinPage = lazy(() => import("./pages/StablecoinPage.jsx"));
 const MinaPage = lazy(() => import("./components/mina-protocol/MinaPage.jsx"));
@@ -149,7 +148,7 @@ export const router = createBrowserRouter([
       // Zcash-Aztec Integration Routes
       {
         path: "/aztec",
-        element: <LazyRoute Component={AztecDashboard} />,
+        element: <Navigate to="/bridge" replace />,
       },
       {
         path: "/bridge",

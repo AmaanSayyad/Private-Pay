@@ -55,13 +55,49 @@ function deployContract(contractName, network, config = {}) {
   log(`🚀 Deploying ${contractName} to ${network}...`, 'yellow');
   
   try {
-    // In production, this would use actual Aztec SDK
-    // For now, we'll create deployment configuration
+    let onChainAddress = 'UNKNOWN';
+
+    // If Aztec CLI is available, perform a real deployment
+    if (checkAztecCLI()) {
+      const cliCmd = `aztec deploy ${contractName} --network ${network}`;
+      log(`   ▶ Running: ${cliCmd}`, 'blue');
+
+      // We expect the CLI to print the deployed address to stdout.
+      // Capture stdout so we can persist the address alongside metadata.
+      const stdout = execSync(cliCmd, {
+        cwd: rootDir,
+        stdio: ['ignore', 'pipe', 'inherit'],
+        encoding: 'utf8',
+      });
+
+      // Very simple heuristic to extract an address from stdout, if present.
+      // This keeps the script generic across Aztec CLI versions.
+      const addressMatch =
+        stdout.match(/address[:\s]+(0x[a-fA-F0-9]{40})/) ||
+        stdout.match(/(0x[a-fA-F0-9]{40})/);
+
+      if (addressMatch && addressMatch[1]) {
+        onChainAddress = addressMatch[1];
+        log(`   ✅ Deployed at: ${onChainAddress}`, 'green');
+      } else {
+        log(
+          '   ⚠️  Deployment succeeded but no address could be parsed from CLI output.',
+          'yellow',
+        );
+      }
+    } else {
+      log(
+        '   ⚠️  Aztec CLI not available, skipping on-chain deployment and only writing config.',
+        'yellow',
+      );
+    }
+
     const deploymentConfig = {
       contract: contractName,
       network,
+      address: onChainAddress,
       timestamp: new Date().toISOString(),
-      ...config
+      ...config,
     };
 
     const deploymentsDir = path.join(rootDir, 'deployments');
@@ -170,18 +206,17 @@ async function main() {
   log(`   Summary: ${summaryFile}`, 'blue');
   log('');
   log('📋 Next Steps:', 'green');
-  log('1. Update contract addresses in .env file', 'blue');
-  log('2. Configure operator addresses', 'blue');
-  log('3. Deploy oracle contract (for PZUSD)', 'blue');
-  log('4. Test contract interactions', 'blue');
+  log('1. Update contract addresses in your application configuration (frontend/backend).', 'blue');
+  log('2. Configure bridge operator, oracle, and governance addresses as needed.', 'blue');
+  log('3. Test contract interactions against the Aztec testnet.', 'blue');
   log('');
-  log('⚠️  Note: This script generates deployment configs.', 'yellow');
-  log('   Actual deployment requires Aztec SDK integration.', 'yellow');
+  log('⚠️  Note: If the Aztec CLI is not installed, this script will only write deployment configs and skip on-chain deployment.', 'yellow');
 }
 
 main().catch(error => {
   log(`❌ Deployment failed: ${error.message}`, 'red');
   process.exit(1);
 });
+
 
 
