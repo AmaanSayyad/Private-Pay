@@ -1,19 +1,27 @@
 /**
  * Zcash Integration Module
- * 
+ *
  * Main entry point for Zcash functionality
  * Exports all Zcash-related utilities and classes
  */
 
-export { 
-  ZcashRPCClient, 
-  createZcashRPCClient 
+// Import first so we can both use and re-export these symbols
+import {
+  ZcashRPCClient,
+  createZcashRPCClient,
 } from './zcashRPC.js';
 
-export { 
-  ZcashWallet, 
-  createZcashWallet 
+import {
+  ZcashWallet,
+  createZcashWallet,
 } from './zcashWallet.js';
+
+export {
+  ZcashRPCClient,
+  createZcashRPCClient,
+  ZcashWallet,
+  createZcashWallet,
+};
 
 export {
   PartialNote,

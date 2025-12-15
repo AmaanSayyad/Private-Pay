@@ -52,10 +52,14 @@ aztec build
 ### Deploy Contracts
 
 ```bash
-# Deploy to testnet
-aztec deploy ZcashBridge
-aztec deploy DummyZEC
-aztec deploy PZUSD
+# Deploy all Aztec contracts to testnet using the deployment script
+cd aztec
+node scripts/deploy.js testnet
+
+# Or deploy individually with the Aztec CLI (addresses will still be picked up by the script)
+aztec deploy ZcashBridge --network testnet
+aztec deploy DummyZEC --network testnet
+aztec deploy PZUSD --network testnet
 ```
 
 ## Testing
@@ -67,9 +71,9 @@ aztec test
 
 ## Notes
 
-- Contracts use placeholder proof verification (needs zk-SNARK integration)
-- Oracle integration is simplified (needs actual oracle contract)
-- Governance functions need proper access control in production
+- ZK proof verification hooks are defined in the Noir contracts, but you still need to wire them to your concrete zk-SNARK verifier and proving keys.
+- Oracle calls in `PZUSD.nr` expect a real Aztec oracle contract to be deployed and configured.
+- Governance and operator roles must be configured according to your production requirements before mainnet deployment.
 
 
 

@@ -6,6 +6,7 @@ import { useSetAtom } from "jotai";
 import { isCreateLinkDialogAtom } from "../../store/dialog-store.js";
 import { useAptos } from "../../providers/AptosProvider";
 import { useState } from "react";
+import toast from "react-hot-toast";
 
 export default function Header() {
   const setCreateLinkModal = useSetAtom(isCreateLinkDialogAtom);
@@ -46,6 +47,31 @@ const UserProfileButton = () => {
       await connect();
     } catch (error) {
       console.error("Failed to connect wallet:", error);
+      
+      // Show user-friendly error message
+      if (error.message?.includes("Aptos wallet not found")) {
+        toast.error(
+          <div>
+            <p className="font-semibold">Aptos Wallet Not Found</p>
+            <p className="text-sm mt-1">
+              Please install{" "}
+              <a
+                href="https://petra.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Petra wallet
+              </a>{" "}
+              to connect.
+            </p>
+          </div>,
+          { duration: 5000 }
+        );
+      } else {
+        toast.error(error.message || "Failed to connect wallet");
+      }
     }
   };
 

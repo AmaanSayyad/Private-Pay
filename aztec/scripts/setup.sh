@@ -70,3 +70,4 @@ echo -e "${BLUE}3. Deploy to testnet: npm run deploy:testnet${NC}"
 echo ""
 
 
+

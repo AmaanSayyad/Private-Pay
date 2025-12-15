@@ -1,5 +1,4 @@
 import { Navigate, Outlet, useLoaderData } from "react-router-dom";
-import { useState, useEffect } from "react";
 import { DynamicEmbeddedWidget } from "@dynamic-labs/sdk-react-core";
 import AuthProvider from "../providers/AuthProvider";
 import { Toaster } from "react-hot-toast";
@@ -16,48 +15,9 @@ import EnvDebug from "../components/debug/EnvDebug.jsx";
 
 // Component to safely use Dynamic context
 function DynamicWidgetWrapper() {
-  // All hooks must be called unconditionally at the top
-  const [isLoading, setIsLoading] = useState(true);
-  
-  // Single useEffect to handle widget detection
-  useEffect(() => {
-    let checkInterval;
-    
-    // Check if widget has loaded by monitoring DOM changes
-    checkInterval = setInterval(() => {
-      const widgetElement = document.querySelector('[data-dynamic-widget]') || 
-                           document.querySelector('.dynamic-widget') ||
-                           document.querySelector('iframe[src*="dynamic"]');
-      if (widgetElement && isLoading) {
-        setIsLoading(false);
-      }
-    }, 1000);
-    
-    // Auto-hide loading after 5 seconds (widget should be loaded by then)
-    const autoHideTimeout = setTimeout(() => {
-      if (isLoading) {
-        setIsLoading(false);
-      }
-    }, 5000);
-    
-    return () => {
-      if (checkInterval) clearInterval(checkInterval);
-      if (autoHideTimeout) clearTimeout(autoHideTimeout);
-    };
-  }, [isLoading]);
-  
   // Just render the widget - it doesn't need useDynamicContext
   // The widget will work as long as DynamicContextProvider is in the tree
-  return (
-    <>
-      {isLoading && (
-        <div className="text-center text-gray-500 text-xs mb-2">
-          Loading authentication widget...
-        </div>
-      )}
-      <DynamicEmbeddedWidget background="with-border" />
-    </>
-  );
+  return <DynamicEmbeddedWidget background="with-border" />;
 }
 
 export default function AuthLayout() {
@@ -143,7 +103,12 @@ export default function AuthLayout() {
             {/* Widget container with loading state */}
             <div id="dynamic-widget-wrapper">
               {hasDynamic ? (
-                <DynamicWidgetWrapper />
+                <>
+                  <div className="text-center text-gray-500 text-xs mb-2">
+                    Loading authentication widget...
+                  </div>
+                  <DynamicWidgetWrapper />
+                </>
               ) : (
                 <div className="p-6 bg-white rounded-lg border border-gray-200 text-center">
                   <p className="text-gray-700 font-semibold mb-2">Authentication Required</p>

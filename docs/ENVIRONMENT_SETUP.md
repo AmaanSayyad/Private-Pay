@@ -51,15 +51,6 @@ VITE_AZTEC_RPC_URL=https://api.aztec.network
 VITE_AZTEC_API_KEY=your-api-key
 ```
 
-### Sapphire Paymaster (Required for Meta Address Registration)
-
-```bash
-# Paymaster Private Key (for paying gas fees on Sapphire)
-VITE_PAYMASTER_PK=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
-```
-
-**See [Paymaster Setup Guide](./PAYMASTER_SETUP.md) for detailed instructions.**
-
 ---
 
 ## How to Obtain Values
@@ -144,6 +135,7 @@ For Vercel deployment:
 - `docs/DEPLOYMENT.md` - Deployment guide
 - `docs/SECURITY_AUDIT.md` - Security information
 - `.env.example` - Complete variable template
+
 
 
 
