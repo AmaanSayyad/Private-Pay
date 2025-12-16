@@ -47,15 +47,17 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
         // Override nested readable-stream in ripemd160/hash-base
         "readable-stream": "readable-stream",
+        // Shim for @aptos-labs/ts-sdk to avoid heavy deps like poseidon-lite
+        "@aptos-labs/ts-sdk": path.resolve(
+          __dirname,
+          "./src/lib/aptos-ts-sdk-shim.js",
+        ),
       },
     },
     optimizeDeps: {
       include: [
         "readable-stream",
         "buffer",
-        "poseidon-lite",
-        "poseidon-lite/poseidon1",
-        "poseidon-lite/poseidon2",
       ],
       esbuildOptions: {
         define: {

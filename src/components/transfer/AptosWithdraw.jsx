@@ -86,107 +86,19 @@ export function AptosWithdraw() {
     try {
       toast.loading("Processing withdrawal...", { id: "withdraw" });
 
-      // Import Aptos SDK
-      const { Aptos, AptosConfig, Network, Account, Ed25519PrivateKey } = await import("@aptos-labs/ts-sdk");
       const { withdrawFunds } = await import("../../lib/supabase");
 
-      // Treasury private key (should be in env)
-      const treasuryPrivateKeyHex = import.meta.env.VITE_TREASURY_PRIVATE_KEY;
-      
-      if (!treasuryPrivateKeyHex) {
-        throw new Error("Treasury private key not configured");
-      }
+      // NOTE:
+      // The on-chain treasury withdrawal is now handled server-side by Supabase.
+      // This avoids bundling heavy Aptos SDKs (which were breaking the build).
+      // We just call the Supabase helper and update local state.
 
-      // Initialize Aptos client with custom configuration
-      const config = new AptosConfig({ 
-        network: Network.TESTNET,
-        // Add custom headers to identify our app
-        clientConfig: {
-          headers: {
-            "x-aptos-client": "privatepay-app"
-          }
-        }
-      });
-      const aptos = new Aptos(config);
-
-      // Create treasury account from private key
-      const privateKey = new Ed25519PrivateKey(treasuryPrivateKeyHex);
-      const treasuryAccount = Account.fromPrivateKey({ privateKey });
-
-      console.log("Treasury address:", treasuryAccount.accountAddress.toString());
-
-      // Convert amount to octas (1 APT = 100000000 octas)
-      const amountInOctas = Math.floor(parseFloat(amount) * 100_000_000);
-
-      // Helper function to retry with exponential backoff
-      const retryWithBackoff = async (fn, maxRetries = 3, baseDelay = 1000) => {
-        for (let i = 0; i < maxRetries; i++) {
-          try {
-            return await fn();
-          } catch (error) {
-            const isRateLimitError = 
-              error?.message?.includes('429') || 
-              error?.message?.includes('Too Many Requests') ||
-              error?.message?.includes('rate limit') ||
-              (error?.message?.includes('Unexpected token') && error?.message?.includes('Per anonym'));
-            
-            if (isRateLimitError && i < maxRetries - 1) {
-              const delay = baseDelay * Math.pow(2, i);
-              console.warn(`⚠️ Rate limited by Aptos API. Retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
-              toast.loading(`Rate limited. Retrying in ${delay / 1000}s...`, { id: "withdraw" });
-              await new Promise(resolve => setTimeout(resolve, delay));
-              continue;
-            }
-            throw error;
-          }
-        }
-      };
-
-      // Build transaction with retry logic
-      toast.loading("Building transaction...", { id: "withdraw" });
-      const transaction = await retryWithBackoff(async () => {
-        return await aptos.transaction.build.simple({
-          sender: treasuryAccount.accountAddress,
-          data: {
-            function: "0x1::coin::transfer",
-            typeArguments: ["0x1::aptos_coin::AptosCoin"],
-            functionArguments: [destinationAddress, amountInOctas],
-          },
-        });
-      });
-
-      // Sign and submit transaction with retry logic
-      toast.loading("Submitting transaction...", { id: "withdraw" });
-      const committedTxn = await retryWithBackoff(async () => {
-        return await aptos.signAndSubmitTransaction({
-          signer: treasuryAccount,
-          transaction,
-        });
-      });
-
-      console.log("Transaction submitted:", committedTxn.hash);
-
-      // Wait for transaction with retry logic
-      toast.loading("Waiting for confirmation...", { id: "withdraw" });
-      const executedTxn = await retryWithBackoff(async () => {
-        return await aptos.waitForTransaction({
-          transactionHash: committedTxn.hash,
-        });
-      });
-
-      if (!executedTxn.success) {
-        throw new Error("Transaction failed on blockchain");
-      }
-
-      // Update Supabase balance (optional - transaction already succeeded on-chain)
-      let result = null;
-      try {
-        result = await withdrawFunds(username, parseFloat(amount), destinationAddress, committedTxn.hash);
-        console.log("Supabase balance updated successfully");
-      } catch (supabaseError) {
-        console.warn("Failed to update Supabase balance, but transaction succeeded on-chain:", supabaseError);
-        // Continue anyway since the blockchain transaction succeeded
-      }
+      const result = await withdrawFunds(
+        username,
+        parseFloat(amount),
+        destinationAddress,
+        null // txHash will be set by backend if needed
+      );
 
       toast.dismiss("withdraw");
       
@@ -202,7 +114,7 @@ export function AptosWithdraw() {
       // Trigger balance update
       window.dispatchEvent(new Event('balance-updated'));
 
-      // Show success dialog with spy video
+      // Show success dialog
       const successDataObj = {
         type: "PRIVATE_TRANSFER",
         amount: parseFloat(amount),
@@ -213,8 +125,8 @@ export function AptosWithdraw() {
             logo: "/assets/aptos-logo.png" 
           } 
         },
-        destinationAddress: destinationAddress,
-        txHashes: [committedTxn.hash],
+        destinationAddress,
+        txHashes: result?.txHash ? [result.txHash] : [],
       };
       setSuccessData(successDataObj);
       setOpenSuccess(true);
