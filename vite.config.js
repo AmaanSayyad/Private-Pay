@@ -47,12 +47,17 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
         // Override nested readable-stream in ripemd160/hash-base
         "readable-stream": "readable-stream",
+        // Fix poseidon-lite CommonJS/ESM interop
+        "poseidon-lite": path.resolve(__dirname, "./src/lib/poseidon-wrapper.js"),
       },
     },
     optimizeDeps: {
       include: [
         "readable-stream",
         "buffer",
+        "poseidon-lite",
+        "poseidon-lite/poseidon1",
+        "poseidon-lite/poseidon2",
       ],
       esbuildOptions: {
         define: {
@@ -64,6 +69,9 @@ export default defineConfig(({ mode }) => {
       commonjsOptions: {
         transformMixedEsModules: true,
         include: [/node_modules/],
+        requireReturnsDefault: 'auto',
+        esmExternals: true,
+        defaultIsModuleExports: 'auto',
       },
       rollupOptions: {
         plugins: [],
