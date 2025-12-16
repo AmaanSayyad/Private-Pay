@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "WebFetch(domain:docs.near.ai)",
+      "WebSearch",
+      "WebFetch(domain:cloud.near.ai)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:near.ai)",
+      "WebFetch(domain:docs.near.org)"
+    ]
+  }
+}

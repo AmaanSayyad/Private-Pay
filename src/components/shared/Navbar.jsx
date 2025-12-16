@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { DollarSign, LayoutDashboard, Wallet, Shield, Lock, ArrowLeftRight } from "lucide-react";
+import { DollarSign, LayoutDashboard, Wallet, Shield, Lock, ArrowLeftRight, Sparkles } from "lucide-react";
 import { cnm } from "../../utils/style.js";
 
 export default function Navbar() {
@@ -121,6 +121,16 @@ export default function Navbar() {
         >
           <ArrowLeftRight className="size-3" />
           Axelar
+        </Link>
+        <Link
+          to={"/say-and-pay"}
+          className={cnm(
+            "px-3 py-2 rounded-full flex items-center gap-1 transition-all duration-300",
+            `${location.pathname === "/say-and-pay" ? "bg-primary text-white" : ""}`
+          )}
+        >
+          <Sparkles className="size-3" />
+          Say & Pay
         </Link>
       </div>
     </div>

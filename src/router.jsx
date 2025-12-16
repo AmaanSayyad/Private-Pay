@@ -27,6 +27,8 @@ const ZcashPage = lazy(() => import("./pages/ZcashPage.jsx"));
 const ZcashMinaBridgePage = lazy(() => import("./pages/ZcashMinaBridgePage.jsx"));
 // Axelar Cross-Chain Payments
 const CrossChainPaymentPage = lazy(() => import("./pages/CrossChainPaymentPage.jsx"));
+// NEAR AI Private Agent
+const SayAndPay = lazy(() => import("./pages/SayAndPay.jsx"));
 
 // Loading component
 const PageLoader = () => (
@@ -174,6 +176,11 @@ export const router = createBrowserRouter([
       {
         path: "/cross-chain",
         element: <LazyRoute Component={CrossChainPaymentPage} />,
+      },
+      // NEAR AI Private Agent
+      {
+        path: "/say-and-pay",
+        element: <LazyRoute Component={SayAndPay} />,
       },
     ],
   },
