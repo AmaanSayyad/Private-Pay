@@ -59,7 +59,7 @@ export default function AptosSendToUsername() {
 
         // Send APT to treasury wallet
         const result = await sendAptTransfer({
-          accountAddress: account,
+          signer: signAndSubmitTransaction,
           recipientAddress: TREASURY_WALLET,
           amount: parseFloat(amount),
           isTestnet: true,

@@ -1,10 +1,9 @@
 /**
  * Aptos Integration Library
- * Handles Aptos wallet connections and transactions (without heavy ts-sdk)
- *
- * NOTE: This implementation uses simple REST calls to the Aptos fullnode
- * APIs instead of @aptos-labs/ts-sdk, to avoid bundle issues with poseidon-lite.
+ * Handles Aptos wallet connections and transactions
  */
+
+import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 
 // Re-export stealth address functions for convenience
 export {
@@ -19,80 +18,12 @@ export {
 export const APTOS_MODULE_ADDRESS = import.meta.env.VITE_APTOS_MODULE_ADDRESS || 
   "0x86c46b435a128d6344d42e832ef22066133d39a8a1f8e42b02107b8b246e280c";
 
-const APTOS_BASE_URLS = {
-  testnet: "https://fullnode.testnet.aptoslabs.com/v1",
-  mainnet: "https://fullnode.mainnet.aptoslabs.com/v1",
-};
-
-const getBaseUrl = (isTestnet) =>
-  isTestnet ? APTOS_BASE_URLS.testnet : APTOS_BASE_URLS.mainnet;
-
-const fetchJson = async (url, options = {}) => {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Aptos API error ${res.status}: ${text}`);
-  }
-  return res.json();
-};
-
-// Minimal client with only the methods we actually use
+// Initialize Aptos client
 export const getAptosClient = (isTestnet = true) => {
-  const baseUrl = getBaseUrl(isTestnet);
-
-  return {
-    // Approximate ts-sdk getAccountAPTAmount
-    async getAccountAPTAmount({ accountAddress }) {
-      const resources = await fetchJson(
-        `${baseUrl}/accounts/${accountAddress}/resources`
-      );
-      const coinStore = resources.find(
-        (r) =>
-          r.type ===
-          "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
-      );
-      const value = coinStore?.data?.coin?.value ?? "0";
-      return BigInt(value);
-    },
-
-    // Approximate ts-sdk waitForTransaction with simple polling
-    async waitForTransaction({ transactionHash }) {
-      const maxAttempts = 20;
-      const delayMs = 1000;
-
-      for (let i = 0; i < maxAttempts; i += 1) {
-        const tx = await fetchJson(
-          `${baseUrl}/transactions/by_hash/${transactionHash}`
-        ).catch(() => null);
-
-        if (tx && tx.type !== "pending_transaction") {
-          return {
-            success: tx.success ?? false,
-            vm_status: tx.vm_status,
-          };
-        }
-
-        // wait 1s before next attempt
-        // eslint-disable-next-line no-await-in-loop
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-
-      // Fallback: assume pending but not failed
-      return { success: true, vm_status: "PENDING" };
-    },
-
-    // Approximate ts-sdk getAccountResource
-    async getAccountResource({ accountAddress, resourceType }) {
-      return fetchJson(
-        `${baseUrl}/accounts/${accountAddress}/resource/${encodeURIComponent(
-          resourceType
-        )}`
-      );
-    },
-  };
+  const config = new AptosConfig({
+    network: isTestnet ? Network.TESTNET : Network.MAINNET,
+  });
+  return new Aptos(config);
 };
 
 // NOTE: connectAptosWallet, disconnectAptosWallet, getAptosAccountAddress removed.

@@ -1,8 +1,10 @@
 import { createContext, useContext, useMemo } from "react";
 import { AptosWalletAdapterProvider, useWallet } from "@aptos-labs/wallet-adapter-react";
+import { PetraWallet } from "petra-plugin-wallet-adapter";
 import { getAptosClient } from "../lib/aptos";
 
-// No need to explicitly initialize wallets - the adapter auto-detects installed wallets like Petra
+// Initialize wallets
+const wallets = [new PetraWallet()];
 
 // Create a context wrapper to maintain backward compatibility with existing code
 const AptosContext = createContext({
@@ -56,7 +58,7 @@ function InternalAptosProvider({ children, isTestnet }) {
 
 export default function AptosProvider({ children, isTestnet = true }) {
   return (
-    <AptosWalletAdapterProvider autoConnect={true}>
+    <AptosWalletAdapterProvider plugins={wallets} autoConnect={true}>
       <InternalAptosProvider isTestnet={isTestnet}>
         {children}
       </InternalAptosProvider>

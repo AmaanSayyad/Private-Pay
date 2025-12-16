@@ -2,13 +2,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
-  "installCommand": "npm install --legacy-peer-deps",
+  "installCommand": "npm install",
   "framework": "vite",
-  "build": {
-    "env": {
-      "NODE_OPTIONS": "--max-old-space-size=8192"
-    }
-  },
   "rewrites": [
     {
       "source": "/((?!assets/).*)",
