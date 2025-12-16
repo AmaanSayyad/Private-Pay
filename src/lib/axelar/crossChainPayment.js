@@ -18,14 +18,18 @@ import {
   trackTransaction,
 } from "./index";
 
-// Contract ABIs
+// Contract ABIs - Human-readable format for ethers.js
+// Full ABI available at: src/abi/AxelarStealthBridge.json
 export const AXELAR_STEALTH_BRIDGE_ABI = [
   "function sendCrossChainStealthPayment(string destinationChain, address stealthAddress, bytes ephemeralPubKey, bytes1 viewHint, uint32 k, string symbol, uint256 amount) external payable",
   "function registerMetaAddress(bytes spendPubKey, bytes viewingPubKey) external",
   "function syncMetaAddress(string destinationChain) external payable",
   "function getMetaAddress(address user) external view returns (bytes spendPubKey, bytes viewingPubKey)",
   "function gateway() external view returns (address)",
+  "function gatewayWithToken() external view returns (address)",
   "function trustedRemotes(string) external view returns (string)",
+  "function protocolFeeBps() external view returns (uint256)",
+  "function feeRecipient() external view returns (address)",
   "event CrossChainStealthPaymentSent(string indexed destinationChain, address indexed sender, address stealthAddress, uint256 amount, string symbol, bytes32 paymentId)",
   "event StealthPaymentReceived(string indexed sourceChain, address indexed stealthAddress, uint256 amount, string symbol, bytes ephemeralPubKey, bytes1 viewHint, uint32 k)",
 ];
@@ -180,9 +184,13 @@ export async function executeCrossChainPayment({
     ]
   );
 
-  // Convert keys to bytes (already done in payload encoding)
-  const ephemeralPubKeyBytes = ethers.getBytes("0x" + ephemeralPubKey);
-  const viewHintByte = ethers.getBytes("0x" + viewHint);
+  // Convert keys to bytes
+  // Handle both with and without 0x prefix
+  const ephemeralPubKeyHex = ephemeralPubKey.startsWith("0x") ? ephemeralPubKey : "0x" + ephemeralPubKey;
+  const ephemeralPubKeyBytes = ethers.getBytes(ephemeralPubKeyHex);
+  // viewHint is a single byte (bytes1 in Solidity) - ensure proper formatting
+  const viewHintHex = viewHint.startsWith("0x") ? viewHint : "0x" + viewHint;
+  const viewHintByte = viewHintHex.slice(0, 4); // bytes1 = 0x + 2 hex chars
 
   // Send payment
   const tx = await bridgeContract.sendCrossChainStealthPayment(

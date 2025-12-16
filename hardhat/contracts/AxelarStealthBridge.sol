@@ -96,6 +96,11 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
         bytes viewingPubKey
     );
 
+    event MetaAddressSyncSkipped(
+        string indexed sourceChain,
+        address indexed user
+    );
+
     event TrustedRemoteSet(string indexed chainName, string contractAddress);
     event ProtocolFeeUpdated(uint256 newFeeBps);
     event FeeRecipientUpdated(address newRecipient);
@@ -184,7 +189,10 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
 
         // Approve gateway for token transfer
         // OpenZeppelin v5 uses forceApprove instead of safeApprove
-        IERC20(tokenAddress).forceApprove(address(gatewayWithToken()), amountAfterFee);
+        // Check existing allowance first for gas efficiency
+        if (IERC20(tokenAddress).allowance(address(this), address(gatewayWithToken())) < amountAfterFee) {
+            IERC20(tokenAddress).forceApprove(address(gatewayWithToken()), amountAfterFee);
+        }
 
         // Generate unique payment ID
         uint256 nonce = paymentNonces[msg.sender]++;
@@ -318,7 +326,7 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
         uint256 amount
     ) internal override {
         // commandId is used by Axelar for tracking, we don't need it here
-        (commandId);
+        commandId;
         
         // Verify source is trusted
         string memory trusted = trustedRemotes[sourceChain];
@@ -361,7 +369,7 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
         bytes calldata payload
     ) internal override {
         // commandId is used by Axelar for tracking, we don't need it here
-        (commandId);
+        commandId;
         
         // Verify source is trusted
         string memory trusted = trustedRemotes[sourceChain];
@@ -389,6 +397,9 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
                 });
 
                 emit MetaAddressSynced(sourceChain, user, spendPubKey, viewingPubKey);
+            } else {
+                // Emit event for transparency when sync is skipped
+                emit MetaAddressSyncSkipped(sourceChain, user);
             }
         }
     }

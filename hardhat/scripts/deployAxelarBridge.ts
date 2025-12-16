@@ -43,11 +43,15 @@ const AXELAR_CONTRACTS: Record<string, { gateway: string; gasService: string }> 
 
 /**
  * Chain names used by Axelar for cross-chain communication
+ * These must match the "axelarId" field from:
+ * https://github.com/axelarnetwork/axelar-contract-deployments/blob/main/axelar-chains-config/info/testnet.json
+ * 
+ * NOTE: Some chains use capitalized names (Avalanche, Fantom) while others use lowercase with suffix
  */
 const AXELAR_CHAIN_NAMES: Record<string, string> = {
   "ethereum-sepolia": "ethereum-sepolia",
-  "polygon-amoy": "polygon-amoy",
-  "avalanche-fuji": "avalanche-fuji",
+  "polygon-amoy": "polygon-sepolia", // Axelar uses "polygon-sepolia" not "polygon-amoy"
+  "avalanche-fuji": "Avalanche", // Capitalized per Axelar config
   "arbitrum-sepolia": "arbitrum-sepolia",
   "optimism-sepolia": "optimism-sepolia",
   "base-sepolia": "base-sepolia",

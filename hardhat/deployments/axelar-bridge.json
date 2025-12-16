@@ -20,5 +20,15 @@
     "deployer": "0xD25a9d413285Ed8963C46397c6f36C844330Fe3B",
     "timestamp": "2025-12-12T06:19:19.770Z",
     "txHash": "0xb784dc144579a58ffdedadc2077bee14d6ed272b543bda518967388c06b3ebf5"
+  },
+  "base-sepolia": {
+    "network": "base-sepolia",
+    "chainId": "84532",
+    "axelarChainName": "base-sepolia",
+    "contractAddress": "0x1764681c26D04f0E9EBb305368cfda808A9F6f8f",
+    "gateway": "0xe432150cce91c13a887f7D836923d5597adD8E31",
+    "gasService": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
+    "deployer": "0xD25a9d413285Ed8963C46397c6f36C844330Fe3B",
+    "timestamp": "2025-12-16T07:48:08.891Z"
   }
 }

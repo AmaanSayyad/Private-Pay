@@ -1,15 +1,28 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, CardBody, Input, Select, SelectItem, Spinner } from "@nextui-org/react";
+import { Button, Card, CardBody, Input, Select, SelectItem, Spinner, Chip, Accordion, AccordionItem, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from "@nextui-org/react";
 import toast from "react-hot-toast";
 import { Icons } from "../components/shared/Icons.jsx";
 import { useAxelarPayment, TX_STATUS } from "../hooks/useAxelarPayment.js";
-import { AXELAR_CHAINS, getSupportedChains, getAxelarscanUrl } from "../lib/axelar/index.js";
+import { AXELAR_CHAINS, getSupportedChains, getAxelarscanUrl, getAvailableTokens } from "../lib/axelar/index.js";
+import { generateMetaAddressKeys } from "../lib/aptos/stealthAddress.js";
 
-// Supported tokens for cross-chain transfers (per Axelar official docs)
-const SUPPORTED_TOKENS = [
-  { symbol: "aUSDC", name: "aUSDC", decimals: 6 },
+// Bridge contract address (same on all chains)
+const BRIDGE_ADDRESS = import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS || "0x1764681c26D04f0E9EBb305368cfda808A9F6f8f";
+
+// Bridge ABI for meta address lookup and registration
+const BRIDGE_ABI = [
+  "function getMetaAddress(address user) external view returns (bytes spendPubKey, bytes viewingPubKey)",
+  "function registerMetaAddress(bytes spendPubKey, bytes viewingPubKey) external",
 ];
+
+// Network detection
+const isMainnet = import.meta.env.VITE_NETWORK === "mainnet";
+
+// Fallback tokens if API fails
+const FALLBACK_TOKENS = isMainnet
+  ? [{ symbol: "axlUSDC", name: "Axelar USDC", decimals: 6 }]
+  : [{ symbol: "TUSDC", name: "Test USDC", decimals: 6 }]; // Our deployed test token at 0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B
 
 export default function CrossChainPaymentPage() {
   const navigate = useNavigate();
@@ -37,8 +50,184 @@ export default function CrossChainPaymentPage() {
   const [destinationChain, setDestinationChain] = useState("");
   const [recipientAddress, setRecipientAddress] = useState("");
   const [amount, setAmount] = useState("");
-  const [selectedToken, setSelectedToken] = useState("aUSDC");
+  const [selectedToken, setSelectedToken] = useState("");
+  const [availableTokens, setAvailableTokens] = useState(FALLBACK_TOKENS);
+  const [loadingTokens, setLoadingTokens] = useState(false);
   const [estimatingGas, setEstimatingGas] = useState(false);
+  
+  // Stealth mode state
+  const [stealthMode, setStealthMode] = useState(null); // null = checking, true = stealth, false = direct
+  const [recipientMetaAddress, setRecipientMetaAddress] = useState(null);
+  const [checkingStealthKeys, setCheckingStealthKeys] = useState(false);
+  
+  // Registration state
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [checkingRegistration, setCheckingRegistration] = useState(false);
+  const [generatedKeys, setGeneratedKeys] = useState(null);
+  const [registering, setRegistering] = useState(false);
+  const { isOpen: isKeysModalOpen, onOpen: onKeysModalOpen, onClose: onKeysModalClose } = useDisclosure();
+
+  // Check if current user is registered for stealth
+  useEffect(() => {
+    async function checkUserRegistration() {
+      if (!evmAddress || !window.ethereum) {
+        setIsRegistered(false);
+        return;
+      }
+
+      setCheckingRegistration(true);
+      try {
+        const { ethers } = await import("ethers");
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const bridgeContract = new ethers.Contract(BRIDGE_ADDRESS, BRIDGE_ABI, provider);
+        
+        const [spendPubKey, viewingPubKey] = await bridgeContract.getMetaAddress(evmAddress);
+        const spendPubKeyHex = ethers.hexlify(spendPubKey);
+        
+        if (spendPubKeyHex !== "0x" && spendPubKeyHex.length > 2) {
+          setIsRegistered(true);
+          console.log("User is registered for stealth payments");
+        } else {
+          setIsRegistered(false);
+          console.log("User is NOT registered for stealth payments");
+        }
+      } catch (err) {
+        console.log("Error checking registration:", err.message);
+        setIsRegistered(false);
+      } finally {
+        setCheckingRegistration(false);
+      }
+    }
+
+    checkUserRegistration();
+  }, [evmAddress]);
+
+  // Generate stealth keys
+  const handleGenerateKeys = () => {
+    try {
+      const keys = generateMetaAddressKeys();
+      setGeneratedKeys(keys);
+      onKeysModalOpen();
+      toast.success("Keys generated! Save your private keys securely.");
+    } catch (error) {
+      toast.error("Failed to generate keys");
+      console.error(error);
+    }
+  };
+
+  // Register meta address on bridge contract
+  const handleRegisterMetaAddress = async () => {
+    if (!generatedKeys || !evmAddress) {
+      toast.error("Please generate keys and connect wallet first");
+      return;
+    }
+
+    setRegistering(true);
+    try {
+      const { ethers } = await import("ethers");
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const bridgeContract = new ethers.Contract(BRIDGE_ADDRESS, BRIDGE_ABI, signer);
+
+      const spendPubKey = `0x${generatedKeys.spend.publicKey}`;
+      const viewingPubKey = `0x${generatedKeys.viewing.publicKey}`;
+
+      console.log("Registering meta address...");
+      console.log("  spendPubKey:", spendPubKey);
+      console.log("  viewingPubKey:", viewingPubKey);
+
+      const tx = await bridgeContract.registerMetaAddress(spendPubKey, viewingPubKey);
+      await tx.wait();
+
+      toast.success("Registered for stealth payments!");
+      setIsRegistered(true);
+      onKeysModalClose();
+    } catch (error) {
+      console.error("Registration error:", error);
+      toast.error(error.message || "Failed to register");
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  // Check for stealth keys when recipient address changes
+  useEffect(() => {
+    async function checkStealthKeys() {
+      if (!recipientAddress || recipientAddress.length !== 42 || !recipientAddress.startsWith("0x")) {
+        setStealthMode(null);
+        setRecipientMetaAddress(null);
+        return;
+      }
+
+      setCheckingStealthKeys(true);
+      try {
+        const { ethers } = await import("ethers");
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const bridgeContract = new ethers.Contract(BRIDGE_ADDRESS, BRIDGE_ABI, provider);
+        
+        const [spendPubKey, viewingPubKey] = await bridgeContract.getMetaAddress(recipientAddress);
+        
+        // Check if keys are registered (not empty)
+        const spendPubKeyHex = ethers.hexlify(spendPubKey);
+        const viewingPubKeyHex = ethers.hexlify(viewingPubKey);
+        
+        if (spendPubKeyHex !== "0x" && viewingPubKeyHex !== "0x" && spendPubKeyHex.length > 2) {
+          console.log("Stealth keys found for recipient:", { spendPubKeyHex, viewingPubKeyHex });
+          setRecipientMetaAddress({
+            spendPubKey: spendPubKeyHex,
+            viewingPubKey: viewingPubKeyHex,
+          });
+          setStealthMode(true);
+        } else {
+          console.log("No stealth keys registered for recipient");
+          setRecipientMetaAddress(null);
+          setStealthMode(false);
+        }
+      } catch (err) {
+        console.log("Error checking stealth keys (recipient may not be registered):", err.message);
+        setRecipientMetaAddress(null);
+        setStealthMode(false);
+      } finally {
+        setCheckingStealthKeys(false);
+      }
+    }
+
+    // Debounce the check
+    const timer = setTimeout(checkStealthKeys, 500);
+    return () => clearTimeout(timer);
+  }, [recipientAddress]);
+
+  // Fetch available tokens when chains change
+  useEffect(() => {
+    async function fetchTokens() {
+      if (!sourceChain || !destinationChain) {
+        setAvailableTokens(FALLBACK_TOKENS);
+        return;
+      }
+      
+      setLoadingTokens(true);
+      try {
+        const tokens = await getAvailableTokens(sourceChain, destinationChain);
+        if (tokens.length > 0) {
+          setAvailableTokens(tokens);
+          // Auto-select first token if none selected
+          if (!selectedToken || !tokens.find(t => t.symbol === selectedToken)) {
+            setSelectedToken(tokens[0].symbol);
+          }
+        } else {
+          setAvailableTokens(FALLBACK_TOKENS);
+          setSelectedToken(FALLBACK_TOKENS[0].symbol);
+        }
+      } catch (err) {
+        console.error("Error fetching tokens:", err);
+        setAvailableTokens(FALLBACK_TOKENS);
+      } finally {
+        setLoadingTokens(false);
+      }
+    }
+    
+    fetchTokens();
+  }, [sourceChain, destinationChain]);
 
   // Check if MetaMask is connected on mount
   useEffect(() => {
@@ -187,19 +376,36 @@ export default function CrossChainPaymentPage() {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
 
-      // Use direct address mode for testing
-      // In production, you would fetch meta address from registry for stealth payments
-      const result = await sendCrossChainPayment({
-        sourceChain,
-        destinationChain,
-        directAddress: recipientAddress, // Direct transfer mode
-        amount: parseFloat(amount),
-        tokenSymbol: selectedToken,
-        signer,
-      });
-
-      if (result.success) {
+      let result;
+      
+      if (stealthMode && recipientMetaAddress) {
+        // Stealth mode - use meta address to generate stealth address
+        console.log("Using STEALTH mode with meta address");
+        result = await sendCrossChainPayment({
+          sourceChain,
+          destinationChain,
+          recipientMetaAddress, // Stealth transfer mode
+          amount: parseFloat(amount),
+          tokenSymbol: selectedToken,
+          signer,
+        });
+        toast.success("Private stealth payment initiated!");
+      } else {
+        // Direct mode - send to regular address
+        console.log("Using DIRECT mode (recipient not registered for stealth)");
+        result = await sendCrossChainPayment({
+          sourceChain,
+          destinationChain,
+          directAddress: recipientAddress, // Direct transfer mode
+          amount: parseFloat(amount),
+          tokenSymbol: selectedToken,
+          signer,
+        });
         toast.success("Cross-chain payment initiated!");
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || "Payment failed");
       }
     } catch (err) {
       console.error("Payment error:", err);
@@ -273,24 +479,38 @@ export default function CrossChainPaymentPage() {
                         Switch to Sepolia
                       </Button>
                     )}
-                    {isOnSepolia && (
-                      <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full">
-                        Sepolia ✓
-                      </span>
-                    )}
-                    <Button
-                      size="sm"
-                      color="danger"
-                      variant="flat"
-                      onClick={() => {
-                        setEvmAddress(null);
-                        setChainId(null);
-                      }}
-                      className="rounded-lg"
-                    >
-                      Disconnect
-                    </Button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Stealth Registration Section */}
+            {evmAddress && !isRegistered && (
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-2xl border border-purple-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-semibold text-purple-900">Enable Stealth Payments</span>
+                    <span className="text-xs text-purple-700">Register to receive private payments</span>
+                  </div>
+                  <Button
+                    color="secondary"
+                    variant="flat"
+                    size="sm"
+                    onClick={handleGenerateKeys}
+                    isLoading={checkingRegistration}
+                    className="rounded-xl"
+                  >
+                    🔒 Register
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {evmAddress && isRegistered && (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-xl border border-green-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-green-600">✓</span>
+                  <span className="text-sm text-green-800">You're registered for stealth payments</span>
                 </div>
               </div>
             )}
@@ -338,7 +558,7 @@ export default function CrossChainPaymentPage() {
             {/* Token Selection */}
             <Select
               label="Token"
-              placeholder="Select token"
+              placeholder={loadingTokens ? "Loading tokens..." : "Select token"}
               selectedKeys={selectedToken ? [selectedToken] : []}
               onSelectionChange={(keys) => setSelectedToken(Array.from(keys)[0])}
               variant="bordered"
@@ -347,26 +567,53 @@ export default function CrossChainPaymentPage() {
                 value: "text-foreground",
               }}
               disallowEmptySelection
-              defaultSelectedKeys={["aUSDC"]}
+              isDisabled={loadingTokens}
             >
-              {SUPPORTED_TOKENS.map((token) => (
-                <SelectItem key={token.symbol} textValue={token.name}>
-                  {token.name}
+              {availableTokens.map((token) => (
+                <SelectItem key={token.symbol} textValue={token.symbol}>
+                  <div className="flex items-center gap-2">
+                    {token.image && (
+                      <img src={token.image} alt={token.symbol} className="w-5 h-5 rounded-full" />
+                    )}
+                    <span>{token.symbol}</span>
+                    <span className="text-xs text-gray-500">({token.name})</span>
+                  </div>
                 </SelectItem>
               ))}
             </Select>
 
             {/* Recipient Address */}
-            <Input
-              label="Recipient Address"
-              placeholder="0x..."
-              value={recipientAddress}
-              onChange={(e) => setRecipientAddress(e.target.value)}
-              variant="bordered"
-              classNames={{
-                inputWrapper: "rounded-xl",
-              }}
-            />
+            <div className="flex flex-col gap-2">
+              <Input
+                label="Recipient Address"
+                placeholder="0x..."
+                value={recipientAddress}
+                onChange={(e) => setRecipientAddress(e.target.value)}
+                variant="bordered"
+                classNames={{
+                  inputWrapper: "rounded-xl",
+                }}
+                endContent={
+                  checkingStealthKeys && (
+                    <Spinner size="sm" />
+                  )
+                }
+              />
+              {/* Stealth Mode Indicator */}
+              {recipientAddress && recipientAddress.length === 42 && !checkingStealthKeys && (
+                <div className="flex items-center gap-2">
+                  {stealthMode ? (
+                    <Chip color="success" variant="flat" size="sm" startContent={<span>🔒</span>}>
+                      Stealth Mode - Private Transfer
+                    </Chip>
+                  ) : (
+                    <Chip color="warning" variant="flat" size="sm" startContent={<span>⚠️</span>}>
+                      Direct Mode - Recipient not registered for stealth
+                    </Chip>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Amount */}
             <Input
@@ -471,6 +718,58 @@ export default function CrossChainPaymentPage() {
           </CardBody>
         </Card>
       </div>
+
+      {/* Keys Generation Modal */}
+      <Modal isOpen={isKeysModalOpen} onClose={onKeysModalClose} size="lg">
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            <span>🔐 Your Stealth Keys</span>
+            <span className="text-sm font-normal text-gray-500">Save these keys securely - you'll need them to receive payments</span>
+          </ModalHeader>
+          <ModalBody>
+            {generatedKeys && (
+              <div className="flex flex-col gap-4">
+                <div className="bg-red-50 border border-red-200 p-3 rounded-xl">
+                  <p className="text-sm text-red-800 font-semibold">⚠️ Important: Save your private keys!</p>
+                  <p className="text-xs text-red-700 mt-1">These private keys are needed to claim received payments. Store them securely and never share them.</p>
+                </div>
+
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Spend Private Key (SAVE THIS!)</p>
+                  <code className="text-xs break-all text-red-600">{generatedKeys.spend.privateKey}</code>
+                </div>
+
+                <div className="bg-gray-50 p-3 rounded-xl">
+                  <p className="text-xs text-gray-500 mb-1">Viewing Private Key (SAVE THIS!)</p>
+                  <code className="text-xs break-all text-red-600">{generatedKeys.viewing.privateKey}</code>
+                </div>
+
+                <div className="bg-blue-50 p-3 rounded-xl">
+                  <p className="text-xs text-blue-500 mb-1">Spend Public Key (will be registered)</p>
+                  <code className="text-xs break-all">{generatedKeys.spend.publicKey}</code>
+                </div>
+
+                <div className="bg-blue-50 p-3 rounded-xl">
+                  <p className="text-xs text-blue-500 mb-1">Viewing Public Key (will be registered)</p>
+                  <code className="text-xs break-all">{generatedKeys.viewing.publicKey}</code>
+                </div>
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button color="danger" variant="light" onPress={onKeysModalClose}>
+              Cancel
+            </Button>
+            <Button 
+              color="primary" 
+              onPress={handleRegisterMetaAddress}
+              isLoading={registering}
+            >
+              I've Saved My Keys - Register
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }
