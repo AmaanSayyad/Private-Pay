@@ -6,7 +6,7 @@ export default function PrivacyNavbar() {
     const location = useLocation();
 
     return (
-        <div className="w-full flex justify-center mb-8">
+        <div className="w-full flex justify-center mb-8 relative z-50">
             <div className="bg-white/80 backdrop-blur-md shadow-lg shadow-black/5 border border-black/10 rounded-full p-1.5 flex flex-wrap justify-center text-sm gap-2 font-medium">
                 <Link
                     to={"/mina"}

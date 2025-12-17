@@ -4,7 +4,6 @@ import { useMina } from "./MinaProvider";
 import { sendMinaPayment } from "./mina";
 import toast from "react-hot-toast";
 import { Copy, Check } from "lucide-react";
-import PrivacyNavbar from "../shared/PrivacyNavbar.jsx";
 
 export default function MinaPage() {
     const {
@@ -75,7 +74,6 @@ export default function MinaPage() {
 
     return (
         <div className="flex flex-col items-center justify-center w-full min-h-[80vh] gap-8 p-4">
-            <PrivacyNavbar />
             <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
                 Mina Protocol Integration
             </h1>

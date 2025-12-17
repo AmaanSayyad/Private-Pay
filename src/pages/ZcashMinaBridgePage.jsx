@@ -7,8 +7,6 @@ import { Icons } from "../components/shared/Icons";
 import toast from "react-hot-toast";
 import { ArrowRight, ShieldCheck, Database, FileCode, CheckCircle2 } from "lucide-react";
 
-import PrivacyNavbar from "../components/shared/PrivacyNavbar.jsx";
-
 export default function ZcashMinaBridgePage() {
     const { zcashAccount, isConnected: isZcashConnected, createWallet: createZcashWallet } = useZcash();
     const { minaAccount, isConnected: isMinaConnected, connect: connectMina } = useMina();
@@ -73,7 +71,6 @@ export default function ZcashMinaBridgePage() {
 
     return (
         <div className="flex flex-col items-center w-full min-h-[85vh] p-4 py-12 gap-8">
-            <PrivacyNavbar />
             <div className="text-center max-w-2xl space-y-4">
                 <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
                     Zcash <span className="text-gray-400 text-3xl">×</span> Mina

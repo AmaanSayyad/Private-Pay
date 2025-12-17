@@ -3,7 +3,6 @@ import { Button, Card, CardBody, Input, Textarea } from "@nextui-org/react";
 import { useZcash } from "../providers/ZcashProvider";
 import toast from "react-hot-toast";
 import { Copy, Check, Eye, EyeOff, RefreshCw } from "lucide-react";
-import PrivacyNavbar from "../components/shared/PrivacyNavbar.jsx";
 
 export default function ZcashPage() {
     const {
@@ -28,7 +27,6 @@ export default function ZcashPage() {
 
     return (
         <div className="flex flex-col items-center justify-center w-full min-h-[80vh] gap-8 p-4">
-            <PrivacyNavbar />
             <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-500 to-amber-600 bg-clip-text text-transparent">
                 Zcash Integration
             </h1>
