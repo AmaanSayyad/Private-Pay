@@ -4,8 +4,9 @@ import { Button, Card, CardBody, Input, Select, SelectItem, Spinner, Chip, Accor
 import toast from "react-hot-toast";
 import { Icons } from "../components/shared/Icons.jsx";
 import { useAxelarPayment, TX_STATUS } from "../hooks/useAxelarPayment.js";
+import { scanStealthPayments, deriveStealthPrivateKey, ERC20_ABI, GATEWAY_ABI } from "../lib/axelar/crossChainPayment.js";
 import { AXELAR_CHAINS, getSupportedChains, getAxelarscanUrl, getAvailableTokens } from "../lib/axelar/index.js";
-import { generateMetaAddressKeys } from "../lib/aptos/stealthAddress.js";
+import { deriveKeysFromSignature } from "../lib/aptos/stealthAddress.js";
 
 // Bridge contract address (same on all chains)
 const BRIDGE_ADDRESS = import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS || "0x1764681c26D04f0E9EBb305368cfda808A9F6f8f";
@@ -54,18 +55,21 @@ export default function CrossChainPaymentPage() {
   const [availableTokens, setAvailableTokens] = useState(FALLBACK_TOKENS);
   const [loadingTokens, setLoadingTokens] = useState(false);
   const [estimatingGas, setEstimatingGas] = useState(false);
-  
+
   // Stealth mode state
   const [stealthMode, setStealthMode] = useState(null); // null = checking, true = stealth, false = direct
   const [recipientMetaAddress, setRecipientMetaAddress] = useState(null);
   const [checkingStealthKeys, setCheckingStealthKeys] = useState(false);
-  
+
+  // Scanning State
+  const [scanning, setScanning] = useState(false);
+  const [scannedPayments, setScannedPayments] = useState([]);
+  const [withdrawing, setWithdrawing] = useState(null); // ID of payment being withdrawn
+
   // Registration state
   const [isRegistered, setIsRegistered] = useState(false);
   const [checkingRegistration, setCheckingRegistration] = useState(false);
-  const [generatedKeys, setGeneratedKeys] = useState(null);
   const [registering, setRegistering] = useState(false);
-  const { isOpen: isKeysModalOpen, onOpen: onKeysModalOpen, onClose: onKeysModalClose } = useDisclosure();
 
   // Check if current user is registered for stealth
   useEffect(() => {
@@ -80,10 +84,10 @@ export default function CrossChainPaymentPage() {
         const { ethers } = await import("ethers");
         const provider = new ethers.BrowserProvider(window.ethereum);
         const bridgeContract = new ethers.Contract(BRIDGE_ADDRESS, BRIDGE_ABI, provider);
-        
+
         const [spendPubKey, viewingPubKey] = await bridgeContract.getMetaAddress(evmAddress);
         const spendPubKeyHex = ethers.hexlify(spendPubKey);
-        
+
         if (spendPubKeyHex !== "0x" && spendPubKeyHex.length > 2) {
           setIsRegistered(true);
           console.log("User is registered for stealth payments");
@@ -102,23 +106,10 @@ export default function CrossChainPaymentPage() {
     checkUserRegistration();
   }, [evmAddress]);
 
-  // Generate stealth keys
-  const handleGenerateKeys = () => {
-    try {
-      const keys = generateMetaAddressKeys();
-      setGeneratedKeys(keys);
-      onKeysModalOpen();
-      toast.success("Keys generated! Save your private keys securely.");
-    } catch (error) {
-      toast.error("Failed to generate keys");
-      console.error(error);
-    }
-  };
-
-  // Register meta address on bridge contract
-  const handleRegisterMetaAddress = async () => {
-    if (!generatedKeys || !evmAddress) {
-      toast.error("Please generate keys and connect wallet first");
+  // Register with signature (Deterministic)
+  const handleRegisterWithSignature = async () => {
+    if (!evmAddress) {
+      toast.error("Please connect wallet first");
       return;
     }
 
@@ -127,26 +118,190 @@ export default function CrossChainPaymentPage() {
       const { ethers } = await import("ethers");
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
-      const bridgeContract = new ethers.Contract(BRIDGE_ADDRESS, BRIDGE_ABI, signer);
 
-      const spendPubKey = `0x${generatedKeys.spend.publicKey}`;
-      const viewingPubKey = `0x${generatedKeys.viewing.publicKey}`;
+      // 1. Request signature
+      const message = "Sign this message to enable Stealth Payments on PrivatePay.\n\nThis signature will be used to generate your unique stealth keys deterministically.\n\nIMPORTANT: Signing this does not cost gas.";
+      const signature = await signer.signMessage(message);
+      const signatureHash = ethers.keccak256(signature);
+
+      // 2. Derive keys
+      console.log("Deriving keys from signature...");
+      const keys = deriveKeysFromSignature(signatureHash);
+
+      // 3. Register on-chain
+      const bridgeContract = new ethers.Contract(BRIDGE_ADDRESS, BRIDGE_ABI, signer);
+      const spendPubKey = `0x${keys.spend.publicKey}`;
+      const viewingPubKey = `0x${keys.viewing.publicKey}`;
 
       console.log("Registering meta address...");
-      console.log("  spendPubKey:", spendPubKey);
-      console.log("  viewingPubKey:", viewingPubKey);
-
       const tx = await bridgeContract.registerMetaAddress(spendPubKey, viewingPubKey);
-      await tx.wait();
 
-      toast.success("Registered for stealth payments!");
+      toast.loading("Registering on-chain...", { id: "register-tx" });
+      await tx.wait();
+      toast.success("Successfully registered!", { id: "register-tx" });
+
       setIsRegistered(true);
-      onKeysModalClose();
+
+      // Optional: Save keys to local storage for convenience (encrypted ideally, but raw for now as they are recoverable)
+      // localStorage.setItem(`stealth_keys_${evmAddress}`, JSON.stringify(keys));
+      // Save signature hash to session storage for scanning without re-signing
+      sessionStorage.setItem(`stealth_sig_${evmAddress}`, signatureHash);
+
     } catch (error) {
       console.error("Registration error:", error);
       toast.error(error.message || "Failed to register");
     } finally {
       setRegistering(false);
+    }
+  };
+
+  // Scan for payments
+  const handleScanPayments = async () => {
+    if (!evmAddress) return;
+
+    setScanning(true);
+    setScannedPayments([]);
+
+    try {
+      const { ethers } = await import("ethers");
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+
+      // 1. Get keys (either from session or ask to sign)
+      let signatureHash = sessionStorage.getItem(`stealth_sig_${evmAddress}`);
+
+      if (!signatureHash) {
+        const message = "Sign this message to enable Stealth Payments on PrivatePay.\n\nThis signature will be used to generate your unique stealth keys deterministically.\n\nIMPORTANT: Signing this does not cost gas.";
+        const signature = await signer.signMessage(message);
+        signatureHash = ethers.keccak256(signature);
+        sessionStorage.setItem(`stealth_sig_${evmAddress}`, signatureHash);
+      }
+
+      const keys = deriveKeysFromSignature(signatureHash);
+
+      // 2. Scan
+      console.log("Scanning for payments...");
+      const payments = await scanStealthPayments({
+        provider,
+        bridgeAddress: BRIDGE_ADDRESS,
+        viewingPrivateKey: keys.viewing.privateKey,
+        spendPublicKey: keys.spend.publicKey,
+        fromBlock: 0, // In prod, optimize this
+      });
+
+      console.log("Found payments:", payments);
+      setScannedPayments(payments);
+
+      if (payments.length === 0) {
+        toast("No stealth payments found", { icon: "🔍" });
+      } else {
+        toast.success(`Found ${payments.length} payments!`);
+      }
+
+    } catch (error) {
+      console.error("Scanning error:", error);
+      toast.error("Failed to scan payments");
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  // Withdraw funds
+  const handleWithdraw = async (payment) => {
+    setWithdrawing(payment.txHash);
+    const toastId = toast.loading("Initializing withdrawal...");
+
+    try {
+      const { ethers } = await import("ethers");
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+
+      // 1. Get keys
+      const signatureHash = sessionStorage.getItem(`stealth_sig_${evmAddress}`);
+      if (!signatureHash) throw new Error("Please scan again to unlock keys");
+
+      const keys = deriveKeysFromSignature(signatureHash);
+
+      // 2. Derive stealth private key
+      const stealthPrivateKey = deriveStealthPrivateKey(
+        payment.ephemeralPubKey,
+        keys.viewing.privateKey,
+        keys.spend.privateKey,
+        payment.k
+      );
+
+      // 3. Create stealth wallet connected to provider
+      const stealthWallet = new ethers.Wallet(stealthPrivateKey, provider);
+
+      // 4. Resolve Token Address
+      // We need the Axelar Gateway to find the token address for the symbol
+      const bridgeContract = new ethers.Contract(BRIDGE_ADDRESS, BRIDGE_ABI, provider);
+      // Note: BRIDGE_ABI in this file is minimal, we need to ensure it has 'gateway()'
+      // The ABI defined at the top of this file is missing 'gateway()'. 
+      // Let's use the full ABI from the hook if possible, or just add it dynamically.
+      // Actually, we imported GATEWAY_ABI, but we need to call bridge.gateway() first.
+
+      // Let's use a direct call for gateway address since we know the bridge ABI has it
+      // (It was added in the previous steps to the contract)
+      const bridgeGatewayABI = ["function gateway() external view returns (address)"];
+      const bridgeForGateway = new ethers.Contract(BRIDGE_ADDRESS, bridgeGatewayABI, provider);
+      const gatewayAddress = await bridgeForGateway.gateway();
+
+      const gatewayContract = new ethers.Contract(gatewayAddress, GATEWAY_ABI, provider);
+      const tokenAddress = await gatewayContract.tokenAddresses(payment.symbol);
+
+      if (tokenAddress === ethers.ZeroAddress) {
+        throw new Error(`Token ${payment.symbol} not found on this chain`);
+      }
+
+      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, stealthWallet); // Connected to stealth wallet
+
+      // 5. Check Stealth Wallet ETH Balance for Gas
+      const gasPrice = (await provider.getFeeData()).gasPrice;
+      const gasLimit = 100000n; // Standard ERC20 transfer is ~65k, buffer to 100k
+      const gasCost = gasPrice * gasLimit;
+
+      const stealthBalance = await provider.getBalance(stealthWallet.address);
+
+      if (stealthBalance < gasCost) {
+        toast.loading(`Stealth wallet needs gas. Sending ETH...`, { id: toastId });
+
+        // Send ETH from Main Wallet -> Stealth Wallet
+        // Add a buffer to gas cost (e.g. 2x) to be safe
+        const topUpAmount = gasCost * 2n;
+
+        const tx = await signer.sendTransaction({
+          to: stealthWallet.address,
+          value: topUpAmount
+        });
+
+        await tx.wait();
+        toast.success("Gas topped up!", { id: toastId });
+      }
+
+      // 6. Execute Withdrawal (Stealth -> Main)
+      toast.loading("Withdrawing funds...", { id: toastId });
+
+      // Get full token balance to sweep
+      const tokenBalance = await tokenContract.balanceOf(stealthWallet.address);
+
+      if (tokenBalance === 0n) {
+        throw new Error("Stealth wallet has 0 token balance. Already withdrawn?");
+      }
+
+      const withdrawTx = await tokenContract.transfer(evmAddress, tokenBalance);
+      await withdrawTx.wait();
+
+      toast.success("Withdrawal complete! Funds sent to your wallet.", { id: toastId });
+
+      // Remove from list or mark as withdrawn
+      setScannedPayments(prev => prev.filter(p => p.txHash !== payment.txHash));
+
+    } catch (error) {
+      console.error("Withdrawal error:", error);
+      toast.error(`Withdrawal failed: ${error.message}`, { id: toastId });
+    } finally {
+      setWithdrawing(null);
     }
   };
 
@@ -164,13 +319,13 @@ export default function CrossChainPaymentPage() {
         const { ethers } = await import("ethers");
         const provider = new ethers.BrowserProvider(window.ethereum);
         const bridgeContract = new ethers.Contract(BRIDGE_ADDRESS, BRIDGE_ABI, provider);
-        
+
         const [spendPubKey, viewingPubKey] = await bridgeContract.getMetaAddress(recipientAddress);
-        
+
         // Check if keys are registered (not empty)
         const spendPubKeyHex = ethers.hexlify(spendPubKey);
         const viewingPubKeyHex = ethers.hexlify(viewingPubKey);
-        
+
         if (spendPubKeyHex !== "0x" && viewingPubKeyHex !== "0x" && spendPubKeyHex.length > 2) {
           console.log("Stealth keys found for recipient:", { spendPubKeyHex, viewingPubKeyHex });
           setRecipientMetaAddress({
@@ -204,7 +359,7 @@ export default function CrossChainPaymentPage() {
         setAvailableTokens(FALLBACK_TOKENS);
         return;
       }
-      
+
       setLoadingTokens(true);
       try {
         const tokens = await getAvailableTokens(sourceChain, destinationChain);
@@ -225,19 +380,19 @@ export default function CrossChainPaymentPage() {
         setLoadingTokens(false);
       }
     }
-    
+
     fetchTokens();
   }, [sourceChain, destinationChain]);
 
   // Check if MetaMask is connected on mount
   useEffect(() => {
     checkEvmConnection();
-    
+
     if (window.ethereum) {
       window.ethereum.on("accountsChanged", handleAccountsChanged);
       window.ethereum.on("chainChanged", handleChainChanged);
     }
-    
+
     return () => {
       if (window.ethereum) {
         window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
@@ -377,7 +532,7 @@ export default function CrossChainPaymentPage() {
       const signer = await provider.getSigner();
 
       let result;
-      
+
       if (stealthMode && recipientMetaAddress) {
         // Stealth mode - use meta address to generate stealth address
         console.log("Using STEALTH mode with meta address");
@@ -421,6 +576,9 @@ export default function CrossChainPaymentPage() {
     return "text-gray-600";
   };
 
+  // Tabs state
+  const [activeTab, setActiveTab] = useState("send");
+
   return (
     <div className="flex min-h-screen w-full items-start justify-center py-20 px-4 md:px-10 bg-gradient-to-br from-white to-indigo-50/30">
       <div className="relative flex flex-col gap-4 w-full max-w-md">
@@ -438,11 +596,25 @@ export default function CrossChainPaymentPage() {
               </Button>
             </div>
 
-            <p className="text-sm text-gray-500 mb-2">
-              Send private stealth payments across blockchains via Axelar
-            </p>
+            {/* Tabs */}
+            <div className="flex p-1 bg-gray-100 rounded-xl mb-4">
+              <button
+                onClick={() => setActiveTab("send")}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === "send" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                Send
+              </button>
+              <button
+                onClick={() => setActiveTab("receive")}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === "receive" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                Receive
+              </button>
+            </div>
 
-            {/* EVM Wallet Connection */}
+            {/* EVM Wallet Connection (Common) */}
             {!evmAddress ? (
               <Button
                 color="primary"
@@ -451,8 +623,8 @@ export default function CrossChainPaymentPage() {
                 className="w-full rounded-xl h-12 mb-2"
                 startContent={
                   <svg className="w-5 h-5" viewBox="0 0 35 33" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M32.9582 1L19.8241 10.7183L22.2665 4.99099L32.9582 1Z" fill="#E17726"/>
-                    <path d="M2.04858 1L15.0707 10.809L12.7402 4.99098L2.04858 1Z" fill="#E27625"/>
+                    <path d="M32.9582 1L19.8241 10.7183L22.2665 4.99099L32.9582 1Z" fill="#E17726" />
+                    <path d="M2.04858 1L15.0707 10.809L12.7402 4.99098L2.04858 1Z" fill="#E27625" />
                   </svg>
                 }
               >
@@ -484,224 +656,301 @@ export default function CrossChainPaymentPage() {
               </div>
             )}
 
-            {/* Stealth Registration Section */}
-            {evmAddress && !isRegistered && (
-              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-2xl border border-purple-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-1">
-                    <span className="font-semibold text-purple-900">Enable Stealth Payments</span>
-                    <span className="text-xs text-purple-700">Register to receive private payments</span>
-                  </div>
-                  <Button
-                    color="secondary"
-                    variant="flat"
-                    size="sm"
-                    onClick={handleGenerateKeys}
-                    isLoading={checkingRegistration}
-                    className="rounded-xl"
+            {/* SEND TAB */}
+            {activeTab === "send" && (
+              <>
+                <p className="text-sm text-gray-500 mb-2">
+                  Send private stealth payments across blockchains via Axelar
+                </p>
+
+                {/* Chain Selection */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Select
+                    label="From Chain"
+                    placeholder="Select source"
+                    selectedKeys={sourceChain ? [sourceChain] : []}
+                    onSelectionChange={(keys) => setSourceChain(Array.from(keys)[0])}
+                    variant="bordered"
+                    classNames={{
+                      trigger: "rounded-xl",
+                      value: "text-foreground",
+                    }}
                   >
-                    🔒 Register
-                  </Button>
+                    {availableChains.map((chain) => (
+                      <SelectItem key={chain.key} textValue={chain.name}>
+                        {chain.name}
+                      </SelectItem>
+                    ))}
+                  </Select>
+
+                  <Select
+                    label="To Chain"
+                    placeholder="Select destination"
+                    selectedKeys={destinationChain ? [destinationChain] : []}
+                    onSelectionChange={(keys) => setDestinationChain(Array.from(keys)[0])}
+                    variant="bordered"
+                    isDisabled={!sourceChain}
+                    classNames={{
+                      trigger: "rounded-xl",
+                      value: "text-foreground",
+                    }}
+                  >
+                    {destinationChains.map((chain) => (
+                      <SelectItem key={chain.key} textValue={chain.name}>
+                        {chain.name}
+                      </SelectItem>
+                    ))}
+                  </Select>
                 </div>
-              </div>
-            )}
 
-            {evmAddress && isRegistered && (
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-xl border border-green-200">
-                <div className="flex items-center gap-2">
-                  <span className="text-green-600">✓</span>
-                  <span className="text-sm text-green-800">You're registered for stealth payments</span>
-                </div>
-              </div>
-            )}
+                {/* Token Selection */}
+                <Select
+                  label="Token"
+                  placeholder={loadingTokens ? "Loading tokens..." : "Select token"}
+                  selectedKeys={selectedToken ? [selectedToken] : []}
+                  onSelectionChange={(keys) => setSelectedToken(Array.from(keys)[0])}
+                  variant="bordered"
+                  classNames={{
+                    trigger: "rounded-xl",
+                    value: "text-foreground",
+                  }}
+                  disallowEmptySelection
+                  isDisabled={loadingTokens}
+                >
+                  {availableTokens.map((token) => (
+                    <SelectItem key={token.symbol} textValue={token.symbol}>
+                      <div className="flex items-center gap-2">
+                        {token.image && (
+                          <img src={token.image} alt={token.symbol} className="w-5 h-5 rounded-full" />
+                        )}
+                        <span>{token.symbol}</span>
+                        <span className="text-xs text-gray-500">({token.name})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </Select>
 
-            {/* Chain Selection */}
-            <div className="grid grid-cols-2 gap-3">
-              <Select
-                label="From Chain"
-                placeholder="Select source"
-                selectedKeys={sourceChain ? [sourceChain] : []}
-                onSelectionChange={(keys) => setSourceChain(Array.from(keys)[0])}
-                variant="bordered"
-                classNames={{
-                  trigger: "rounded-xl",
-                  value: "text-foreground",
-                }}
-              >
-                {availableChains.map((chain) => (
-                  <SelectItem key={chain.key} textValue={chain.name}>
-                    {chain.name}
-                  </SelectItem>
-                ))}
-              </Select>
-
-              <Select
-                label="To Chain"
-                placeholder="Select destination"
-                selectedKeys={destinationChain ? [destinationChain] : []}
-                onSelectionChange={(keys) => setDestinationChain(Array.from(keys)[0])}
-                variant="bordered"
-                isDisabled={!sourceChain}
-                classNames={{
-                  trigger: "rounded-xl",
-                  value: "text-foreground",
-                }}
-              >
-                {destinationChains.map((chain) => (
-                  <SelectItem key={chain.key} textValue={chain.name}>
-                    {chain.name}
-                  </SelectItem>
-                ))}
-              </Select>
-            </div>
-
-            {/* Token Selection */}
-            <Select
-              label="Token"
-              placeholder={loadingTokens ? "Loading tokens..." : "Select token"}
-              selectedKeys={selectedToken ? [selectedToken] : []}
-              onSelectionChange={(keys) => setSelectedToken(Array.from(keys)[0])}
-              variant="bordered"
-              classNames={{
-                trigger: "rounded-xl",
-                value: "text-foreground",
-              }}
-              disallowEmptySelection
-              isDisabled={loadingTokens}
-            >
-              {availableTokens.map((token) => (
-                <SelectItem key={token.symbol} textValue={token.symbol}>
-                  <div className="flex items-center gap-2">
-                    {token.image && (
-                      <img src={token.image} alt={token.symbol} className="w-5 h-5 rounded-full" />
-                    )}
-                    <span>{token.symbol}</span>
-                    <span className="text-xs text-gray-500">({token.name})</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </Select>
-
-            {/* Recipient Address */}
-            <div className="flex flex-col gap-2">
-              <Input
-                label="Recipient Address"
-                placeholder="0x..."
-                value={recipientAddress}
-                onChange={(e) => setRecipientAddress(e.target.value)}
-                variant="bordered"
-                classNames={{
-                  inputWrapper: "rounded-xl",
-                }}
-                endContent={
-                  checkingStealthKeys && (
-                    <Spinner size="sm" />
-                  )
-                }
-              />
-              {/* Stealth Mode Indicator */}
-              {recipientAddress && recipientAddress.length === 42 && !checkingStealthKeys && (
-                <div className="flex items-center gap-2">
-                  {stealthMode ? (
-                    <Chip color="success" variant="flat" size="sm" startContent={<span>🔒</span>}>
-                      Stealth Mode - Private Transfer
-                    </Chip>
-                  ) : (
-                    <Chip color="warning" variant="flat" size="sm" startContent={<span>⚠️</span>}>
-                      Direct Mode - Recipient not registered for stealth
-                    </Chip>
+                {/* Recipient Address */}
+                <div className="flex flex-col gap-2">
+                  <Input
+                    label="Recipient Address"
+                    placeholder="0x..."
+                    value={recipientAddress}
+                    onChange={(e) => setRecipientAddress(e.target.value)}
+                    variant="bordered"
+                    classNames={{
+                      inputWrapper: "rounded-xl",
+                    }}
+                    endContent={
+                      checkingStealthKeys && (
+                        <Spinner size="sm" />
+                      )
+                    }
+                  />
+                  {/* Stealth Mode Indicator */}
+                  {recipientAddress && recipientAddress.length === 42 && !checkingStealthKeys && (
+                    <div className="flex items-center gap-2">
+                      {stealthMode ? (
+                        <Chip color="success" variant="flat" size="sm" startContent={<span>🔒</span>}>
+                          Stealth Mode - Private Transfer
+                        </Chip>
+                      ) : (
+                        <Chip color="warning" variant="flat" size="sm" startContent={<span>⚠️</span>}>
+                          Direct Mode - Recipient not registered for stealth
+                        </Chip>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* Amount */}
-            <Input
-              label="Amount"
-              placeholder="0.00"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              variant="bordered"
-              endContent={
-                <span className="text-gray-500 text-sm">{selectedToken}</span>
-              }
-              classNames={{
-                inputWrapper: "rounded-xl",
-              }}
-            />
+                {/* Amount */}
+                <Input
+                  label="Amount"
+                  placeholder="0.00"
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  variant="bordered"
+                  endContent={
+                    <span className="text-gray-500 text-sm">{selectedToken}</span>
+                  }
+                  classNames={{
+                    inputWrapper: "rounded-xl",
+                  }}
+                />
 
-            {/* Gas Estimate Button */}
-            <Button
-              color="default"
-              variant="flat"
-              onClick={handleEstimateGas}
-              isLoading={estimatingGas}
-              isDisabled={!sourceChain || !destinationChain}
-              className="w-full rounded-xl"
-            >
-              Estimate Gas Fee
-            </Button>
+                {/* Gas Estimate Button */}
+                <Button
+                  color="default"
+                  variant="flat"
+                  onClick={handleEstimateGas}
+                  isLoading={estimatingGas}
+                  isDisabled={!sourceChain || !destinationChain}
+                  className="w-full rounded-xl"
+                >
+                  Estimate Gas Fee
+                </Button>
 
-            {gasEstimate && (
-              <div className="bg-gray-50 p-3 rounded-xl text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Estimated Gas:</span>
-                  <span className="font-mono">{(Number(gasEstimate) / 1e18).toFixed(6)} ETH</span>
-                </div>
-              </div>
+                {gasEstimate && (
+                  <div className="bg-gray-50 p-3 rounded-xl text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Estimated Gas:</span>
+                      <span className="font-mono">{(Number(gasEstimate) / 1e18).toFixed(6)} ETH</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status Display */}
+                {txStatus !== TX_STATUS.IDLE && (
+                  <div className={`bg-gray-50 p-3 rounded-xl ${getStatusColor()}`}>
+                    <div className="flex items-center gap-2">
+                      {isProcessing && <Spinner size="sm" />}
+                      <span className="text-sm font-medium">{getStatusLabel()}</span>
+                    </div>
+                    {txHash && (
+                      <a
+                        href={getAxelarscanUrl(txHash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-500 hover:underline mt-1 block"
+                      >
+                        View on Axelarscan →
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {/* Error Display */}
+                {error && (
+                  <div className="bg-red-50 p-3 rounded-xl text-red-600 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                {/* Send Button */}
+                <Button
+                  color="primary"
+                  onClick={handleSendPayment}
+                  isLoading={loading}
+                  isDisabled={!evmAddress || !isOnSepolia || !sourceChain || !destinationChain || !recipientAddress || !amount || isProcessing}
+                  className="w-full rounded-xl h-12"
+                  size="lg"
+                >
+                  {!evmAddress ? "Connect Wallet First" : isProcessing ? "Processing..." : "Send Cross-Chain Payment"}
+                </Button>
+
+                {/* Reset Button (show after completion/failure) */}
+                {(isComplete || isFailed) && (
+                  <Button
+                    color="default"
+                    variant="flat"
+                    onClick={reset}
+                    className="w-full rounded-xl"
+                  >
+                    New Payment
+                  </Button>
+                )}
+              </>
             )}
 
-            {/* Status Display */}
-            {txStatus !== TX_STATUS.IDLE && (
-              <div className={`bg-gray-50 p-3 rounded-xl ${getStatusColor()}`}>
-                <div className="flex items-center gap-2">
-                  {isProcessing && <Spinner size="sm" />}
-                  <span className="text-sm font-medium">{getStatusLabel()}</span>
-                </div>
-                {txHash && (
-                  <a
-                    href={getAxelarscanUrl(txHash)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-500 hover:underline mt-1 block"
-                  >
-                    View on Axelarscan →
-                  </a>
+            {/* RECEIVE TAB */}
+            {activeTab === "receive" && (
+              <div className="flex flex-col gap-4">
+                <p className="text-sm text-gray-500">
+                  Scan for private payments sent to your stealth address.
+                </p>
+
+                {/* Stealth Registration Section */}
+                {evmAddress && !isRegistered && (
+                  <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-2xl border border-purple-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-semibold text-purple-900">Enable Stealth Payments</span>
+                        <span className="text-xs text-purple-700">Register to receive private payments</span>
+                      </div>
+                      <Button
+                        color="secondary"
+                        variant="flat"
+                        size="sm"
+                        onClick={handleRegisterWithSignature}
+                        isLoading={registering}
+                        className="rounded-xl"
+                      >
+                        ✍️ Sign to Register
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {evmAddress && isRegistered && (
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-xl border border-green-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-600">✓</span>
+                      <span className="text-sm text-green-800">You're registered for stealth payments</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Scan Button */}
+                <Button
+                  color="primary"
+                  onClick={handleScanPayments}
+                  isLoading={scanning}
+                  isDisabled={!evmAddress}
+                  className="w-full rounded-xl h-12"
+                  size="lg"
+                  startContent={!scanning && <span>🔍</span>}
+                >
+                  {scanning ? "Scanning Blockchain..." : "Scan for Payments"}
+                </Button>
+
+                {/* Results List */}
+                {scannedPayments.length > 0 && (
+                  <div className="flex flex-col gap-3 mt-2">
+                    <h3 className="font-semibold text-gray-900">Found Payments</h3>
+                    {scannedPayments.map((payment, idx) => (
+                      <Card key={idx} className="bg-gray-50 border border-gray-200 shadow-none">
+                        <CardBody className="p-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-lg">
+                                {ethers.formatUnits(payment.amount, 6)} {payment.symbol}
+                              </span>
+                              <Chip size="sm" color="success" variant="flat">Verified</Chip>
+                            </div>
+                            <span className="text-xs text-gray-500">
+                              Block {payment.blockNumber}
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-gray-500 break-all mb-3">
+                            Stealth Address: {payment.stealthAddress}
+                          </div>
+
+                          <Button
+                            size="sm"
+                            color="secondary"
+                            variant="flat"
+                            className="w-full"
+                            onClick={() => handleWithdraw(payment)}
+                            isLoading={withdrawing === payment.txHash}
+                          >
+                            Withdraw to Main Wallet
+                          </Button>
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+
+                {scannedPayments.length === 0 && !scanning && (
+                  <div className="text-center py-8 text-gray-400 text-sm">
+                    No pending payments found.
+                  </div>
                 )}
               </div>
             )}
 
-            {/* Error Display */}
-            {error && (
-              <div className="bg-red-50 p-3 rounded-xl text-red-600 text-sm">
-                {error}
-              </div>
-            )}
-
-            {/* Send Button */}
-            <Button
-              color="primary"
-              onClick={handleSendPayment}
-              isLoading={loading}
-              isDisabled={!evmAddress || !isOnSepolia || !sourceChain || !destinationChain || !recipientAddress || !amount || isProcessing}
-              className="w-full rounded-xl h-12"
-              size="lg"
-            >
-              {!evmAddress ? "Connect Wallet First" : isProcessing ? "Processing..." : "Send Cross-Chain Payment"}
-            </Button>
-
-            {/* Reset Button (show after completion/failure) */}
-            {(isComplete || isFailed) && (
-              <Button
-                color="default"
-                variant="flat"
-                onClick={reset}
-                className="w-full rounded-xl"
-              >
-                New Payment
-              </Button>
-            )}
           </CardBody>
         </Card>
 
@@ -718,58 +967,6 @@ export default function CrossChainPaymentPage() {
           </CardBody>
         </Card>
       </div>
-
-      {/* Keys Generation Modal */}
-      <Modal isOpen={isKeysModalOpen} onClose={onKeysModalClose} size="lg">
-        <ModalContent>
-          <ModalHeader className="flex flex-col gap-1">
-            <span>🔐 Your Stealth Keys</span>
-            <span className="text-sm font-normal text-gray-500">Save these keys securely - you'll need them to receive payments</span>
-          </ModalHeader>
-          <ModalBody>
-            {generatedKeys && (
-              <div className="flex flex-col gap-4">
-                <div className="bg-red-50 border border-red-200 p-3 rounded-xl">
-                  <p className="text-sm text-red-800 font-semibold">⚠️ Important: Save your private keys!</p>
-                  <p className="text-xs text-red-700 mt-1">These private keys are needed to claim received payments. Store them securely and never share them.</p>
-                </div>
-
-                <div className="bg-gray-50 p-3 rounded-xl">
-                  <p className="text-xs text-gray-500 mb-1">Spend Private Key (SAVE THIS!)</p>
-                  <code className="text-xs break-all text-red-600">{generatedKeys.spend.privateKey}</code>
-                </div>
-
-                <div className="bg-gray-50 p-3 rounded-xl">
-                  <p className="text-xs text-gray-500 mb-1">Viewing Private Key (SAVE THIS!)</p>
-                  <code className="text-xs break-all text-red-600">{generatedKeys.viewing.privateKey}</code>
-                </div>
-
-                <div className="bg-blue-50 p-3 rounded-xl">
-                  <p className="text-xs text-blue-500 mb-1">Spend Public Key (will be registered)</p>
-                  <code className="text-xs break-all">{generatedKeys.spend.publicKey}</code>
-                </div>
-
-                <div className="bg-blue-50 p-3 rounded-xl">
-                  <p className="text-xs text-blue-500 mb-1">Viewing Public Key (will be registered)</p>
-                  <code className="text-xs break-all">{generatedKeys.viewing.publicKey}</code>
-                </div>
-              </div>
-            )}
-          </ModalBody>
-          <ModalFooter>
-            <Button color="danger" variant="light" onPress={onKeysModalClose}>
-              Cancel
-            </Button>
-            <Button 
-              color="primary" 
-              onPress={handleRegisterMetaAddress}
-              isLoading={registering}
-            >
-              I've Saved My Keys - Register
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
     </div>
   );
 }

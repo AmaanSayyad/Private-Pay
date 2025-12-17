@@ -68,6 +68,7 @@ function getITSTokenAddress(symbol) {
 // ABI for AxelarStealthBridge contract (must match contract signature)
 const AXELAR_STEALTH_BRIDGE_ABI = [
   "function sendCrossChainStealthPayment(string destinationChain, address stealthAddress, bytes ephemeralPubKey, bytes1 viewHint, uint32 k, string symbol, uint256 amount) external payable",
+  "function sendCrossChainStealthPaymentITS(string destinationChain, address stealthAddress, bytes ephemeralPubKey, bytes1 viewHint, uint32 k, bytes32 tokenId, uint256 amount) external payable",
   "function gateway() external view returns (address)",
   "function gatewayWithToken() external view returns (address)",
   "event CrossChainStealthPaymentSent(string indexed destinationChain, address indexed sender, address stealthAddress, uint256 amount, string symbol, bytes32 paymentId)",
@@ -111,36 +112,69 @@ export function useAxelarPayment() {
   const [bridgeStatus, setBridgeStatus] = useState(null);
 
   // Poll for bridge status when we have a txHash
+  // Uses adaptive polling: starts at 5s, increases to 15s after 2 minutes
   useEffect(() => {
     let interval;
+    let pollCount = 0;
+    const MAX_POLLS = 60; // Stop after ~10-15 minutes
+    const INITIAL_INTERVAL = 5000; // 5 seconds initially
+    const EXTENDED_INTERVAL = 15000; // 15 seconds after a while
+
     if (txHash && txStatus === TX_STATUS.BRIDGING) {
-      interval = setInterval(async () => {
+      const pollStatus = async () => {
         try {
+          pollCount++;
           const status = await trackTransaction(txHash);
           setBridgeStatus(status);
 
-          if (status?.status === "executed") {
+          console.log(`[Poll ${pollCount}] Status:`, status.statusLabel, status.message);
+
+          // Use normalized response properties
+          if (status.isComplete) {
             setTxStatus(TX_STATUS.COMPLETE);
             clearInterval(interval);
-          } else if (status?.status === "error") {
+            console.log("Transaction completed:", status.isExpressExecuted ? "Express" : "Standard");
+          } else if (status.isFailed) {
             setTxStatus(TX_STATUS.FAILED);
             setError(
+              status.message ||
               "Transaction execution was reverted. " +
               "Please check the implementation of the destination contract's _execute function."
             );
             clearInterval(interval);
-          } else if (status?.status === "insufficient_fee" || status?.is_insufficient_fee) {
+          } else if (status.isInsufficientFee) {
             setTxStatus(TX_STATUS.FAILED);
             setError(
               "NOT ENOUGH GAS - Insufficient gas for executing the transaction. " +
-              "You can add more gas using the recovery function."
+              "You can add more gas using the recovery function on Axelarscan."
             );
             clearInterval(interval);
           }
+
+          // Switch to slower polling after 2 minutes (24 polls at 5s)
+          if (pollCount === 24 && interval) {
+            clearInterval(interval);
+            interval = setInterval(pollStatus, EXTENDED_INTERVAL);
+            console.log("Switching to extended polling interval (15s)");
+          }
+
+          // Stop polling after max attempts
+          if (pollCount >= MAX_POLLS) {
+            clearInterval(interval);
+            console.log("Max polling attempts reached. Check Axelarscan for status.");
+          }
         } catch (err) {
           console.error("Error polling status:", err);
+          // Continue polling on transient errors, but log count
+          if (pollCount >= MAX_POLLS) {
+            clearInterval(interval);
+          }
         }
-      }, 10000); // Poll every 10 seconds
+      };
+
+      // Start polling immediately, then at regular intervals
+      pollStatus();
+      interval = setInterval(pollStatus, INITIAL_INTERVAL);
     }
 
     return () => {
@@ -252,9 +286,9 @@ export function useAxelarPayment() {
         console.log("Gas fee estimated:", ethers.formatEther(gasFee), "ETH");
 
         // Step 3: Get contract instances
-        const bridgeAddress = import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS;
+        const bridgeAddress = srcChainConfig.stealthBridge || import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS;
         if (!bridgeAddress) {
-          throw new Error("Axelar bridge address not configured");
+          throw new Error(`Axelar bridge address not configured for ${srcChainConfig.name}`);
         }
 
         const bridgeContract = new ethers.Contract(
@@ -265,7 +299,7 @@ export function useAxelarPayment() {
 
         // Get token address - check ITS tokens first, then gateway
         let tokenAddress;
-        
+
         if (isITSToken(tokenSymbol)) {
           // ITS tokens have the same address on all chains
           tokenAddress = getITSTokenAddress(tokenSymbol);
@@ -314,15 +348,15 @@ export function useAxelarPayment() {
 
         // Step 5: Send cross-chain payment
         setTxStatus(TX_STATUS.SENDING);
-        
+
         let tx;
-        
+
         if (isITSToken(tokenSymbol)) {
-          // === STEALTH TRANSFER FOR ITS TOKENS (Direct ITS Call) ===
-          console.log("Using ITS for stealth transfer...");
-          
+          // === STEALTH TRANSFER FOR ITS TOKENS (via Bridge) ===
+          console.log("Using Bridge ITS function for stealth transfer...");
+
           const itsConfig = getITSTokenConfig(tokenSymbol);
-          
+
           // Get tokenId from token manager
           const tokenManager = new ethers.Contract(
             itsConfig.tokenManagerAddress,
@@ -331,49 +365,42 @@ export function useAxelarPayment() {
           );
           const tokenId = await tokenManager.interchainTokenId();
           console.log("Token ID:", tokenId);
-          
-          // Approve ITS to spend tokens
-          const currentAllowance = await tokenContract.allowance(signerAddress, ITS_ADDRESS);
+
+          // Approve ITS to spend tokens (Bridge will call ITS, so we approve Bridge?)
+          // Wait! The Bridge transfers tokens from User to Bridge, then Bridge approves ITS.
+          // So User must approve Bridge.
+
+          const currentAllowance = await tokenContract.allowance(signerAddress, bridgeAddress);
           if (currentAllowance < amountInWei) {
-            console.log("Approving ITS to spend tokens...");
-            const approveTx = await tokenContract.approve(ITS_ADDRESS, amountInWei);
+            console.log("Approving Bridge to spend tokens...");
+            const approveTx = await tokenContract.approve(bridgeAddress, amountInWei);
             await approveTx.wait();
-            console.log("ITS approval confirmed");
+            console.log("Bridge approval confirmed");
           }
-          
-          // Debug: Check stealth address value
-          console.log("Stealth address before encoding:", stealthAddress);
-          
-          // Encode destination address as bytes32 (pad to 32 bytes for ITS)
-          const destinationAddressBytes = ethers.zeroPadValue(stealthAddress, 32);
-          console.log("Encoded destination address:", destinationAddressBytes);
-          
-          // Call ITS interchainTransfer with empty metadata
-          const itsContract = new ethers.Contract(ITS_ADDRESS, ITS_ABI, signer);
-          
-          console.log("Calling ITS interchainTransfer for stealth payment...");
-          console.log("  tokenId:", tokenId);
-          console.log("  destinationChain:", dstChainConfig.axelarName);
-          console.log("  destinationAddress (stealth):", destinationAddressBytes);
-          console.log("  amount:", amountInWei.toString());
-          console.log("  gasFee:", gasFee.toString());
-          
-          tx = await itsContract.interchainTransfer(
-            tokenId,
+
+          // Convert ephemeralPubKey to bytes
+          const ephemeralPubKeyHex = ephemeralPubKey.startsWith("0x") ? ephemeralPubKey : "0x" + ephemeralPubKey;
+          const ephemeralPubKeyBytes = ethers.getBytes(ephemeralPubKeyHex);
+          const viewHintHex = viewHint.startsWith("0x") ? viewHint : "0x" + viewHint;
+          const viewHintByte = viewHintHex.slice(0, 4);
+
+          console.log("Calling sendCrossChainStealthPaymentITS...");
+
+          tx = await bridgeContract.sendCrossChainStealthPaymentITS(
             dstChainConfig.axelarName,
-            destinationAddressBytes,
+            stealthAddress,
+            ephemeralPubKeyBytes,
+            viewHintByte,
+            k,
+            tokenId,
             amountInWei,
-            '0x', // empty metadata for simple transfer
-            gasFee,
             { value: gasFee }
           );
-          
-          console.log("Stealth payment sent via ITS - tokens will arrive at stealth address");
-          
+
         } else {
           // === GMP TOKEN TRANSFER (via Bridge) ===
           console.log("Using GMP Bridge for cross-chain transfer...");
-          
+
           // Check allowance for bridge
           const currentAllowance = await tokenContract.allowance(signerAddress, bridgeAddress);
           if (currentAllowance < amountInWei) {

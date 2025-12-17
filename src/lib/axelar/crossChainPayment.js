@@ -5,7 +5,7 @@
 
 import { ethers } from "ethers";
 import * as secp256k1 from "@noble/secp256k1";
-import { sha256 } from "@noble/hashes/sha256";
+import { sha256 } from "@noble/hashes/sha2.js";
 import {
   generateStealthAddress,
   generateEphemeralKeyPair,
@@ -100,7 +100,8 @@ export async function prepareCrossChainPayment({
     sourceChain,
     destinationChain,
     gasLimit: 350000,
-    executeData: payload, // Include for L2 chains
+    gasLimit: 350000,
+    express: true, // Enable GMP Express for faster execution (< 1 min)
   });
 
   return {
@@ -159,14 +160,14 @@ export async function executeCrossChainPayment({
   // Check balance
   const signerAddress = await signer.getAddress();
   const balance = await tokenContract.balanceOf(signerAddress);
-  
+
   if (balance < amountInWei) {
     throw new Error(`Insufficient ${tokenSymbol} balance`);
   }
 
   // Check and set allowance
   const currentAllowance = await tokenContract.allowance(signerAddress, bridgeAddress);
-  
+
   if (currentAllowance < amountInWei) {
     const approveTx = await tokenContract.approve(bridgeAddress, amountInWei);
     await approveTx.wait();
@@ -284,23 +285,23 @@ function computeViewHint(sharedSecret) {
 function checkViewHintMatch(ephemeralPubKeyHex, viewingPrivateKeyHex, eventViewHint) {
   try {
     // Remove 0x prefix if present
-    const ephemeralPubKey = ephemeralPubKeyHex.startsWith("0x") 
-      ? ephemeralPubKeyHex.slice(2) 
+    const ephemeralPubKey = ephemeralPubKeyHex.startsWith("0x")
+      ? ephemeralPubKeyHex.slice(2)
       : ephemeralPubKeyHex;
-    const viewingPrivateKey = viewingPrivateKeyHex.startsWith("0x") 
-      ? viewingPrivateKeyHex.slice(2) 
+    const viewingPrivateKey = viewingPrivateKeyHex.startsWith("0x")
+      ? viewingPrivateKeyHex.slice(2)
       : viewingPrivateKeyHex;
-    
+
     // Compute shared secret: viewingPrivateKey * ephemeralPubKey
     const sharedSecret = secp256k1.getSharedSecret(
       viewingPrivateKey,
       ephemeralPubKey,
       true // compressed
     );
-    
+
     // Compute expected view hint
     const expectedViewHint = computeViewHint(sharedSecret);
-    
+
     // Compare view hints (case-insensitive)
     return expectedViewHint.toLowerCase() === eventViewHint.toLowerCase();
   } catch (error) {
@@ -323,47 +324,47 @@ function checkViewHintMatch(ephemeralPubKeyHex, viewingPrivateKeyHex, eventViewH
  */
 export function deriveStealthPrivateKey(ephemeralPubKeyHex, viewingPrivateKeyHex, spendPrivateKeyHex, k = 0) {
   // Remove 0x prefix if present
-  const ephemeralPubKey = ephemeralPubKeyHex.startsWith("0x") 
-    ? ephemeralPubKeyHex.slice(2) 
+  const ephemeralPubKey = ephemeralPubKeyHex.startsWith("0x")
+    ? ephemeralPubKeyHex.slice(2)
     : ephemeralPubKeyHex;
-  const viewingPrivateKey = viewingPrivateKeyHex.startsWith("0x") 
-    ? viewingPrivateKeyHex.slice(2) 
+  const viewingPrivateKey = viewingPrivateKeyHex.startsWith("0x")
+    ? viewingPrivateKeyHex.slice(2)
     : viewingPrivateKeyHex;
-  const spendPrivateKey = spendPrivateKeyHex.startsWith("0x") 
-    ? spendPrivateKeyHex.slice(2) 
+  const spendPrivateKey = spendPrivateKeyHex.startsWith("0x")
+    ? spendPrivateKeyHex.slice(2)
     : spendPrivateKeyHex;
-  
+
   // Compute shared secret: viewingPrivKey * ephemeralPubKey
   const sharedSecret = secp256k1.getSharedSecret(
     viewingPrivateKey,
     ephemeralPubKey,
     true // compressed
   );
-  
+
   // MUST match stealthAddress.js lines 135-142:
   // tweak = sha256(sharedSecret || k) where k is 4 bytes big-endian
   const kBytes = new Uint8Array(4);
   const kView = new DataView(kBytes.buffer);
   kView.setUint32(0, k, false); // big-endian
-  
+
   const tweakInput = new Uint8Array(sharedSecret.length + 4);
   tweakInput.set(sharedSecret, 0);
   tweakInput.set(kBytes, sharedSecret.length);
   const tweak = sha256(tweakInput);
-  
+
   // Add tweak to spend private key (mod curve order)
   const spendKeyBigInt = BigInt("0x" + spendPrivateKey);
   const tweakBigInt = BigInt("0x" + ethers.hexlify(tweak).slice(2));
   const curveOrder = BigInt("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141");
-  
+
   let stealthPrivateKeyBigInt = (spendKeyBigInt + tweakBigInt) % curveOrder;
-  
+
   // Ensure valid private key (cannot be 0)
   // Probability is negligible (~1/2^256) but handle for correctness
   if (stealthPrivateKeyBigInt === 0n) {
     throw new Error("Invalid stealth private key derived (zero)");
   }
-  
+
   return "0x" + stealthPrivateKeyBigInt.toString(16).padStart(64, "0");
 }
 
@@ -397,7 +398,7 @@ export async function scanStealthPayments({
   if (!viewingPrivateKey) {
     throw new Error("viewingPrivateKey is required for scanning");
   }
-  
+
   const bridgeContract = new ethers.Contract(
     bridgeAddress,
     AXELAR_STEALTH_BRIDGE_ABI,
@@ -409,24 +410,24 @@ export async function scanStealthPayments({
   if (toBlock === "latest") {
     endBlock = await provider.getBlockNumber();
   }
-  
+
   const totalBlocks = endBlock - fromBlock;
   let allEvents = [];
-  
+
   // Chunk scanning for scalability (prevents RPC timeout on large ranges)
   for (let start = fromBlock; start <= endBlock; start += MAX_BLOCK_RANGE) {
     const end = Math.min(start + MAX_BLOCK_RANGE - 1, endBlock);
-    
+
     const filter = bridgeContract.filters.StealthPaymentReceived();
     const events = await bridgeContract.queryFilter(filter, start, end);
     allEvents = allEvents.concat(events);
-    
+
     // Report progress if callback provided
     if (onProgress) {
       onProgress(end - fromBlock, totalBlocks);
     }
   }
-  
+
   const events = allEvents;
 
   const matchingPayments = [];
@@ -435,7 +436,7 @@ export async function scanStealthPayments({
     try {
       // Extract event data
       const { stealthAddress, amount, symbol, ephemeralPubKey, viewHint, k } = event.args;
-      
+
       const ephemeralPubKeyHex = ethers.hexlify(ephemeralPubKey);
       const viewHintHex = ethers.hexlify(viewHint);
 
@@ -445,7 +446,7 @@ export async function scanStealthPayments({
         viewingPrivateKey,
         viewHintHex
       );
-      
+
       if (isMatch) {
         matchingPayments.push({
           stealthAddress,

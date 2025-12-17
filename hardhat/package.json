@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@axelar-network/axelar-gmp-sdk-solidity": "^6.0.6",
+    "@axelar-network/interchain-token-service": "^2.2.0",
     "@openzeppelin/contracts": "^5.4.0",
     "bech32": "^2.0.0",
     "dotenv": "^16.4.5",

@@ -16,13 +16,15 @@ pragma solidity ^0.8.19;
 
 import {AxelarExecutableWithToken} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/executable/AxelarExecutableWithToken.sol";
 import {IAxelarGasService} from "@axelar-network/axelar-gmp-sdk-solidity/contracts/interfaces/IAxelarGasService.sol";
+import {InterchainTokenExecutable} from "@axelar-network/interchain-token-service/contracts/executable/InterchainTokenExecutable.sol";
+import {IInterchainTokenService} from "@axelar-network/interchain-token-service/contracts/interfaces/IInterchainTokenService.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
-contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Ownable, Pausable {
+contract AxelarStealthBridge is AxelarExecutableWithToken, InterchainTokenExecutable, ReentrancyGuard, Ownable, Pausable {
     using SafeERC20 for IERC20;
 
     // ============ State Variables ============
@@ -31,6 +33,9 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
     
     // Mapping of trusted remote contracts (chain name => contract address string)
     mapping(string => string) public trustedRemotes;
+    
+    // Mapping of trusted remote contracts as addresses (for ITS)
+    mapping(string => address) public trustedRemotesAddress;
     
     // Meta address registry for cross-chain sync
     mapping(address => MetaAddress) public metaAddresses;
@@ -44,6 +49,9 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
     
     // Maximum fee in basis points (5%)
     uint256 public constant MAX_FEE_BPS = 500;
+
+    // Selector for Sync messages (keccak256("SYNC_META_ADDRESS"))
+    bytes4 private constant SYNC_SELECTOR = bytes4(keccak256("SYNC_META_ADDRESS"));
 
     // ============ Structs ============
 
@@ -121,14 +129,20 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
     error AmountTooSmall();
     error InvalidSpendKeyLength();
     error InvalidViewingKeyLength();
+    error InvalidMessage();
 
     // ============ Constructor ============
 
     constructor(
         address gateway_,
         address gasService_,
+        address tokenService_,
         address initialOwner
-    ) AxelarExecutableWithToken(gateway_) Ownable(initialOwner) {
+    ) 
+        AxelarExecutableWithToken(gateway_) 
+        InterchainTokenExecutable(tokenService_)
+        Ownable(initialOwner) 
+    {
         if (gasService_ == address(0)) revert ZeroAddress();
         gasService = IAxelarGasService(gasService_);
         feeRecipient = initialOwner;
@@ -244,6 +258,98 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
     }
 
     /**
+     * @notice Send a cross-chain stealth payment via ITS (Interchain Token Service)
+     * @param destinationChain The name of the destination chain (Axelar format)
+     * @param stealthAddress The computed stealth address on destination
+     * @param ephemeralPubKey The ephemeral public key for recipient detection
+     * @param viewHint The view hint byte for fast scanning
+     * @param k The index used in stealth address generation
+     * @param tokenId The ITS Token ID
+     * @param amount The amount of tokens to send
+     */
+    function sendCrossChainStealthPaymentITS(
+        string calldata destinationChain,
+        address stealthAddress,
+        bytes calldata ephemeralPubKey,
+        bytes1 viewHint,
+        uint32 k,
+        bytes32 tokenId,
+        uint256 amount
+    ) external payable nonReentrant whenNotPaused {
+        // Validate inputs
+        if (bytes(destinationChain).length == 0) revert InvalidDestination();
+        if (stealthAddress == address(0)) revert InvalidStealthAddress();
+        if (amount == 0) revert InvalidAmount();
+        if (msg.value == 0) revert InsufficientGasPayment();
+        if (ephemeralPubKey.length != 33) revert InvalidEphemeralKeyLength();
+        
+        address destinationContractAddress = trustedRemotesAddress[destinationChain];
+        if (destinationContractAddress == address(0)) revert UntrustedRemote();
+
+        // Calculate protocol fee
+        uint256 fee = (amount * protocolFeeBps) / 10000;
+        uint256 amountAfterFee = amount - fee;
+        
+        if (amountAfterFee < 1000) revert AmountTooSmall();
+
+        // Get token address from ITS
+        address tokenAddress = IInterchainTokenService(interchainTokenService).interchainTokenAddress(tokenId);
+        if (tokenAddress == address(0)) revert InvalidTokenAddress();
+
+        // Transfer tokens from sender
+        IERC20(tokenAddress).safeTransferFrom(msg.sender, address(this), amount);
+        
+        // Transfer fee to recipient
+        if (fee > 0 && feeRecipient != address(0)) {
+            IERC20(tokenAddress).safeTransfer(feeRecipient, fee);
+        }
+
+        // Approve ITS
+        IERC20(tokenAddress).forceApprove(interchainTokenService, amountAfterFee);
+
+        // Generate unique payment ID
+        uint256 nonce = paymentNonces[msg.sender]++;
+        bytes32 paymentId = keccak256(
+            abi.encodePacked(msg.sender, nonce, block.timestamp, stealthAddress)
+        );
+
+        // Encode payload
+        bytes memory payload = abi.encode(
+            StealthPayment({
+                stealthAddress: stealthAddress,
+                ephemeralPubKey: ephemeralPubKey,
+                viewHint: viewHint,
+                k: k,
+                sender: msg.sender,
+                nonce: nonce
+            })
+        );
+
+        // Call ITS using interchainTransfer with metadata for contract execution
+        // Per Axelar docs: metadata = bytes.concat(bytes4(0), payload) for contract calls
+        // https://docs.axelar.dev/dev/send-tokens/interchain-tokens/developer-guides/programmatically-create-a-token#send-tokens-with-data
+        bytes memory metadata = abi.encodePacked(bytes4(0), payload);
+        
+        IInterchainTokenService(interchainTokenService).interchainTransfer{value: msg.value}(
+            tokenId,
+            destinationChain,
+            abi.encodePacked(destinationContractAddress), // 20-byte address as bytes
+            amountAfterFee,
+            metadata,
+            msg.value // gasValue
+        );
+
+        emit CrossChainStealthPaymentSent(
+            destinationChain,
+            msg.sender,
+            stealthAddress,
+            amountAfterFee,
+            "ITS_TOKEN", // Symbol might not be available, use placeholder or fetch from token
+            paymentId
+        );
+    }
+
+    /**
      * @notice Send a message-only cross-chain call (no tokens)
      * @dev Used for syncing meta addresses across chains
      */
@@ -259,7 +365,7 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
         if (!meta.isRegistered) revert InvalidStealthAddress();
 
         bytes memory payload = abi.encode(
-            uint8(1), // Message type: Meta address sync
+            SYNC_SELECTOR, // Use selector for safety
             msg.sender,
             meta.spendPubKey,
             meta.viewingPubKey
@@ -359,8 +465,7 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
 
     /**
      * @notice Handle incoming cross-chain message (no tokens)
-     * @dev Used for meta address sync
-     *      Function signature from: https://github.com/axelarnetwork/axelar-gmp-sdk-solidity/blob/main/contracts/executable/AxelarExecutable.sol
+     * @dev Overrides AxelarExecutableWithToken (which overrides AxelarExecutable)
      */
     function _execute(
         bytes32 commandId,
@@ -368,27 +473,19 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
         string calldata sourceAddress,
         bytes calldata payload
     ) internal override {
-        // commandId is used by Axelar for tracking, we don't need it here
-        commandId;
-        
-        // Verify source is trusted
-        string memory trusted = trustedRemotes[sourceChain];
-        if (keccak256(bytes(trusted)) != keccak256(bytes(sourceAddress))) {
-            revert UntrustedRemote();
-        }
+        // Check if it's our Sync message
+        if (payload.length >= 4 && bytes4(payload) == SYNC_SELECTOR) {
+            // Verify source is trusted
+            string memory trusted = trustedRemotes[sourceChain];
+            if (keccak256(bytes(trusted)) != keccak256(bytes(sourceAddress))) {
+                revert UntrustedRemote();
+            }
 
-        // Decode message type
-        uint8 messageType = abi.decode(payload, (uint8));
-
-        if (messageType == 1) {
-            // Meta address sync
-            // NOTE: Only sync if user has NOT already registered locally
-            // This prevents cross-chain overwrite attacks
+            // Decode payload (skip selector)
             (, address user, bytes memory spendPubKey, bytes memory viewingPubKey) = 
-                abi.decode(payload, (uint8, address, bytes, bytes));
+                abi.decode(payload, (bytes4, address, bytes, bytes));
 
             // Security: Only allow sync if user hasn't registered on this chain
-            // User must explicitly update via registerMetaAddress() if they want to change
             if (!metaAddresses[user].isRegistered) {
                 metaAddresses[user] = MetaAddress({
                     spendPubKey: spendPubKey,
@@ -398,10 +495,56 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
 
                 emit MetaAddressSynced(sourceChain, user, spendPubKey, viewingPubKey);
             } else {
-                // Emit event for transparency when sync is skipped
                 emit MetaAddressSyncSkipped(sourceChain, user);
             }
+        } else {
+            revert InvalidMessage();
         }
+    }
+
+    /**
+     * @notice Handle incoming ITS token transfer
+     * @dev Called by InterchainTokenExecutable when receiving ITS tokens
+     */
+    function _executeWithInterchainToken(
+        bytes32 commandId,
+        string calldata sourceChain,
+        bytes calldata sourceAddress,
+        bytes calldata data,
+        bytes32 tokenId,
+        address token,
+        uint256 amount
+    ) internal override {
+        // commandId is used by Axelar for tracking
+        commandId;
+        tokenId; // We don't need to verify tokenId if we trust the token address provided by ITS
+
+        // Verify source is trusted
+        // Note: ITS sourceAddress is bytes, we need to convert to string to match trustedRemotes
+        string memory sourceAddressStr = string(sourceAddress);
+        string memory trusted = trustedRemotes[sourceChain];
+        
+        // Compare strings
+        if (keccak256(bytes(trusted)) != keccak256(bytes(sourceAddressStr))) {
+            revert UntrustedRemote();
+        }
+
+        // Decode payload
+        StealthPayment memory payment = abi.decode(data, (StealthPayment));
+
+        // Transfer tokens to stealth address
+        IERC20(token).safeTransfer(payment.stealthAddress, amount);
+
+        // Emit event for recipient's scanner to detect
+        emit StealthPaymentReceived(
+            sourceChain,
+            payment.stealthAddress,
+            amount,
+            "ITS_TOKEN", // We don't have symbol here easily, use placeholder
+            payment.ephemeralPubKey,
+            payment.viewHint,
+            payment.k
+        );
     }
 
     // ============ Admin Functions ============
@@ -416,7 +559,35 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
         string calldata contractAddress
     ) external onlyOwner {
         trustedRemotes[chainName] = contractAddress;
+        // Also parse and store as address for ITS
+        trustedRemotesAddress[chainName] = _parseAddress(contractAddress);
         emit TrustedRemoteSet(chainName, contractAddress);
+    }
+    
+    /**
+     * @notice Parse a hex string address to address type
+     * @dev Expects format: 0x followed by 40 hex characters
+     */
+    function _parseAddress(string memory str) internal pure returns (address) {
+        bytes memory strBytes = bytes(str);
+        require(strBytes.length == 42, "Invalid address length");
+        require(strBytes[0] == '0' && strBytes[1] == 'x', "Invalid address prefix");
+        
+        uint160 result = 0;
+        for (uint256 i = 2; i < 42; i++) {
+            result *= 16;
+            uint8 b = uint8(strBytes[i]);
+            if (b >= 48 && b <= 57) {
+                result += b - 48; // 0-9
+            } else if (b >= 65 && b <= 70) {
+                result += b - 55; // A-F
+            } else if (b >= 97 && b <= 102) {
+                result += b - 87; // a-f
+            } else {
+                revert("Invalid hex character");
+            }
+        }
+        return address(result);
     }
 
     /**
@@ -430,6 +601,7 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, ReentrancyGuard, Owna
         
         for (uint256 i = 0; i < chainNames.length; i++) {
             trustedRemotes[chainNames[i]] = contractAddresses[i];
+            trustedRemotesAddress[chainNames[i]] = _parseAddress(contractAddresses[i]);
             emit TrustedRemoteSet(chainNames[i], contractAddresses[i]);
         }
     }

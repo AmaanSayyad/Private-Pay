@@ -15,14 +15,14 @@ export const generatePrivateKey = () => {
   // Use crypto.getRandomValues for secure random generation
   const privateKey = new Uint8Array(32);
   crypto.getRandomValues(privateKey);
-  
+
   // Ensure the private key is valid (not zero and less than secp256k1 order)
   // This is a simple check - in production, you might want more validation
   if (privateKey.every(byte => byte === 0)) {
     // If all zeros, generate again (extremely unlikely but handle it)
     crypto.getRandomValues(privateKey);
   }
-  
+
   return privateKey;
 };
 
@@ -73,7 +73,7 @@ export const computeSharedSecret = (privateKey, publicKey) => {
   } else {
     publicKeyHex = publicKey.startsWith("0x") ? publicKey.slice(2) : publicKey;
   }
-  
+
   // Convert private key to bigint if it's Uint8Array
   // Manual conversion from bytes to bigint (big-endian)
   let privateKeyBigInt;
@@ -93,15 +93,15 @@ export const computeSharedSecret = (privateKey, publicKey) => {
   } else {
     privateKeyBigInt = privateKey;
   }
-  
+
   const point = Point.fromHex(publicKeyHex);
   const sharedPoint = point.multiply(privateKeyBigInt);
-  
+
   // Convert Point to compressed public key bytes
   // Use toHex and convert to bytes (toRawBytes might not be available in all versions)
   const sharedPointHex = sharedPoint.toHex(true); // compressed (33 bytes)
   const sharedSecret = hexToBytes(sharedPointHex);
-  
+
   return sharedSecret;
 };
 
@@ -135,7 +135,7 @@ export const generateStealthAddress = (
     const kBytes = new Uint8Array(4);
     const kView = new DataView(kBytes.buffer);
     kView.setUint32(0, k, false); // big-endian
-    
+
     const tweakInput = new Uint8Array(sharedSecret.length + 4);
     tweakInput.set(sharedSecret, 0);
     tweakInput.set(kBytes, sharedSecret.length);
@@ -153,7 +153,7 @@ export const generateStealthAddress = (
     // Convert Point to hex and then to bytes
     const tweakPubKeyHex = tweakPoint.toHex(true); // compressed
     const tweakPubKey = hexToBytes(tweakPubKeyHex);
-    
+
     // Point addition: spend_pub + tweak_pub
     // Convert bytes to hex for Point.fromHex
     const spendPubKeyHexStr = bytesToHex(spendPubKey);
@@ -167,7 +167,7 @@ export const generateStealthAddress = (
 
     // Derive Aptos address from stealth public key using SHA3-256
     const addressHash = sha3_256(stealthPubKey);
-    
+
     // Take first 16 bytes for Aptos address
     const addressBytes16 = addressHash.slice(0, 16);
     // Convert to hex and pad to 64 characters (32 bytes) by adding zeros at the beginning
@@ -203,18 +203,49 @@ export const generateEphemeralKeyPair = () => {
 };
 
 /**
+ * Derive keys from a seed (signature hash)
+ * Deterministic generation: seed -> spendKey, hash(seed) -> viewKey
+ */
+export const deriveKeysFromSignature = (signatureHash) => {
+  // Use the signature hash as the seed for the spend key
+  // Ensure it's a valid private key (32 bytes)
+  const seedBytes = hexToBytes(signatureHash);
+
+  // Spend Key: Derived directly from seed
+  const spendPrivateKey = seedBytes.slice(0, 32);
+  const spendPublicKey = getPublicKey(spendPrivateKey);
+
+  // View Key: Derived from hash of seed (to keep it separate)
+  const viewSeed = sha256(seedBytes);
+  const viewingPrivateKey = viewSeed.slice(0, 32);
+  const viewingPublicKey = getPublicKey(viewingPrivateKey);
+
+  return {
+    spend: {
+      privateKey: bytesToHex(spendPrivateKey),
+      publicKey: bytesToHex(spendPublicKey),
+    },
+    viewing: {
+      privateKey: bytesToHex(viewingPrivateKey),
+      publicKey: bytesToHex(viewingPublicKey),
+    },
+  };
+};
+
+/**
  * Generate meta address key pairs (spend and viewing)
  * Returns both private and public keys for secure storage
+ * @deprecated Use deriveKeysFromSignature for better UX
  */
 export const generateMetaAddressKeys = () => {
   // Generate spend key pair
   const spendPrivateKey = generatePrivateKey();
   const spendPublicKey = getPublicKey(spendPrivateKey);
-  
+
   // Generate viewing key pair
   const viewingPrivateKey = generatePrivateKey();
   const viewingPublicKey = getPublicKey(viewingPrivateKey);
-  
+
   return {
     spend: {
       privateKey: bytesToHex(spendPrivateKey),
@@ -238,11 +269,11 @@ export const validatePublicKey = (pubKeyHex) => {
 
     // Clean the hex string
     const cleanHex = pubKeyHex.trim().startsWith("0x") ? pubKeyHex.trim().slice(2) : pubKeyHex.trim();
-    
+
     if (cleanHex.length !== 66) { // 33 bytes = 66 hex characters
-      return { 
-        valid: false, 
-        error: `Public key must be 33 bytes (66 hex characters), got ${cleanHex.length / 2} bytes` 
+      return {
+        valid: false,
+        error: `Public key must be 33 bytes (66 hex characters), got ${cleanHex.length / 2} bytes`
       };
     }
 

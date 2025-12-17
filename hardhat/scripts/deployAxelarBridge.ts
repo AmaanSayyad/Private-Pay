@@ -108,6 +108,7 @@ async function main() {
   const bridge = await AxelarStealthBridge.deploy(
     axelarContracts.gateway,
     axelarContracts.gasService,
+    "0xB5FB4BE02232B1bBA4dC8f81dc24C26980dE9e3C", // ITS Address (same on all chains)
     deployer.address // initial owner
   );
 

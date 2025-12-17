@@ -3,12 +3,12 @@
     "network": "ethereum-sepolia",
     "chainId": 11155111,
     "axelarChainName": "ethereum-sepolia",
-    "contractAddress": "0x1764681c26D04f0E9EBb305368cfda808A9F6f8f",
+    "contractAddress": "0x04ab5fA40Df5bF1B5e9E640b5D24C740ec5DfDeE",
     "gateway": "0xe432150cce91c13a887f7D836923d5597adD8E31",
     "gasService": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
     "deployer": "0xD25a9d413285Ed8963C46397c6f36C844330Fe3B",
-    "timestamp": "2025-12-12T06:18:50.831Z",
-    "txHash": "0xbc961a9197ebb3b3730c01a95caf873093be4388f3a69c1adadda4ae0ca595d8"
+    "timestamp": "2025-12-17T04:04:25.020Z",
+    "txHash": "0x850cba6c22524220a16acceb16b1f8b578d1597bcfb37471f77d1084efa40f82"
   },
   "polygon-amoy": {
     "network": "polygon-amoy",
@@ -23,12 +23,13 @@
   },
   "base-sepolia": {
     "network": "base-sepolia",
-    "chainId": "84532",
+    "chainId": 84532,
     "axelarChainName": "base-sepolia",
-    "contractAddress": "0x1764681c26D04f0E9EBb305368cfda808A9F6f8f",
+    "contractAddress": "0xE09f184968cdAD4D0B94e2968Cfbf1395FB66D79",
     "gateway": "0xe432150cce91c13a887f7D836923d5597adD8E31",
     "gasService": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
     "deployer": "0xD25a9d413285Ed8963C46397c6f36C844330Fe3B",
-    "timestamp": "2025-12-16T07:48:08.891Z"
+    "timestamp": "2025-12-17T04:04:45.664Z",
+    "txHash": "0xc722baae94957225cfe19b9eda9e8483c64bd687273482913d3cda8c4b586c40"
   }
 }

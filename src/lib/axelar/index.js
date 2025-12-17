@@ -24,7 +24,7 @@ const API_TIMEOUT = 30000;
 async function fetchWithTimeout(url, options = {}, timeout = API_TIMEOUT) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -84,10 +84,11 @@ export const AXELAR_CHAINS = {
     explorer: isMainnet
       ? "https://etherscan.io"
       : "https://sepolia.etherscan.io",
-    tokens: isMainnet ? ["axlUSDC", "WETH", "USDC", "aUSDC"] : ["TUSDC", "WETH"], // TUSDC = Test token at 0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B
+    tokens: isMainnet ? ["axlUSDC", "WETH", "USDC", "aUSDC"] : ["TUSDC", "aUSDC", "axlUSDC", "WETH"], // TUSDC = Test token at 0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B
     icon: "/chains/ethereum.svg",
     gasToken: GAS_TOKENS.ETH,
     color: "#627EEA",
+    stealthBridge: isMainnet ? "" : "0x04ab5fA40Df5bF1B5e9E640b5D24C740ec5DfDeE",
   },
   polygon: {
     name: "Polygon",
@@ -199,10 +200,11 @@ export const AXELAR_CHAINS = {
     explorer: isMainnet
       ? "https://basescan.org"
       : "https://sepolia.basescan.org",
-    tokens: isMainnet ? ["axlUSDC", "WETH", "USDC", "aUSDC"] : ["WETH"], // TUSDC not deployed on Base yet
+    tokens: isMainnet ? ["axlUSDC", "WETH", "USDC", "aUSDC"] : ["aUSDC", "axlUSDC", "WETH"], // TUSDC not deployed on Base yet
     icon: "/chains/base.svg",
     gasToken: GAS_TOKENS.ETH,
     color: "#0052FF",
+    stealthBridge: isMainnet ? "" : "0xE09f184968cdAD4D0B94e2968Cfbf1395FB66D79",
   },
   oasis: {
     name: "Oasis Sapphire",
@@ -498,9 +500,9 @@ export async function estimateCrossChainGas({
 
   // For L2 chains, include executeData if provided for accurate L1 fee calculation
   // Docs: https://docs.axelar.dev/dev/gas-service/pay-gas/
-  if (isL2Chain(destinationChain) && executeData) {
-    requestBody.executeData = executeData;
-  }
+  // if (isL2Chain(destinationChain) && executeData) {
+  //   requestBody.executeData = executeData;
+  // }
 
   // Add express flag for premium faster execution
   // Express service incurs additional insurance fee
@@ -534,7 +536,7 @@ export async function estimateCrossChainGas({
   try {
     // API can return plain number string or JSON object
     const text = await response.text();
-    
+
     // Try to parse as JSON first
     try {
       data = JSON.parse(text);
@@ -545,7 +547,7 @@ export async function estimateCrossChainGas({
   } catch (error) {
     throw new Error("Invalid response from gas estimation API");
   }
-  
+
   // API returns the fee as a plain number string (most common case)
   if (typeof data === "string" && /^\d+$/.test(data)) {
     if (data === "0") {
@@ -553,7 +555,7 @@ export async function estimateCrossChainGas({
     }
     return data;
   }
-  
+
   // API returns a number
   if (typeof data === "number") {
     if (data === 0) {
@@ -561,7 +563,7 @@ export async function estimateCrossChainGas({
     }
     return data.toString();
   }
-  
+
   // Object with result field
   if (data && data.result) {
     return data.result;
@@ -573,8 +575,8 @@ export async function estimateCrossChainGas({
     const baseFee = BigInt(data.baseFee);
     const executionFee = BigInt(data.executionFeeWithMultiplier);
     // L1 fee is automatically included for L2 destination chains
-    const l1Fee = data.l1ExecutionFeeWithMultiplier 
-      ? BigInt(data.l1ExecutionFeeWithMultiplier) 
+    const l1Fee = data.l1ExecutionFeeWithMultiplier
+      ? BigInt(data.l1ExecutionFeeWithMultiplier)
       : 0n;
     return (baseFee + executionFee + l1Fee).toString();
   }
@@ -645,11 +647,11 @@ const CUSTOM_ITS_TOKENS = {
  */
 export async function getAvailableTokens(sourceChainKey, destChainKey) {
   const assets = await fetchAxelarAssets();
-  
+
   // Map our chain keys to Axelar chain names
   const srcChain = AXELAR_CHAINS[sourceChainKey];
   const dstChain = AXELAR_CHAINS[destChainKey];
-  
+
   if (!srcChain || !dstChain) {
     return [];
   }
@@ -660,10 +662,10 @@ export async function getAvailableTokens(sourceChainKey, destChainKey) {
 
   // Start with custom ITS tokens that are available on both chains
   const customTokens = Object.values(CUSTOM_ITS_TOKENS).filter(token => {
-    const srcSupported = token.deployedChains.some(c => 
+    const srcSupported = token.deployedChains.some(c =>
       c.toLowerCase() === srcAxelarName || c.toLowerCase().includes(sourceChainKey)
     );
-    const dstSupported = token.deployedChains.some(c => 
+    const dstSupported = token.deployedChains.some(c =>
       c.toLowerCase() === dstAxelarName || c.toLowerCase().includes(destChainKey)
     );
     return srcSupported && dstSupported;
@@ -678,17 +680,17 @@ export async function getAvailableTokens(sourceChainKey, destChainKey) {
   // Filter Axelar API assets that exist on both chains
   const axelarTokens = assets.filter(asset => {
     if (!asset.addresses) return false;
-    
+
     // Check if asset exists on source chain
     const srcAddress = Object.keys(asset.addresses).find(
-      chain => chain.toLowerCase() === srcAxelarName || 
-               chain.toLowerCase().includes(srcAxelarName.split("-")[0])
+      chain => chain.toLowerCase() === srcAxelarName ||
+        chain.toLowerCase().includes(srcAxelarName.split("-")[0])
     );
-    
+
     // Check if asset exists on destination chain
     const dstAddress = Object.keys(asset.addresses).find(
       chain => chain.toLowerCase() === dstAxelarName ||
-               chain.toLowerCase().includes(dstAxelarName.split("-")[0])
+        chain.toLowerCase().includes(dstAxelarName.split("-")[0])
     );
 
     return srcAddress && dstAddress;
@@ -728,7 +730,7 @@ export function getSupportedTokens(sourceChain, destinationChain) {
   if (!srcChain || !dstChain) {
     return [];
   }
-  
+
   // Return common tokens as fallback (for sync calls)
   return ["aUSDC", "WETH", "WMATIC", "WAVAX", "WBNB"];
 }
@@ -750,12 +752,12 @@ export function getAllSupportedChains() {
  */
 export function getSupportedChains(network = "testnet") {
   const isMainnet = network === "mainnet";
-  
+
   return Object.entries(AXELAR_CHAINS).filter(([key, chain]) => {
     // Filter out chains that don't support the current network
     if (isMainnet && chain.axelarName === "ethereum-sepolia") return false;
     if (!isMainnet && chain.axelarName === "ethereum") return false;
-    
+
     // IMPORTANT: Only include testnets officially supported by Axelar
     // Verified against https://github.com/axelarnetwork/axelar-contract-deployments/blob/main/axelar-chains-config/info/testnet.json
     if (!isMainnet) {
@@ -773,22 +775,36 @@ export function getSupportedChains(network = "testnet") {
       ];
       return supportedTestnets.includes(key);
     }
-    
+
     return true;
   }).map(([key, chain]) => ({
     key,
     ...chain,
     // Add testnet support flag
-    ...(isMainnet ? {} : { 
+    ...(isMainnet ? {} : {
       hasTestnetSupport: true
     })
   }));
 }
 
 /**
- * Track cross-chain transaction status via Axelarscan API
+ * Track cross-chain transaction status via Axelarscan GMP API
+ * Based on: https://docs.axelarscan.io/gmp
+ * 
+ * GMPStatus values per Axelar SDK:
+ * - source_gateway_called: Transaction sent to gateway
+ * - confirmed: Confirmed on source chain
+ * - approving: Being approved on Axelar
+ * - destination_gateway_approved: Approved on destination
+ * - executing: Being executed on destination
+ * - destination_executed: Successfully executed
+ * - express_executed: Express executed (fast path)
+ * - error: Execution failed
+ * - insufficient_fee: Not enough gas paid
+ * - not_executed: Not yet executed
+ * 
  * @param {string} txHash - Transaction hash from source chain
- * @returns {Promise<object>} - Transaction status
+ * @returns {Promise<object>} - Transaction status with normalized fields
  */
 export async function trackTransaction(txHash) {
   const baseUrl = isMainnet
@@ -796,12 +812,29 @@ export async function trackTransaction(txHash) {
     : "https://testnet.api.axelarscan.io";
 
   try {
+    // Use the GMP API endpoint with POST method for searching
     const response = await fetchWithTimeout(
-      `${baseUrl}/cross-chain/transfers-status?txHash=${txHash}`
+      `${baseUrl}/gmp/searchGMP`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          txHash: txHash,
+          size: 1,
+        }),
+      }
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch transaction status: ${response.status}`);
+      // Fallback to simple GET if POST fails
+      const fallbackResponse = await fetchWithTimeout(
+        `${baseUrl}/gmp/${txHash}`
+      );
+      if (!fallbackResponse.ok) {
+        throw new Error(`Failed to fetch transaction status: ${response.status}`);
+      }
+      const fallbackData = await fallbackResponse.json();
+      return normalizeGMPResponse(fallbackData);
     }
 
     let data;
@@ -810,7 +843,36 @@ export async function trackTransaction(txHash) {
     } catch (parseError) {
       throw new Error("Invalid JSON response from transaction status API");
     }
-    return data;
+
+    // The searchGMP endpoint can return:
+    // 1. { data: [...], total: N, ... } format
+    // 2. Direct array format [...]
+    // 3. Single object format { ... }
+
+    // Check for { data: [...] } wrapper format
+    if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
+      return normalizeGMPResponse(data.data[0]);
+    }
+
+    // Check for direct array format
+    if (Array.isArray(data) && data.length > 0) {
+      return normalizeGMPResponse(data[0]);
+    }
+
+    // If data is already a single transaction object (check for status field)
+    if (data && typeof data === "object" && !Array.isArray(data) && data.status) {
+      return normalizeGMPResponse(data);
+    }
+
+    // Transaction not yet indexed - return pending status
+    return {
+      status: "source_gateway_called",
+      statusLabel: "Initiated",
+      isComplete: false,
+      isPending: true,
+      isFailed: false,
+      message: "Transaction submitted, waiting for Axelar network to index...",
+    };
   } catch (error) {
     if (error.name === "AbortError") {
       throw new Error("Transaction status request timed out");
@@ -818,6 +880,86 @@ export async function trackTransaction(txHash) {
     console.error("Error tracking transaction:", error);
     throw error;
   }
+}
+
+/**
+ * Normalize GMP API response to a consistent format
+ * @param {object} data - Raw GMP API response
+ * @returns {object} - Normalized status object
+ */
+function normalizeGMPResponse(data) {
+  // Handle different response structures from the API
+  const status = data?.status || data?.simplified_status || "unknown";
+  const gasPaidStatus = data?.gas_paid_info?.status || data?.gas_status;
+
+  // Check for express execution
+  const isExpressExecuted = status === "express_executed" ||
+    data?.express_executed ||
+    data?.is_express_executed;
+
+  // Check for successful execution
+  const isExecuted = status === "destination_executed" ||
+    status === "executed" ||
+    isExpressExecuted ||
+    data?.executed;
+
+  // Check for errors
+  const isError = status === "error" ||
+    status === "destination_execute_error" ||
+    data?.error;
+
+  // Check for insufficient gas
+  const isInsufficientFee = status === "insufficient_fee" ||
+    gasPaidStatus === "gas_paid_not_enough_gas" ||
+    data?.is_insufficient_fee;
+
+  // Determine human-readable status
+  let statusLabel = "Processing";
+  let message = "";
+
+  if (isExpressExecuted) {
+    statusLabel = "Express Executed";
+    message = "Transaction completed via Express service";
+  } else if (isExecuted) {
+    statusLabel = "Completed";
+    message = "Transaction successfully executed on destination chain";
+  } else if (isError) {
+    statusLabel = "Failed";
+    message = data?.error?.message || "Transaction execution failed on destination chain";
+  } else if (isInsufficientFee) {
+    statusLabel = "Insufficient Gas";
+    message = "Not enough gas was paid. Consider adding more gas to complete the transaction.";
+  } else if (status === "destination_gateway_approved" || status === "approved") {
+    statusLabel = "Approved";
+    message = "Approved on destination gateway, awaiting execution";
+  } else if (status === "executing") {
+    statusLabel = "Executing";
+    message = "Transaction is being executed on destination chain";
+  } else if (status === "approving" || status === "confirmed") {
+    statusLabel = "Confirming";
+    message = "Transaction confirmed, awaiting approval on Axelar";
+  } else if (status === "source_gateway_called") {
+    statusLabel = "Initiated";
+    message = "Transaction sent to Axelar gateway, awaiting confirmation";
+  }
+
+  return {
+    status,
+    statusLabel,
+    gasPaidStatus,
+    isComplete: isExecuted,
+    isPending: !isExecuted && !isError && !isInsufficientFee,
+    isFailed: isError,
+    isInsufficientFee,
+    isExpressExecuted,
+    message,
+    // Include raw data for debugging
+    timeSpent: data?.time_spent,
+    sourceChain: data?.call?.chain || data?.source_chain,
+    destinationChain: data?.call?.returnValues?.destinationChain || data?.destination_chain,
+    executedTxHash: data?.executed?.transactionHash,
+    rawData: data,
+  };
 }
 
 /**
@@ -1076,8 +1218,8 @@ export function getAddGasUrl(txHash, logIndex = "0") {
  * @returns {boolean} - True if transaction needs more gas
  */
 export function needsMoreGas(txStatus) {
-  return txStatus?.status === "insufficient_fee" || 
-         txStatus?.is_insufficient_fee === true;
+  return txStatus?.status === "insufficient_fee" ||
+    txStatus?.is_insufficient_fee === true;
 }
 
 /**
