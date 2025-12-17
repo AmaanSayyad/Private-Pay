@@ -21,14 +21,26 @@ export default function MinaProvider({ children }) {
     const [network, setNetwork] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
 
-    const simulateDeposit = (amount) => {
-        const newSimulated = (minaBalance.simulated || 0) + parseFloat(amount);
-        setMinaBalance(prev => ({
-            ...prev,
-            simulated: newSimulated
-        }));
-        localStorage.setItem("simulated_mina", newSimulated.toString());
-        toast.success(`Received incoming transfer: ${amount} MINA (Simulated)`);
+    const simulateDeposit = async (amount) => {
+        try {
+            const amountNum = parseFloat(amount);
+            if (isNaN(amountNum) || amountNum <= 0) {
+                throw new Error('Invalid amount');
+            }
+            const newSimulated = (minaBalance.simulated || 0) + amountNum;
+            setMinaBalance(prev => ({
+                ...prev,
+                simulated: newSimulated
+            }));
+            const txHash = `mina_sim_tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            localStorage.setItem("simulated_mina", newSimulated.toString());
+            toast.success(`Received incoming transfer: ${amount} MINA (Simulated)`);
+            return txHash;
+        } catch (error) {
+            console.error('Error in simulateDeposit:', error);
+            toast.error(`Failed to simulate deposit: ${error.message}`);
+            throw error;
+        }
     };
     const [isInstalled, setIsInstalled] = useState(false);
 
@@ -64,11 +76,20 @@ export default function MinaProvider({ children }) {
 
     const updateBalance = async (address) => {
         if (!address) return;
-        const bal = await getMinaBalance(address);
-        setMinaBalance(bal);
+        try {
+            const bal = await getMinaBalance(address);
+            setMinaBalance(prev => ({
+                ...bal,
+                simulated: prev?.simulated || 0  // Keep existing simulated balance
+            }));
 
-        const net = await requestNetwork();
-        setNetwork(net);
+            const net = await requestNetwork();
+            setNetwork(net);
+            return bal;
+        } catch (error) {
+            console.error('Error updating balance:', error);
+            throw error;
+        }
     };
 
     const connect = async () => {
@@ -99,9 +120,10 @@ export default function MinaProvider({ children }) {
                 minaAccount,
                 isConnected,
                 isInstalled,
+                updateBalance,
                 minaBalance: {
                     ...minaBalance,
-                    total: (parseFloat(minaBalance.total) + parseFloat(minaBalance.simulated || 0)).toFixed(2)
+                    total: (parseFloat(minaBalance.liquid || 0) + parseFloat(minaBalance.simulated || 0)).toFixed(2)
                 },
                 network,
                 connect,

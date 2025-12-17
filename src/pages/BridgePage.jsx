@@ -145,20 +145,34 @@ export default function BridgePage() {
             // Generate a 'fake' or real tx hash depending on what we can do
             const mockHash = "mock_privacy_tx_" + Date.now();
 
-            // NOTE: Simulate deposit to reflect in destination for demo
+            // Simulate deposit and refresh balance for the destination chain
+            let releaseTxHash = mockHash;
+            
             if (destChain === "mina") {
-                mina.simulateDeposit(amount);
+                releaseTxHash = await mina.simulateDeposit(amount);
+                // Refresh Mina balance after deposit
+                if (mina.minaAccount) {
+                    await mina.updateBalance(mina.minaAccount);
+                }
             } else if (destChain === "zcash") {
-                zcash.simulateDeposit(amount);
+                releaseTxHash = await zcash.simulateDeposit(amount);
             }
 
-            setCompletedTx(prev => ({ ...prev, release: mockHash }));
+            setCompletedTx(prev => ({ ...prev, release: releaseTxHash }));
             setStep(4);
-            toast.success("Bridge Complete! Privacy tokens received.");
+            toast.success((t) => (
+                <div className="flex flex-col">
+                    <div>Bridge Complete! Privacy tokens received.</div>
+                    <div className="text-xs mt-1">
+                        Tx: <span className="font-mono text-blue-500">{releaseTxHash}</span>
+                    </div>
+                </div>
+            ));
 
         } catch (error) {
             console.error(error);
-            toast.error("Release failed");
+            toast.error(`Release failed: ${error.message || 'Unknown error'}`);
+            console.error('Release error details:', error);
         }
     };
 

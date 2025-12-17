@@ -16,6 +16,8 @@ export default function MinaPage() {
         network
     } = useMina();
 
+    console.log(minaBalance);
+
     const [recipient, setRecipient] = useState("");
     const [amount, setAmount] = useState("");
     const [memo, setMemo] = useState("");
