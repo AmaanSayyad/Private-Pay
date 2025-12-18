@@ -324,7 +324,10 @@ export default function PrivatePaymentsPage() {
               </div>
             </div>
           </div>
-          <WalletMultiButton className="!bg-primary !rounded-xl !h-10" />
+          <WalletMultiButton 
+            className="!bg-[#0d08e3] !rounded-xl !h-10 hover:!bg-[#0e0dc6] !text-white" 
+            style={{ backgroundColor: '#0d08e3' }}
+          />
         </div>
 
         {!connected ? (
@@ -335,7 +338,10 @@ export default function PrivatePaymentsPage() {
               <p className="text-gray-500 text-center mb-6 max-w-sm">
                 Connect your Solana wallet to use private payments with encrypted amounts
               </p>
-              <WalletMultiButton className="!bg-primary !rounded-xl !px-8 !py-3" />
+              <WalletMultiButton 
+                className="!bg-[#0d08e3] !rounded-xl !px-8 !py-3 hover:!bg-[#0e0dc6] !text-white" 
+                style={{ backgroundColor: '#0d08e3' }}
+              />
             </CardBody>
           </Card>
         ) : (

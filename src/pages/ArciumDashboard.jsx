@@ -106,7 +106,10 @@ export default function ArciumDashboard() {
                 </span>
               </div>
             )}
-            <WalletMultiButton className="!bg-primary !rounded-xl !h-10" />
+            <WalletMultiButton 
+              className="!bg-[#0d08e3] !rounded-xl !h-10 hover:!bg-[#0e0dc6] !text-white" 
+              style={{ backgroundColor: '#0d08e3' }}
+            />
           </div>
         </div>
 
@@ -144,7 +147,10 @@ export default function ArciumDashboard() {
                 Connect your wallet to access private payments, swaps, and dark pool trading
                 powered by Arcium's encrypted computation network.
               </p>
-              <WalletMultiButton className="!bg-primary !rounded-xl !px-8 !py-3" />
+              <WalletMultiButton 
+                className="!bg-[#0d08e3] !rounded-xl !px-8 !py-3 hover:!bg-[#0e0dc6] !text-white" 
+                style={{ backgroundColor: '#0d08e3' }}
+              />
             </CardBody>
           </Card>
         ) : (

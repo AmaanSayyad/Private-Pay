@@ -115,3 +115,142 @@
     transform: rotate(159deg);
   }
 }
+
+/* Override Solana Wallet Adapter button colors to dark blue */
+.wallet-adapter-button,
+.wallet-adapter-button-trigger,
+button.wallet-adapter-button,
+button.wallet-adapter-button-trigger {
+  background-color: #0d08e3 !important;
+  background: #0d08e3 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 12px !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+
+.wallet-adapter-button:hover:not([disabled]),
+.wallet-adapter-button-trigger:hover:not([disabled]),
+button.wallet-adapter-button:hover:not([disabled]),
+button.wallet-adapter-button-trigger:hover:not([disabled]) {
+  background-color: #0e0dc6 !important;
+  background: #0e0dc6 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(13, 8, 227, 0.3) !important;
+}
+
+/* Wallet Modal Styling - Clean White Design */
+.wallet-adapter-modal-wrapper {
+  background: rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.wallet-adapter-modal {
+  background: white !important;
+  border-radius: 24px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid #e5e7eb !important;
+  overflow: hidden !important;
+  max-width: 400px !important;
+}
+
+.wallet-adapter-modal-title {
+  background: white !important;
+  color: #1f2937 !important;
+  padding: 24px 24px 20px 24px !important;
+  font-weight: 700 !important;
+  font-size: 20px !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.wallet-adapter-modal-list {
+  padding: 16px !important;
+  background: white !important;
+}
+
+.wallet-adapter-modal-list-item {
+  background: #f9fafb !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  margin-bottom: 8px !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+}
+
+.wallet-adapter-modal-list-item:hover {
+  background: white !important;
+  border-color: #0d08e3 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(13, 8, 227, 0.15) !important;
+}
+
+.wallet-adapter-modal-list-item .wallet-adapter-button {
+  background: transparent !important;
+  color: #1f2937 !important;
+  width: 100% !important;
+  justify-content: flex-start !important;
+  padding: 0 !important;
+  font-weight: 600 !important;
+  font-size: 15px !important;
+}
+
+.wallet-adapter-modal-list-item:hover .wallet-adapter-button {
+  background: transparent !important;
+  color: #0d08e3 !important;
+}
+
+.wallet-adapter-modal-button-close {
+  background: #f3f4f6 !important;
+  color: #6b7280 !important;
+  border-radius: 8px !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.wallet-adapter-modal-button-close:hover {
+  background: #e5e7eb !important;
+  color: #1f2937 !important;
+}
+
+.wallet-adapter-modal-button-close svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.wallet-adapter-modal-middle-button {
+  background: white !important;
+  color: #6b7280 !important;
+  border-top: 1px solid #e5e7eb !important;
+  padding: 16px 24px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  transition: all 0.2s ease !important;
+}
+
+.wallet-adapter-modal-middle-button:hover {
+  background: #f9fafb !important;
+  color: #0d08e3 !important;
+}
+
+/* Wallet adapter button icons */
+.wallet-adapter-button-start-icon,
+.wallet-adapter-button-end-icon {
+  filter: none !important;
+}
+
+/* Override any purple/violet colors */
+.wallet-adapter-button[style*="background"],
+.wallet-adapter-button-trigger[style*="background"] {
+  background-color: #0d08e3 !important;
+  background: #0d08e3 !important;
+}

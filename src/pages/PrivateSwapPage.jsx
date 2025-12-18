@@ -527,7 +527,10 @@ export default function PrivateSwapPage() {
 
             {/* Swap Button */}
             {!connected ? (
-              <WalletMultiButton className="!w-full !bg-primary !rounded-xl !h-12 !justify-center" />
+              <WalletMultiButton 
+                className="!w-full !bg-[#0d08e3] !rounded-xl !h-12 !justify-center hover:!bg-[#0e0dc6] !text-white" 
+                style={{ backgroundColor: '#0d08e3' }}
+              />
             ) : (
               <Button
                 color="primary"
