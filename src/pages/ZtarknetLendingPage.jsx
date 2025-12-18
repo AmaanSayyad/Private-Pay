@@ -87,62 +87,59 @@ export default function ZtarknetLendingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-indigo-50">
-      <div className="max-w-6xl mx-auto px-4 py-8 pb-24">
+    <div className="min-h-screen bg-white">
+      <div className="max-w-6xl mx-auto px-4 py-6 pb-24">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link
-            to="/starknet"
-            className="p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Ztarknet Private Lending</h1>
-            <p className="text-gray-600">Privacy-preserving lending protocol on Starknet</p>
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <img src="/assets/starknet-logo.png" alt="Starknet" className="w-12 h-12 rounded-full" />
+          <div className="text-center">
+            <h1 className="text-2xl font-bold" style={{ color: '#0d08e3' }}>
+              Ztarknet Private Lending
+            </h1>
+            <p className="text-gray-600 text-sm">Privacy-preserving lending protocol on Starknet</p>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-purple-100">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <DollarSign className="w-5 h-5 text-purple-600" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-4 shadow-md border-2 border-indigo-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 rounded-lg shadow-md" style={{ backgroundColor: '#0d08e3' }}>
+                <DollarSign className="w-4 h-4 text-white" />
               </div>
-              <span className="text-gray-500 text-sm">Total Deposits</span>
+              <span className="text-gray-600 text-xs font-bold">Total Deposits</span>
             </div>
-            <p className="text-2xl font-bold text-gray-900">$5.2M</p>
+            <p className="text-xl font-bold text-gray-900">$5.2M</p>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-blue-100">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <TrendingUp className="w-5 h-5 text-blue-600" />
+          <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-4 shadow-md border-2 border-indigo-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 rounded-lg shadow-md" style={{ backgroundColor: '#0d08e3' }}>
+                <TrendingUp className="w-4 h-4 text-white" />
               </div>
-              <span className="text-gray-500 text-sm">Total Borrowed</span>
+              <span className="text-gray-600 text-xs font-bold">Total Borrowed</span>
             </div>
-            <p className="text-2xl font-bold text-gray-900">$2.8M</p>
+            <p className="text-xl font-bold text-gray-900">$2.8M</p>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-green-100">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Percent className="w-5 h-5 text-green-600" />
+          <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-4 shadow-md border-2 border-indigo-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 rounded-lg shadow-md" style={{ backgroundColor: '#0d08e3' }}>
+                <Percent className="w-4 h-4 text-white" />
               </div>
-              <span className="text-gray-500 text-sm">Borrow APY</span>
+              <span className="text-gray-600 text-xs font-bold">Borrow APY</span>
             </div>
-            <p className="text-2xl font-bold text-gray-900">5.0%</p>
+            <p className="text-xl font-bold text-gray-900">5.0%</p>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-yellow-100">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Shield className="w-5 h-5 text-yellow-600" />
+          <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-4 shadow-md border-2 border-indigo-200">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 rounded-lg shadow-md" style={{ backgroundColor: '#0d08e3' }}>
+                <Shield className="w-4 h-4 text-white" />
               </div>
-              <span className="text-gray-500 text-sm">Collateral Ratio</span>
+              <span className="text-gray-600 text-xs font-bold">Collateral Ratio</span>
             </div>
-            <p className="text-2xl font-bold text-gray-900">150%</p>
+            <p className="text-xl font-bold text-gray-900">150%</p>
           </div>
         </div>
 
@@ -151,13 +148,18 @@ export default function ZtarknetLendingPage() {
           <div className="space-y-6">
             {/* Wallet Connection */}
             {!isConnected ? (
-              <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 text-center">
-                <Wallet className="w-12 h-12 mx-auto mb-4 text-purple-500" />
-                <h3 className="text-lg font-semibold mb-2">Connect Wallet</h3>
-                <p className="text-gray-500 mb-4">Connect your Starknet wallet to start lending</p>
+              <div className="bg-gradient-to-br from-indigo-500/10 via-indigo-500/10 to-indigo-500/10 border-2 border-indigo-300/50 shadow-xl backdrop-blur-sm rounded-2xl p-8 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center shadow-xl" style={{ backgroundColor: '#0d08e3' }}>
+                  <Wallet className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-bold mb-2 text-gray-900">Connect Wallet</h3>
+                <p className="text-gray-600 text-sm mb-4">Connect your Starknet wallet to start lending</p>
                 <button
                   onClick={() => connect("argentX")}
-                  className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors flex items-center gap-2 justify-center"
+                  className="mx-auto px-6 py-3 text-white rounded-xl hover:scale-105 transition-all shadow-xl font-bold flex items-center gap-2 justify-center"
+                  style={{ backgroundColor: '#0d08e3' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0a06b8'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#0d08e3'}
                 >
                   <img src="/assets/argentx_logo.png" alt="ArgentX" className="w-5 h-5 rounded-full" />
                   Connect Wallet
@@ -166,26 +168,28 @@ export default function ZtarknetLendingPage() {
             ) : (
               <>
                 {/* Tab Selector */}
-                <div className="bg-white rounded-2xl p-2 shadow-lg border border-gray-100">
-                  <div className="flex">
+                <div className="bg-white/80 backdrop-blur-xl border-2 border-gray-200 shadow-xl rounded-2xl p-2">
+                  <div className="flex gap-2">
                     <button
                       onClick={() => setActiveTab("deposit")}
-                      className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${
+                      className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
                         activeTab === "deposit"
-                          ? "bg-purple-600 text-white"
+                          ? "text-white shadow-lg"
                           : "text-gray-600 hover:bg-gray-100"
                       }`}
+                      style={activeTab === "deposit" ? { backgroundColor: '#0d08e3' } : {}}
                     >
                       <Lock className="w-4 h-4 inline mr-2" />
-                      Deposit Collateral
+                      Deposit
                     </button>
                     <button
                       onClick={() => setActiveTab("borrow")}
-                      className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${
+                      className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
                         activeTab === "borrow"
-                          ? "bg-purple-600 text-white"
+                          ? "text-white shadow-lg"
                           : "text-gray-600 hover:bg-gray-100"
                       }`}
+                      style={activeTab === "borrow" ? { backgroundColor: '#0d08e3' } : {}}
                     >
                       <TrendingUp className="w-4 h-4 inline mr-2" />
                       Borrow
@@ -195,27 +199,39 @@ export default function ZtarknetLendingPage() {
 
                 {/* Deposit Form */}
                 {activeTab === "deposit" && (
-                  <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                    <h3 className="text-lg font-semibold mb-4">Deposit Collateral</h3>
+                  <div className="bg-white/80 backdrop-blur-xl border-2 border-indigo-200 shadow-xl rounded-2xl p-5">
+                    <h3 className="text-base font-bold mb-4 text-gray-900 flex items-center gap-2">
+                      <Lock className="w-5 h-5" style={{ color: '#0d08e3' }} />
+                      Deposit Collateral
+                    </h3>
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-bold text-gray-800 mb-2">
                           Collateral Type
                         </label>
+                        <div className="relative">
                         <select
                           value={collateralType}
                           onChange={(e) => setCollateralType(e.target.value)}
-                          className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="w-full p-3 pl-10 border-2 border-gray-200 rounded-xl focus:ring-2 font-semibold appearance-none bg-white"
+                            onFocus={(e) => e.currentTarget.style.borderColor = '#0d08e3'}
+                            onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                         >
                           <option value="ETH">ETH</option>
                           <option value="STRK">STRK</option>
                           <option value="sZEC">sZEC</option>
                         </select>
+                          <img 
+                            src={collateralType === "ETH" ? "/assets/eth-logo.png" : collateralType === "STRK" ? "/assets/starknet-logo.png" : "/assets/zcash_logo.png"} 
+                            alt={collateralType} 
+                            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full pointer-events-none" 
+                          />
+                        </div>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-bold text-gray-800 mb-2">
                           Amount
                         </label>
                         <div className="relative">
@@ -224,21 +240,33 @@ export default function ZtarknetLendingPage() {
                             value={amount}
                             onChange={(e) => setAmount(e.target.value)}
                             placeholder="0.0"
-                            className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="w-full p-3 pr-20 border-2 border-gray-200 rounded-xl focus:ring-2 text-lg font-bold"
+                            onFocus={(e) => e.currentTarget.style.borderColor = '#0d08e3'}
+                            onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                           />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <img 
+                              src={collateralType === "ETH" ? "/assets/eth-logo.png" : collateralType === "STRK" ? "/assets/starknet-logo.png" : "/assets/zcash_logo.png"} 
+                              alt={collateralType} 
+                              className="w-4 h-4 rounded-full" 
+                            />
+                            <span className="text-sm font-semibold text-gray-600">
                             {collateralType}
                           </span>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-xs text-gray-500 mt-1 font-medium">
                           Balance: {balance.eth} ETH
                         </p>
                       </div>
 
-                      <div className="bg-purple-50 rounded-xl p-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Max Borrow (66%)</span>
-                          <span className="font-medium">
+                      <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-xl p-4">
+                        <div className="flex justify-between text-sm items-center">
+                          <span className="text-gray-700 font-semibold flex items-center gap-2">
+                            <img src="/assets/zcash_logo.png" alt="sZEC" className="w-4 h-4 rounded-full" />
+                            Max Borrow (66%)
+                          </span>
+                          <span className="font-bold" style={{ color: '#0d08e3' }}>
                             {amount ? (parseFloat(amount) * 0.66).toFixed(4) : "0"} sZEC
                           </span>
                         </div>
@@ -246,10 +274,13 @@ export default function ZtarknetLendingPage() {
 
                       <button
                         onClick={handleDeposit}
-                        disabled={!amount}
-                        className="w-full py-4 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!amount || isLoading}
+                        className="w-full py-4 text-white rounded-xl font-bold hover:scale-[1.01] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        style={{ backgroundColor: '#0d08e3' }}
+                        onMouseEnter={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = '#0a06b8')}
+                        onMouseLeave={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = '#0d08e3')}
                       >
-                        Deposit Collateral
+                        {isLoading ? "Processing..." : "Deposit Collateral"}
                       </button>
                     </div>
                   </div>
@@ -257,18 +288,23 @@ export default function ZtarknetLendingPage() {
 
                 {/* Borrow Form */}
                 {activeTab === "borrow" && (
-                  <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                    <h3 className="text-lg font-semibold mb-4">Borrow sZEC</h3>
+                  <div className="bg-white/80 backdrop-blur-xl border-2 border-indigo-200 shadow-xl rounded-2xl p-5">
+                    <h3 className="text-base font-bold mb-4 text-gray-900 flex items-center gap-2">
+                      <img src="/assets/zcash_logo.png" alt="sZEC" className="w-5 h-5 rounded-full" />
+                      Borrow sZEC
+                    </h3>
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-bold text-gray-800 mb-2">
                           Select Collateral
                         </label>
                         <select
                           value={selectedCollateral || ""}
                           onChange={(e) => setSelectedCollateral(e.target.value)}
-                          className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 font-semibold"
+                          onFocus={(e) => e.currentTarget.style.borderColor = '#0d08e3'}
+                          onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                         >
                           <option value="">Select collateral...</option>
                           <option value="1">Collateral #1 - 1.5 ETH ($3,000)</option>
@@ -276,7 +312,7 @@ export default function ZtarknetLendingPage() {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-bold text-gray-800 mb-2">
                           Borrow Amount
                         </label>
                         <div className="relative">
@@ -285,34 +321,43 @@ export default function ZtarknetLendingPage() {
                             value={borrowAmount}
                             onChange={(e) => setBorrowAmount(e.target.value)}
                             placeholder="0.0"
-                            className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="w-full p-3 pr-20 border-2 border-gray-200 rounded-xl focus:ring-2 text-lg font-bold"
+                            onFocus={(e) => e.currentTarget.style.borderColor = '#0d08e3'}
+                            onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                           />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                            sZEC
-                          </span>
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <img src="/assets/zcash_logo.png" alt="sZEC" className="w-4 h-4 rounded-full" />
+                            <span className="text-sm font-semibold text-gray-600">sZEC</span>
+                          </div>
                         </div>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-xs text-gray-500 mt-1 font-medium">
                           Max borrow: 2,000 sZEC
                         </p>
                       </div>
 
-                      <div className="bg-blue-50 rounded-xl p-4 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Interest Rate</span>
-                          <span className="font-medium">5.0% APY</span>
+                      <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-xl p-4 space-y-2">
+                        <div className="flex justify-between text-sm items-center">
+                          <span className="text-gray-700 font-semibold">Interest Rate</span>
+                          <span className="font-bold" style={{ color: '#0d08e3' }}>5.0% APY</span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Health Factor</span>
-                          <span className="font-medium text-green-600">185%</span>
+                        <div className="flex justify-between text-sm items-center">
+                          <span className="text-gray-700 font-semibold">Health Factor</span>
+                          <span className="font-bold text-green-600 flex items-center gap-1">
+                            <CheckCircle className="w-4 h-4" />
+                            185%
+                          </span>
                         </div>
                       </div>
 
                       <button
                         onClick={handleBorrow}
-                        disabled={!borrowAmount || !selectedCollateral}
-                        className="w-full py-4 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!borrowAmount || !selectedCollateral || isLoading}
+                        className="w-full py-4 text-white rounded-xl font-bold hover:scale-[1.01] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        style={{ backgroundColor: '#0d08e3' }}
+                        onMouseEnter={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = '#0a06b8')}
+                        onMouseLeave={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = '#0d08e3')}
                       >
-                        Borrow sZEC
+                        {isLoading ? "Processing..." : "Borrow sZEC"}
                       </button>
                     </div>
                   </div>
@@ -322,14 +367,20 @@ export default function ZtarknetLendingPage() {
           </div>
 
           {/* Right: Positions */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-              <h3 className="text-lg font-semibold mb-4">Your Positions</h3>
+          <div className="space-y-5">
+            <div className="bg-white/80 backdrop-blur-xl border-2 border-gray-200 shadow-xl rounded-2xl p-5">
+              <h3 className="text-base font-bold mb-4 text-gray-900 flex items-center gap-2">
+                <Shield className="w-5 h-5" style={{ color: '#0d08e3' }} />
+                Your Positions
+              </h3>
 
               {positions.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Shield className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No active positions</p>
+                <div className="text-center py-12 text-gray-500">
+                  <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                    <Shield className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="font-medium">No active positions</p>
+                  <p className="text-sm text-gray-400 mt-1">Deposit collateral to get started</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -338,17 +389,18 @@ export default function ZtarknetLendingPage() {
                       key={position.id}
                       className={`p-4 rounded-xl border ${
                         position.type === "collateral"
-                          ? "bg-purple-50 border-purple-200"
-                          : "bg-blue-50 border-blue-200"
+                          ? "bg-indigo-50 border-indigo-200"
+                          : "bg-indigo-50 border-indigo-200"
                       }`}
                     >
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                             position.type === "collateral"
-                              ? "bg-purple-200 text-purple-700"
-                              : "bg-blue-200 text-blue-700"
-                          }`}>
+                              ? "bg-indigo-200"
+                              : "bg-indigo-200"
+                          }`}
+                          style={{ color: '#0d08e3' }}>
                             {position.type === "collateral" ? "Collateral" : "Loan"}
                           </span>
                           <h4 className="font-medium mt-2">
@@ -379,11 +431,10 @@ export default function ZtarknetLendingPage() {
                             ? handleWithdraw(position.id)
                             : handleRepay(position.id)
                         }
-                        className={`w-full py-2 rounded-lg text-sm font-medium transition-colors ${
-                          position.type === "collateral"
-                            ? "bg-purple-600 text-white hover:bg-purple-700"
-                            : "bg-blue-600 text-white hover:bg-blue-700"
-                        }`}
+                        className="w-full py-2 rounded-lg text-sm font-medium transition-colors text-white"
+                        style={{ backgroundColor: '#0d08e3' }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0a06b8'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#0d08e3'}
                       >
                         {position.type === "collateral" ? (
                           <>
@@ -401,10 +452,14 @@ export default function ZtarknetLendingPage() {
             </div>
 
             {/* Privacy Info */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 text-white">
-              <Shield className="w-8 h-8 mb-3" />
-              <h3 className="text-lg font-semibold mb-2">Privacy-Preserving</h3>
-              <p className="text-purple-100 text-sm">
+            <div className="rounded-2xl p-5 text-white shadow-xl" style={{ backgroundColor: '#0d08e3' }}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-bold">Privacy-Preserving</h3>
+              </div>
+              <p className="text-indigo-100 text-sm leading-relaxed">
                 All lending positions use stealth addresses. Your collateral deposits and
                 loan amounts are shielded from public view using Ztarknet's privacy layer.
               </p>

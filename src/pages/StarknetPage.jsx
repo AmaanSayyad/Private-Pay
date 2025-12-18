@@ -134,50 +134,53 @@ export default function StarknetPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full min-h-[80vh] gap-8 p-4 pb-24">
+    <div className="flex flex-col items-center w-full min-h-screen bg-white py-6 px-4 pb-24">
+      <div className="w-full max-w-5xl">
+        {/* Compact Header */}
+        <div className="flex flex-col items-center gap-3 mb-6">
       <div className="flex items-center gap-3">
-        <Shield className="w-10 h-10 text-purple-500" />
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+            <img src="/assets/starknet-logo.png" alt="Starknet" className="w-12 h-12 rounded-full" />
+            <h1 className="text-3xl font-extrabold bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 bg-clip-text text-transparent">
           Starknet Privacy
         </h1>
       </div>
-
-      <p className="text-gray-600 max-w-lg text-center">
-        Experience cross-chain privacy with Ztarknet - bridging Zcash shielded transactions with Starknet.
+          <p className="text-gray-600 max-w-xl text-sm text-center">
+            Experience cross-chain privacy with Ztarknet - bridging Zcash shielded transactions with Starknet
       </p>
+        </div>
 
       {!isConnected ? (
-        <div className="flex flex-col items-center gap-6">
-          <Card className="max-w-md">
-            <CardBody className="gap-4 p-6">
-              <h2 className="text-xl font-bold text-center">Connect Wallet</h2>
-              <p className="text-sm text-gray-600 text-center">
-                Connect your Starknet wallet to access stealth payments and the Zcash bridge.
+          <div className="flex flex-col items-center">
+            <Card className="bg-gradient-to-br from-purple-500/10 via-indigo-500/10 to-blue-500/10 border-2 border-purple-300/50 shadow-xl backdrop-blur-sm max-w-md w-full">
+              <CardBody className="p-6">
+                <div className="flex flex-col items-center gap-4 text-center">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-xl">
+                    <Shield className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">Connect Wallet</h3>
+                    <p className="text-gray-600 text-sm">
+                      Connect your Starknet wallet to access stealth payments and the Zcash bridge
               </p>
+                  </div>
 
-              <div className="flex flex-col gap-3 mt-2">
+                  <div className="flex flex-col gap-3 mt-2 w-full">
                 <Button
-                  color="secondary"
-                  variant="shadow"
-                  size="lg"
-                  className="font-bold"
+                      className="w-full h-12 font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xl hover:scale-105 transition-all"
                   onClick={() => handleConnect("argentX")}
                   isLoading={isConnecting}
                   isDisabled={!availableWallets.argentX && !isConnecting}
-                  startContent={<img src="/assets/argentx_logo.png" alt="ArgentX" className="w-5 h-5 rounded-full" />}
+                      startContent={!isConnecting && <img src="/assets/argentx_logo.png" alt="ArgentX" className="w-5 h-5 rounded-full" />}
                 >
                   {availableWallets.argentX ? "Connect ArgentX" : "Install ArgentX"}
                 </Button>
 
                 <Button
-                  color="warning"
-                  variant="shadow"
-                  size="lg"
-                  className="font-bold"
+                      className="w-full h-12 font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xl hover:scale-105 transition-all"
                   onClick={() => handleConnect("braavos")}
                   isLoading={isConnecting}
                   isDisabled={!availableWallets.braavos && !isConnecting}
-                  startContent={<Wallet className="w-5 h-5" />}
+                      startContent={!isConnecting && <Wallet className="w-5 h-5" />}
                 >
                   {availableWallets.braavos ? "Connect Braavos" : "Install Braavos"}
                 </Button>
@@ -188,16 +191,17 @@ export default function StarknetPage() {
                   No Starknet wallet detected. Install ArgentX or Braavos to continue.
                 </p>
               )}
+                </div>
             </CardBody>
           </Card>
         </div>
       ) : (
-        <div className="flex flex-col w-full max-w-2xl gap-6">
+          <div className="flex flex-col w-full gap-5">
           {/* Wallet Info Card */}
-          <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-100">
-            <CardBody className="gap-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-purple-900">Wallet Details</h2>
+            <Card className="bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 border-2 border-purple-300 shadow-lg">
+              <CardBody className="p-5">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-bold text-purple-900">Wallet Details</h2>
                 <div className="flex items-center gap-2">
                   <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">
                     {walletType === "argentX" ? "ArgentX" : "Braavos"}
@@ -208,60 +212,81 @@ export default function StarknetPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-purple-700 font-semibold">Address</label>
-                <div className="flex items-center gap-2 bg-white/50 p-2 rounded-lg border border-purple-100">
-                  <code className="text-sm truncate flex-1 text-gray-700">
+                <div className="flex flex-col gap-2 mb-4">
+                  <label className="text-xs text-purple-700 font-bold">Address</label>
+                  <div className="flex items-center gap-2 bg-white/70 p-3 rounded-lg border border-purple-200">
+                    <code className="text-sm truncate flex-1 text-gray-700 font-mono">
                     {truncateAddress(account)}
                   </code>
-                  <button onClick={() => handleCopy(account)} className="p-1 hover:bg-purple-100 rounded">
-                    {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} className="text-purple-400" />}
+                    <button onClick={() => handleCopy(account)} className="p-1.5 hover:bg-purple-100 rounded transition-colors">
+                      {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} className="text-purple-600" />}
                   </button>
                   <a
                     href={`https://sepolia.starkscan.co/contract/${account}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-1 hover:bg-purple-100 rounded"
+                      className="p-1.5 hover:bg-purple-100 rounded transition-colors"
                   >
-                    <ExternalLink size={16} className="text-purple-400" />
+                      <ExternalLink size={16} className="text-purple-600" />
                   </a>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-purple-700 font-semibold">ETH Balance</label>
-                  <div className="text-xl font-bold text-gray-800">
-                    {balance.eth} <span className="text-sm text-purple-500">ETH</span>
+                <div className="grid grid-cols-3 gap-3 mb-3">
+                  <Card className="bg-white/70 border border-purple-200 shadow-sm">
+                    <CardBody className="p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <img src="/assets/eth-logo.png" alt="ETH" className="w-4 h-4 rounded-full" />
+                        <label className="text-xs text-purple-700 font-bold">ETH Balance</label>
+                      </div>
+                      <div className="text-lg font-bold text-gray-800">
+                        {balance.eth} <span className="text-xs text-purple-500">ETH</span>
                   </div>
+                    </CardBody>
+                  </Card>
+                  <Card className="bg-white/70 border border-purple-200 shadow-sm">
+                    <CardBody className="p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <img src="/assets/starknet-logo.png" alt="STRK" className="w-4 h-4 rounded-full" />
+                        <label className="text-xs text-purple-700 font-bold">STRK Balance</label>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-purple-700 font-semibold">STRK Balance</label>
-                  <div className="text-xl font-bold text-gray-800">
-                    {balance.strk} <span className="text-sm text-purple-500">STRK</span>
+                      <div className="text-lg font-bold text-gray-800">
+                        {balance.strk} <span className="text-xs text-purple-500">STRK</span>
                   </div>
+                    </CardBody>
+                  </Card>
+                  <Card className="bg-white/70 border border-green-200 shadow-sm">
+                    <CardBody className="p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <img src="/assets/zcash_logo.png" alt="sZEC" className="w-4 h-4 rounded-full" />
+                        <label className="text-xs text-green-700 font-bold">sZEC Balance</label>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-purple-700 font-semibold">sZEC Balance</label>
-                  <div className="text-xl font-bold text-gray-800">
-                    {balance.szec} <span className="text-sm text-green-500">sZEC</span>
+                      <div className="text-lg font-bold text-gray-800">
+                        {balance.szec} <span className="text-xs text-green-500">sZEC</span>
                   </div>
                   {balance.simulated > 0 && (
-                    <div className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded w-fit">
+                        <div className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-0.5 rounded w-fit mt-1">
                       + {balance.simulated} Simulated
                     </div>
                   )}
-                </div>
+                    </CardBody>
+                  </Card>
               </div>
 
-              <Button color="danger" variant="light" className="self-end" size="sm" onClick={disconnect}>
+                <Button 
+                  color="danger" 
+                  variant="light" 
+                  className="self-end" 
+                  size="sm" 
+                  onClick={disconnect}
+                >
                 Disconnect
               </Button>
             </CardBody>
           </Card>
 
           {/* Tabs for Receive/Send */}
-          <Card>
+            <Card className="bg-white/80 backdrop-blur-xl border-2 border-white/50 shadow-2xl rounded-2xl overflow-hidden">
             <CardBody className="p-0">
               <Tabs
                 selectedKey={selectedTab}
@@ -270,9 +295,10 @@ export default function StarknetPage() {
                 color="secondary"
                 variant="underlined"
                 classNames={{
-                  tabList: "gap-6 w-full relative rounded-none p-0 border-b border-divider px-6",
+                    tabList: "gap-6 w-full relative rounded-none p-0 border-b-2 border-gray-200 px-6 pt-3 bg-gradient-to-r from-purple-50/50 to-indigo-50/50",
+                    cursor: "bg-gradient-to-r from-purple-600 to-indigo-600 h-1",
                   tab: "max-w-fit px-0 h-12",
-                  tabContent: "group-data-[selected=true]:text-purple-600",
+                    tabContent: "group-data-[selected=true]:text-purple-600 group-data-[selected=true]:font-bold text-sm",
                 }}
               >
                 <Tab
@@ -284,80 +310,90 @@ export default function StarknetPage() {
                     </div>
                   }
                 >
-                  <div className="p-6 flex flex-col gap-4">
-                    <h3 className="text-lg font-bold">Stealth Address Setup</h3>
+                  <div className="p-6 flex flex-col gap-4 bg-gradient-to-br from-white to-purple-50/30">
+                    <div>
+                      <h3 className="text-base font-bold text-gray-900 mb-1">Stealth Address Setup</h3>
                     <p className="text-sm text-gray-600">
                       Generate a meta address to receive private payments. Your stealth addresses are derived from this meta address.
                     </p>
+                    </div>
 
                     {!metaAddress ? (
                       <Button
-                        color="secondary"
-                        variant="shadow"
-                        size="lg"
+                        className="w-full h-12 font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xl hover:scale-[1.01] transition-all"
                         onClick={handleGenerateMetaAddress}
                         isLoading={isGenerating}
-                        className="font-bold"
+                        startContent={<Shield className="w-5 h-5" />}
                       >
-                        Generate Meta Address
+                        {isGenerating ? "Generating..." : "Generate Meta Address"}
                       </Button>
                     ) : (
-                      <div className="flex flex-col gap-4">
-                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
-                          <label className="text-xs text-purple-700 font-semibold">Spend Public Key</label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <code className="text-xs truncate flex-1 text-gray-700 bg-white/50 p-2 rounded">
+                      <div className="flex flex-col gap-3">
+                        <Card className="bg-purple-50/80 border-2 border-purple-200 shadow-sm">
+                          <CardBody className="p-4">
+                            <label className="text-xs text-purple-700 font-bold mb-2 block">Spend Public Key</label>
+                            <div className="flex items-center gap-2">
+                              <code className="text-xs truncate flex-1 text-gray-700 bg-white/70 p-2 rounded font-mono">
                               {metaAddress.spend.publicKey}
                             </code>
                             <button
                               onClick={() => handleCopy(metaAddress.spend.publicKey, "Spend Key")}
-                              className="p-1 hover:bg-purple-100 rounded"
+                                className="p-1.5 hover:bg-purple-100 rounded transition-colors"
                             >
-                              <Copy size={14} className="text-purple-400" />
+                                <Copy size={14} className="text-purple-600" />
                             </button>
                           </div>
-                        </div>
+                          </CardBody>
+                        </Card>
 
-                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
-                          <label className="text-xs text-purple-700 font-semibold">Viewing Public Key</label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <code className="text-xs truncate flex-1 text-gray-700 bg-white/50 p-2 rounded">
+                        <Card className="bg-purple-50/80 border-2 border-purple-200 shadow-sm">
+                          <CardBody className="p-4">
+                            <label className="text-xs text-purple-700 font-bold mb-2 block">Viewing Public Key</label>
+                            <div className="flex items-center gap-2">
+                              <code className="text-xs truncate flex-1 text-gray-700 bg-white/70 p-2 rounded font-mono">
                               {metaAddress.viewing.publicKey}
                             </code>
                             <button
                               onClick={() => handleCopy(metaAddress.viewing.publicKey, "Viewing Key")}
-                              className="p-1 hover:bg-purple-100 rounded"
+                                className="p-1.5 hover:bg-purple-100 rounded transition-colors"
                             >
-                              <Copy size={14} className="text-purple-400" />
+                                <Copy size={14} className="text-purple-600" />
                             </button>
                           </div>
-                        </div>
+                          </CardBody>
+                        </Card>
 
-                        <div className="text-xs text-amber-600 bg-amber-50 p-3 rounded-lg">
+                        <Card className="bg-amber-50 border-2 border-amber-200">
+                          <CardBody className="p-3">
+                            <p className="text-xs text-amber-700">
                           <strong>Important:</strong> Your private keys are stored locally. Back them up securely to avoid losing access to your funds.
-                        </div>
+                            </p>
+                          </CardBody>
+                        </Card>
 
                         {metaAddress.txHash && (
-                          <div className="text-xs text-green-600 bg-green-50 p-3 rounded-lg">
+                          <Card className="bg-green-50 border-2 border-green-200">
+                            <CardBody className="p-3">
+                              <p className="text-xs text-green-700">
                             <strong>Registered on-chain:</strong>{" "}
                             <a
                               href={`https://sepolia.starkscan.co/tx/${metaAddress.txHash}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="underline"
+                                  className="underline font-mono"
                             >
                               {metaAddress.txHash.slice(0, 10)}...{metaAddress.txHash.slice(-6)}
                             </a>
-                          </div>
+                              </p>
+                            </CardBody>
+                          </Card>
                         )}
 
                         <Button
-                          color="secondary"
                           variant="bordered"
-                          size="md"
+                          className="w-full h-10 border-2 border-purple-300 text-purple-700 hover:bg-purple-50 font-semibold"
                           onClick={handleGenerateMetaAddress}
                           isLoading={isGenerating}
-                          className="font-bold mt-2"
                         >
                           {isGenerating ? "Registering..." : "Regenerate & Register On-Chain"}
                         </Button>
@@ -375,35 +411,57 @@ export default function StarknetPage() {
                     </div>
                   }
                 >
-                  <div className="p-6 flex flex-col gap-4">
-                    <h3 className="text-lg font-bold">Send Private Payment</h3>
+                  <div className="p-6 flex flex-col gap-4 bg-gradient-to-br from-white to-indigo-50/30">
+                    <div>
+                      <h3 className="text-base font-bold text-gray-900 mb-1">Send Private Payment</h3>
                     <p className="text-sm text-gray-600">
                       Send sZEC or STRK to a stealth address. The recipient can claim funds privately.
                     </p>
+                    </div>
 
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-gray-800">Recipient Meta Address</label>
                     <Input
-                      label="Recipient Meta Address"
                       placeholder="Enter spend public key..."
                       value={recipient}
                       onChange={(e) => setRecipient(e.target.value)}
                       variant="bordered"
+                        classNames={{
+                          inputWrapper: "h-12 rounded-xl bg-white border-2 border-gray-200",
+                          input: "font-mono text-sm",
+                        }}
                     />
+                    </div>
 
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                        <img src="/assets/zcash_logo.png" alt="sZEC" className="w-5 h-5 rounded-full" />
+                        Amount
+                      </label>
                     <Input
-                      label="Amount"
                       placeholder="0.00"
                       type="number"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
-                      endContent={<span className="text-sm text-gray-500">sZEC</span>}
+                        endContent={
+                          <div className="flex items-center gap-1">
+                            <img src="/assets/zcash_logo.png" alt="sZEC" className="w-4 h-4 rounded-full" />
+                            <span className="text-sm font-semibold text-green-600">sZEC</span>
+                          </div>
+                        }
                       variant="bordered"
+                        classNames={{
+                          inputWrapper: "h-12 rounded-xl bg-white border-2 border-gray-200",
+                          input: "text-lg font-bold",
+                        }}
                     />
+                    </div>
 
                     <Button
-                      className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold h-12 mt-2"
-                      size="lg"
+                      className="w-full h-14 font-bold bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white shadow-xl hover:scale-[1.01] transition-all mt-2"
                       onClick={handleSend}
                       isLoading={isSending}
+                      startContent={!isSending && <Send className="w-5 h-5" />}
                     >
                       {isSending ? "Sending..." : "Send Private Payment"}
                     </Button>
@@ -414,27 +472,33 @@ export default function StarknetPage() {
           </Card>
 
           {/* Bridge Link Card */}
-          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-100">
-            <CardBody className="flex flex-row items-center justify-between gap-4">
+            <Card className="bg-gradient-to-r from-green-50 via-emerald-50 to-teal-50 border-2 border-green-300 shadow-lg">
+              <CardBody className="p-5">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
+                      <img src="/assets/zcash_logo.png" alt="Zcash" className="w-7 h-7 rounded-full" />
+                    </div>
               <div>
-                <h3 className="text-lg font-bold text-green-900">Zcash Bridge</h3>
+                      <h3 className="text-base font-bold text-green-900">Zcash Bridge</h3>
                 <p className="text-sm text-green-700">
                   Bridge ZEC to sZEC for cross-chain privacy
                 </p>
+                    </div>
               </div>
               <Button
                 as="a"
                 href="/zcash-starknet-bridge"
-                color="success"
-                variant="shadow"
-                className="font-bold"
+                    className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold shadow-xl hover:scale-105 transition-all"
               >
                 Open Bridge
               </Button>
+                </div>
             </CardBody>
           </Card>
         </div>
       )}
+      </div>
     </div>
   );
 }

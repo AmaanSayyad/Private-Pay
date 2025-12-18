@@ -290,11 +290,11 @@ export default function SolanaZcashBridgePage() {
           </div>
           <div className="text-center">
             <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-purple-600 to-amber-500 bg-clip-text text-transparent mb-2 px-4 text-center">
-              Solana ↔ Zcash Bridge
-            </h1>
+                  Solana ↔ Zcash Bridge
+              </h1>
             <p className="text-gray-600 max-w-lg px-4 text-center text-sm sm:text-base">
               Cross-chain privacy bridge powered by Helius. Transfer between Solana and Zcash with zero-knowledge privacy.
-            </p>
+              </p>
             </div>
           <div className="flex items-center gap-3">
 
@@ -319,11 +319,11 @@ export default function SolanaZcashBridgePage() {
               <div className="flex items-center gap-3 flex-shrink-0">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-indigo-400 flex items-center justify-center flex-shrink-0">
                   <Shield className="w-6 h-6 text-white" />
-                </div>
+            </div>
                 <div className="min-w-0">
                   <h3 className="text-gray-900 font-bold text-sm sm:text-base">Privacy-Preserving Bridge</h3>
                   <p className="text-gray-600 text-xs sm:text-sm">Powered by Helius Monitoring</p>
-                </div>
+              </div>
               </div>
               <div className="flex items-center gap-3 sm:gap-6 flex-wrap justify-center">
                 <div className="flex items-center gap-2 text-gray-700">
@@ -597,8 +597,8 @@ export default function SolanaZcashBridgePage() {
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <img src="/assets/solana_logo.png" alt="Solana" className="w-6 h-6 rounded-full flex-shrink-0" />
                             <span className="text-gray-700 text-sm font-semibold whitespace-nowrap">To Solana</span>
-                          </div>
                         </div>
+                          </div>
                         <div className="flex items-center gap-3 bg-white p-4 rounded-lg border border-gray-200">
                           <img src="/assets/solana_logo.png" alt="Solana" className="w-10 h-10 rounded-full" />
                           <div className="flex-1">

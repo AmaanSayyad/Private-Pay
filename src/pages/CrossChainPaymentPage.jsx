@@ -580,21 +580,23 @@ export default function CrossChainPaymentPage() {
   const [activeTab, setActiveTab] = useState("send");
 
   return (
-    <div className="flex flex-col items-center w-full min-h-screen py-12 px-4 pb-24">
+    <div className="flex flex-col items-center w-full min-h-screen bg-white py-6 px-4 pb-24">
       <div className="w-full max-w-5xl">
-        <div className="flex flex-col items-center gap-6 mb-8">
+        {/* Compact Header */}
+        <div className="flex flex-col items-center gap-3 mb-6">
           <div className="flex items-center gap-3">
-            <img src="/assets/axelar.png" alt="Axelar" className="w-10 h-10 rounded-full" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            <img src="/assets/axelar.png" alt="Axelar" className="w-12 h-12 rounded-full" />
+            <h1 className="text-3xl font-extrabold" style={{ color: '#0d08e3' }}>
               Cross-Chain Payments
             </h1>
           </div>
-          <p className="text-gray-600 max-w-lg text-center">
-            Send private stealth payments across blockchains via Axelar. Your transactions remain confidential.
+          <p className="text-gray-600 max-w-xl text-sm text-center">
+            Send private stealth payments across blockchains via Axelar
           </p>
-        </div>
+            </div>
 
-        <Card className="bg-white border border-gray-200 shadow-lg rounded-3xl mb-6">
+        {/* Main Content Card */}
+        <Card className="bg-white/80 backdrop-blur-xl border-2 border-white/50 shadow-2xl rounded-2xl mb-6 overflow-hidden">
           <CardBody className="p-0">
             <Tabs
               selectedKey={activeTab}
@@ -602,10 +604,10 @@ export default function CrossChainPaymentPage() {
               variant="underlined"
               color="secondary"
               classNames={{
-                tabList: "gap-6 w-full relative rounded-none p-0 border-b border-divider px-6",
-                cursor: "bg-gradient-to-r from-indigo-600 to-purple-600",
+                tabList: "gap-6 w-full relative rounded-none p-0 border-b-2 border-gray-200 px-6 pt-3 bg-indigo-50/30",
+                cursor: "h-1",
                 tab: "max-w-fit px-0 h-12",
-                tabContent: "group-data-[selected=true]:text-indigo-600 group-data-[selected=true]:font-semibold"
+                tabContent: "group-data-[selected=true]:font-bold text-sm"
               }}
             >
               <Tab
@@ -614,182 +616,190 @@ export default function CrossChainPaymentPage() {
                   <div className="flex items-center gap-2">
                     <Send size={18} />
                     <span>Send</span>
-                  </div>
+            </div>
                 }
               >
                 <div className="p-6 space-y-6">
 
                   {/* EVM Wallet Connection */}
-                  {!evmAddress ? (
-                    <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 shadow-sm">
-                      <CardBody className="p-8">
-                        <div className="flex flex-col items-center gap-5 text-center">
-                          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center shadow-lg">
-                            <Shield className="w-10 h-10 text-white" />
+            {!evmAddress ? (
+                    <Card className="bg-gradient-to-br from-indigo-500/10 via-indigo-500/10 to-indigo-500/10 border-2 border-indigo-300/50 shadow-xl backdrop-blur-sm">
+                      <CardBody className="p-6">
+                        <div className="flex flex-col items-center gap-4 text-center">
+                          <div className="w-16 h-16 rounded-full flex items-center justify-center shadow-xl" style={{ backgroundColor: '#0d08e3' }}>
+                            <Shield className="w-8 h-8 text-white" />
                           </div>
                           <div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-2">Connect Wallet</h3>
-                            <p className="text-sm text-gray-600">Connect MetaMask to send cross-chain payments</p>
+                            <h3 className="text-lg font-bold text-gray-900 mb-1">Connect Your Wallet</h3>
+                            <p className="text-gray-600 text-sm">Connect MetaMask to start sending payments</p>
                           </div>
-                          <Button
-                            onClick={connectEvmWallet}
-                            isLoading={evmConnecting}
-                            className="w-full h-14 font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg hover:shadow-xl hover:from-indigo-500 hover:to-purple-500 transition-all text-base"
-                            startContent={
+              <Button
+                onClick={connectEvmWallet}
+                isLoading={evmConnecting}
+                            className="w-full max-w-sm h-12 font-bold text-white shadow-xl hover:scale-105 transition-all"
+                            style={{ backgroundColor: '#0d08e3' }}
+                            onMouseEnter={(e) => !evmConnecting && (e.currentTarget.style.backgroundColor = '#0a06b8')}
+                            onMouseLeave={(e) => !evmConnecting && (e.currentTarget.style.backgroundColor = '#0d08e3')}
+                startContent={
                               !evmConnecting && (
-                                <svg className="w-6 h-6" viewBox="0 0 35 33" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M32.9582 1L19.8241 10.7183L22.2665 4.99099L32.9582 1Z" fill="#E17726" />
-                                  <path d="M2.04858 1L15.0707 10.809L12.7402 4.99098L2.04858 1Z" fill="#E27625" />
-                                </svg>
+                  <svg className="w-5 h-5" viewBox="0 0 35 33" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M32.9582 1L19.8241 10.7183L22.2665 4.99099L32.9582 1Z" fill="#E17726" />
+                    <path d="M2.04858 1L15.0707 10.809L12.7402 4.99098L2.04858 1Z" fill="#E27625" />
+                  </svg>
                               )
-                            }
-                          >
-                            Connect MetaMask
-                          </Button>
+                }
+              >
+                            {evmConnecting ? "Connecting..." : "Connect MetaMask"}
+              </Button>
                         </div>
                       </CardBody>
                     </Card>
-                  ) : (
-                    <Card className="bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-200 shadow-sm">
-                      <CardBody className="p-5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-green-400 flex items-center justify-center shadow-md">
-                              <CheckCircle2 className="w-6 h-6 text-white" />
+            ) : (
+                    <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 shadow-lg">
+                      <CardBody className="p-4">
+                <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center shadow-md">
+                              <CheckCircle2 className="w-5 h-5 text-white" />
                             </div>
-                            <div>
-                              <p className="text-xs text-emerald-600 font-semibold mb-1">Connected</p>
-                              <p className="text-sm font-mono text-emerald-800 font-bold">
-                                {evmAddress.slice(0, 6)}...{evmAddress.slice(-4)}
-                              </p>
-                            </div>
+                  <div>
+                              <p className="text-xs font-bold mb-0.5" style={{ color: '#0d08e3' }}>Connected</p>
+                              <p className="text-sm font-mono text-gray-900 font-bold">
+                      {evmAddress.slice(0, 6)}...{evmAddress.slice(-4)}
+                    </p>
+                  </div>
                           </div>
-                          {!isOnSepolia && (
-                            <Button
-                              size="sm"
-                              className="bg-amber-500 text-white hover:bg-amber-600 font-semibold shadow-md"
-                              onClick={switchToSepolia}
-                            >
-                              Switch to Sepolia
-                            </Button>
-                          )}
-                        </div>
+                    {!isOnSepolia && (
+                      <Button
+                        size="sm"
+                              className="bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-md"
+                        onClick={switchToSepolia}
+                      >
+                        Switch to Sepolia
+                      </Button>
+                    )}
+                  </div>
                       </CardBody>
                     </Card>
-                  )}
+            )}
 
                   {evmAddress && (
                     <>
 
-                      {/* Chain Selection */}
+                      {/* Chain Selection - Compact */}
                       <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-semibold text-gray-700 mb-3 block flex items-center gap-2">
-                            <ArrowUp className="w-4 h-4 text-indigo-600" />
-                            From Chain
-                          </label>
-                          <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 shadow-sm">
-                            <CardBody className="p-5">
-                              <div className="flex items-center gap-3 mb-3">
-                                {sourceChain && availableChains.find(c => c.key === sourceChain)?.image ? (
-                                  <img 
-                                    src={availableChains.find(c => c.key === sourceChain).image} 
-                                    alt="Source" 
-                                    className="w-10 h-10 rounded-full border-2 border-white shadow-md" 
-                                  />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-full bg-indigo-100 border-2 border-white flex items-center justify-center">
-                                    <ArrowUp className="w-5 h-5 text-indigo-600" />
-                                  </div>
-                                )}
-                                <Select
-                                  placeholder="Select source chain"
-                                  selectedKeys={sourceChain ? [sourceChain] : []}
-                                  onSelectionChange={(keys) => setSourceChain(Array.from(keys)[0])}
-                                  variant="bordered"
-                                  classNames={{
-                                    trigger: "h-12 rounded-xl bg-white border-gray-200 flex-1",
-                                    value: "text-foreground flex items-center",
-                                  }}
-                                >
-                                  {availableChains.map((chain) => (
-                                    <SelectItem key={chain.key} textValue={chain.name}>
-                                      <div className="flex items-center gap-2">
-                                        {chain.image && (
-                                          <img src={chain.image} alt={chain.name} className="w-5 h-5 rounded-full" />
-                                        )}
-                                        <span>{chain.name}</span>
-                                      </div>
-                                    </SelectItem>
-                                  ))}
-                                </Select>
-                              </div>
-                            </CardBody>
-                          </Card>
-                        </div>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          {/* From Chain */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                              <ArrowUp className="w-4 h-4" style={{ color: '#0d08e3' }} />
+                              <span>From Chain</span>
+                            </label>
+                            <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 shadow-md">
+                              <CardBody className="p-4">
+                                <div className="flex items-center gap-3">
+                                  {sourceChain && availableChains.find(c => c.key === sourceChain)?.image ? (
+                                    <img 
+                                      src={availableChains.find(c => c.key === sourceChain).image} 
+                                      alt="Source" 
+                                      className="w-10 h-10 rounded-full border-2 border-white shadow-md" 
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-full bg-indigo-200 border-2 border-white flex items-center justify-center">
+                                      <ArrowUp className="w-5 h-5" style={{ color: '#0d08e3' }} />
+                                    </div>
+                                  )}
+                  <Select
+                                    placeholder="Select source chain"
+                    selectedKeys={sourceChain ? [sourceChain] : []}
+                    onSelectionChange={(keys) => setSourceChain(Array.from(keys)[0])}
+                    variant="bordered"
+                    classNames={{
+                                      trigger: "h-12 rounded-xl bg-white/90 border-2 border-gray-200 flex-1",
+                                      value: "text-foreground flex items-center font-semibold text-sm",
+                    }}
+                  >
+                    {availableChains.map((chain) => (
+                      <SelectItem key={chain.key} textValue={chain.name}>
+                                        <div className="flex items-center gap-2">
+                                          {chain.image && (
+                                            <img src={chain.image} alt={chain.name} className="w-5 h-5 rounded-full" />
+                                          )}
+                                          <span>{chain.name}</span>
+                                        </div>
+                      </SelectItem>
+                    ))}
+                  </Select>
+                                </div>
+                              </CardBody>
+                            </Card>
+                          </div>
 
-                        <div className="flex justify-center -my-2 z-10 relative">
-                          <div className="bg-gradient-to-br from-indigo-100 to-purple-100 p-4 rounded-full border-2 border-indigo-300 shadow-lg flex items-center justify-center">
-                            <img src="/assets/axelar.png" alt="Axelar" className="w-8 h-8 rounded-full" />
-                            <ArrowLeftRight className="w-5 h-5 text-indigo-600 ml-2" />
+                          {/* To Chain */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                              <ArrowDown className="w-4 h-4" style={{ color: '#0d08e3' }} />
+                              <span>To Chain</span>
+                            </label>
+                            <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 shadow-md">
+                              <CardBody className="p-4">
+                                <div className="flex items-center gap-3">
+                                  {destinationChain && destinationChains.find(c => c.key === destinationChain)?.image ? (
+                                    <img 
+                                      src={destinationChains.find(c => c.key === destinationChain).image} 
+                                      alt="Destination" 
+                                      className="w-10 h-10 rounded-full border-2 border-white shadow-md" 
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-full bg-indigo-200 border-2 border-white flex items-center justify-center">
+                                      <ArrowDown className="w-5 h-5" style={{ color: '#0d08e3' }} />
+                                    </div>
+                                  )}
+                  <Select
+                                    placeholder="Select destination chain"
+                    selectedKeys={destinationChain ? [destinationChain] : []}
+                    onSelectionChange={(keys) => setDestinationChain(Array.from(keys)[0])}
+                    variant="bordered"
+                    isDisabled={!sourceChain}
+                    classNames={{
+                                      trigger: "h-12 rounded-xl bg-white/90 border-2 border-gray-200 flex-1",
+                                      value: "text-foreground flex items-center font-semibold text-sm",
+                    }}
+                  >
+                    {destinationChains.map((chain) => (
+                      <SelectItem key={chain.key} textValue={chain.name}>
+                                        <div className="flex items-center gap-2">
+                                          {chain.image && (
+                                            <img src={chain.image} alt={chain.name} className="w-5 h-5 rounded-full" />
+                                          )}
+                                          <span>{chain.name}</span>
+                                        </div>
+                      </SelectItem>
+                    ))}
+                  </Select>
+                                </div>
+                              </CardBody>
+                            </Card>
                           </div>
                         </div>
 
-                        <div>
-                          <label className="text-sm font-semibold text-gray-700 mb-3 block flex items-center gap-2">
-                            <ArrowDown className="w-4 h-4 text-purple-600" />
-                            To Chain
-                          </label>
-                          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 shadow-sm">
-                            <CardBody className="p-5">
-                              <div className="flex items-center gap-3 mb-3">
-                                {destinationChain && destinationChains.find(c => c.key === destinationChain)?.image ? (
-                                  <img 
-                                    src={destinationChains.find(c => c.key === destinationChain).image} 
-                                    alt="Destination" 
-                                    className="w-10 h-10 rounded-full border-2 border-white shadow-md" 
-                                  />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-full bg-purple-100 border-2 border-white flex items-center justify-center">
-                                    <ArrowDown className="w-5 h-5 text-purple-600" />
-                                  </div>
-                                )}
-                                <Select
-                                  placeholder="Select destination chain"
-                                  selectedKeys={destinationChain ? [destinationChain] : []}
-                                  onSelectionChange={(keys) => setDestinationChain(Array.from(keys)[0])}
-                                  variant="bordered"
-                                  isDisabled={!sourceChain}
-                                  classNames={{
-                                    trigger: "h-12 rounded-xl bg-white border-gray-200 flex-1",
-                                    value: "text-foreground flex items-center",
-                                  }}
-                                >
-                                  {destinationChains.map((chain) => (
-                                    <SelectItem key={chain.key} textValue={chain.name}>
-                                      <div className="flex items-center gap-2">
-                                        {chain.image && (
-                                          <img src={chain.image} alt={chain.name} className="w-5 h-5 rounded-full" />
-                                        )}
-                                        <span>{chain.name}</span>
-                                      </div>
-                                    </SelectItem>
-                                  ))}
-                                </Select>
-                              </div>
-                            </CardBody>
-                          </Card>
+                        {/* Axelar Bridge Indicator */}
+                        <div className="flex justify-center -my-2 z-10 relative">
+                          <div className="bg-indigo-100 p-3 rounded-full border-2 border-white shadow-lg flex items-center gap-2">
+                            <img src="/assets/axelar.png" alt="Axelar" className="w-6 h-6 rounded-full" />
+                            <ArrowLeftRight className="w-4 h-4" style={{ color: '#0d08e3' }} />
+                          </div>
                         </div>
-                      </div>
+                </div>
 
-                      {/* Token Selection */}
-                      <div>
-                        <label className="text-sm font-semibold text-gray-700 mb-3 block flex items-center gap-2">
-                          <Coins className="w-4 h-4 text-blue-600" />
-                          Token
+                {/* Token Selection */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                          <img src="/assets/axelar.png" alt="Axelar" className="w-4 h-4 rounded-full" />
+                          <span>Token</span>
                         </label>
-                        <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 shadow-sm">
-                          <CardBody className="p-5">
+                        <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 shadow-md">
+                          <CardBody className="p-4">
                             <div className="flex items-center gap-3">
                               {selectedToken && (
                                 <img 
@@ -798,123 +808,122 @@ export default function CrossChainPaymentPage() {
                                   className="w-10 h-10 rounded-full border-2 border-white shadow-md" 
                                 />
                               )}
-                              <Select
-                                placeholder={loadingTokens ? "Loading tokens..." : "Select token"}
-                                selectedKeys={selectedToken ? [selectedToken] : []}
-                                onSelectionChange={(keys) => setSelectedToken(Array.from(keys)[0])}
-                                variant="bordered"
-                                classNames={{
-                                  trigger: "h-12 rounded-xl bg-white border-gray-200 flex-1",
-                                  value: "text-foreground flex items-center",
-                                }}
-                                disallowEmptySelection
-                                isDisabled={loadingTokens}
-                              >
-                                {availableTokens.map((token) => (
-                                  <SelectItem key={token.symbol} textValue={token.symbol}>
-                                    <div className="flex items-center gap-2">
+                <Select
+                  placeholder={loadingTokens ? "Loading tokens..." : "Select token"}
+                  selectedKeys={selectedToken ? [selectedToken] : []}
+                  onSelectionChange={(keys) => setSelectedToken(Array.from(keys)[0])}
+                  variant="bordered"
+                  classNames={{
+                                  trigger: "h-12 rounded-xl bg-white/90 border-2 border-gray-200 flex-1",
+                                  value: "text-foreground flex items-center font-semibold text-sm",
+                  }}
+                  disallowEmptySelection
+                  isDisabled={loadingTokens}
+                >
+                  {availableTokens.map((token) => (
+                    <SelectItem key={token.symbol} textValue={token.symbol}>
+                      <div className="flex items-center gap-2">
                                       <img src="/assets/usdc.png" alt={token.symbol} className="w-5 h-5 rounded-full" />
                                       <span className="font-medium">{token.symbol}</span>
-                                      <span className="text-xs text-gray-500">({token.name})</span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </Select>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </Select>
                             </div>
                           </CardBody>
                         </Card>
                       </div>
 
-                      {/* Recipient Address */}
+                {/* Recipient Address */}
                       <div className="flex flex-col gap-3">
-                        <div>
-                          <label className="text-sm font-semibold text-gray-700 mb-3 block flex items-center gap-2">
-                            <Shield className="w-4 h-4 text-indigo-600" />
-                            Recipient Address
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                            <Shield className="w-4 h-4" style={{ color: '#0d08e3' }} />
+                            <span>Recipient Address</span>
                           </label>
-                          <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 shadow-sm">
-                            <CardBody className="p-5">
-                              <Input
-                                placeholder="0x..."
-                                value={recipientAddress}
-                                onChange={(e) => setRecipientAddress(e.target.value)}
-                                variant="bordered"
-                                classNames={{
-                                  inputWrapper: "h-12 rounded-xl bg-white border-gray-200",
+                          <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 shadow-md">
+                            <CardBody className="p-4">
+                  <Input
+                    placeholder="0x..."
+                    value={recipientAddress}
+                    onChange={(e) => setRecipientAddress(e.target.value)}
+                    variant="bordered"
+                    classNames={{
+                                  inputWrapper: "h-12 rounded-xl bg-white/90 border-2 border-gray-200",
                                   input: "font-mono text-sm",
-                                }}
-                                endContent={
-                                  checkingStealthKeys && (
-                                    <Spinner size="sm" />
-                                  )
-                                }
-                              />
+                    }}
+                    endContent={
+                      checkingStealthKeys && (
+                        <Spinner size="sm" style={{ color: '#0d08e3' }} />
+                      )
+                    }
+                  />
                             </CardBody>
                           </Card>
                         </div>
-                        {/* Stealth Mode Indicator */}
-                        {recipientAddress && recipientAddress.length === 42 && !checkingStealthKeys && (
-                          <Card className={stealthMode ? "bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 shadow-sm" : "bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200 shadow-sm"}>
-                            <CardBody className="p-4">
+                  {/* Stealth Mode Indicator */}
+                  {recipientAddress && recipientAddress.length === 42 && !checkingStealthKeys && (
+                          <Card className={stealthMode ? "bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 shadow-md" : "bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-300 shadow-md"}>
+                            <CardBody className="p-3">
                               <div className="flex items-center gap-3">
-                                {stealthMode ? (
+                      {stealthMode ? (
                                   <>
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-emerald-400 flex items-center justify-center shadow-md">
-                                      <Shield className="w-6 h-6 text-white" />
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-md">
+                                      <Shield className="w-5 h-5 text-white" />
                                     </div>
                                     <div>
-                                      <p className="text-sm font-bold text-green-900">Stealth Mode</p>
-                                      <p className="text-xs text-green-700">Private Transfer Enabled</p>
+                                      <p className="text-sm font-bold text-green-900">Stealth Mode Active</p>
+                                      <p className="text-xs text-green-700">Private transfer enabled</p>
                                     </div>
                                   </>
-                                ) : (
+                      ) : (
                                   <>
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-yellow-400 flex items-center justify-center shadow-md">
-                                      <AlertCircle className="w-6 h-6 text-white" />
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-md">
+                                      <AlertCircle className="w-5 h-5 text-white" />
                                     </div>
                                     <div>
                                       <p className="text-sm font-bold text-amber-900">Direct Mode</p>
-                                      <p className="text-xs text-amber-700">Recipient not registered for stealth</p>
+                                      <p className="text-xs text-amber-700">Not registered for stealth</p>
                                     </div>
                                   </>
-                                )}
-                              </div>
+                      )}
+                    </div>
                             </CardBody>
                           </Card>
-                        )}
-                      </div>
+                  )}
+                </div>
 
-                      {/* Amount */}
-                      <div>
-                        <label className="text-sm font-semibold text-gray-700 mb-3 block flex items-center gap-2">
-                          <Zap className="w-4 h-4 text-indigo-600" />
-                          Amount
+                {/* Amount */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                          <Coins className="w-4 h-4" style={{ color: '#0d08e3' }} />
+                          <span>Amount</span>
                         </label>
-                        <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 shadow-sm">
-                          <CardBody className="p-5">
+                        <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 shadow-md">
+                          <CardBody className="p-4">
                             <div className="flex items-center gap-3">
                               <img 
                                 src="/assets/usdc.png" 
                                 alt="Token" 
                                 className="w-12 h-12 rounded-full border-2 border-white shadow-md flex-shrink-0" 
                               />
-                              <Input
-                                placeholder="0.00"
-                                type="number"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                variant="bordered"
+                <Input
+                  placeholder="0.00"
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  variant="bordered"
                                 size="lg"
-                                classNames={{
+                  classNames={{
                                   input: "text-2xl font-bold",
-                                  inputWrapper: "h-14 rounded-xl bg-white border-gray-200 flex-1",
-                                }}
+                                  inputWrapper: "h-14 rounded-xl bg-white/90 border-2 border-gray-200 flex-1",
+                  }}
                                 endContent={
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-gray-700 font-semibold">{selectedToken || "Token"}</span>
+                                  <div className="flex items-center gap-2 pr-2">
+                                    <span className="text-gray-800 font-semibold">{selectedToken || "Token"}</span>
                                   </div>
                                 }
-                              />
+                />
                             </div>
                           </CardBody>
                         </Card>
@@ -922,116 +931,124 @@ export default function CrossChainPaymentPage() {
 
                       {/* Gas Estimate */}
                       <div className="space-y-3">
-                        <Button
-                          variant="bordered"
-                          onClick={handleEstimateGas}
-                          isLoading={estimatingGas}
-                          isDisabled={!sourceChain || !destinationChain}
-                          className="w-full rounded-xl border-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50 font-semibold h-12"
-                          startContent={<Zap className="w-5 h-5" />}
-                        >
-                          Estimate Gas Fee
-                        </Button>
+                <Button
+                            variant="bordered"
+                  onClick={handleEstimateGas}
+                  isLoading={estimatingGas}
+                  isDisabled={!sourceChain || !destinationChain}
+                            className="w-full rounded-xl border-2 bg-white/80 font-semibold h-12 text-sm shadow-md"
+                            style={{ borderColor: '#0d08e3', color: '#0d08e3' }}
+                            onMouseEnter={(e) => !estimatingGas && !(!sourceChain || !destinationChain) && (e.currentTarget.style.backgroundColor = '#f0f0ff')}
+                            onMouseLeave={(e) => !estimatingGas && !(!sourceChain || !destinationChain) && (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.8)')}
+                            startContent={<Zap className="w-4 h-4" />}
+                          >
+                            {estimatingGas ? "Estimating..." : "Estimate Gas Fee"}
+                </Button>
 
-                        {gasEstimate && (
-                          <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 shadow-sm">
-                            <CardBody className="p-4">
+                {gasEstimate && (
+                          <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 shadow-md">
+                            <CardBody className="p-3">
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-400 flex items-center justify-center">
-                                    <Zap className="w-5 h-5 text-white" />
-                                  </div>
-                                  <span className="text-sm text-gray-700 font-semibold">Estimated Gas:</span>
-                                </div>
-                                <span className="font-mono font-bold text-gray-900 text-lg">{(Number(gasEstimate) / 1e18).toFixed(6)} ETH</span>
-                              </div>
+                                <div className="flex items-center gap-2">
+                                  <Zap className="w-5 h-5" style={{ color: '#0d08e3' }} />
+                                  <span className="text-sm text-gray-800 font-bold">Estimated Gas:</span>
+                    </div>
+                                <span className="font-mono font-bold text-gray-900">{(Number(gasEstimate) / 1e18).toFixed(6)} ETH</span>
+                  </div>
                             </CardBody>
                           </Card>
-                        )}
+                )}
                       </div>
 
-                      {/* Status Display */}
-                      {txStatus !== TX_STATUS.IDLE && (
-                        <Card className={isComplete ? "bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 shadow-sm" : isFailed ? "bg-gradient-to-br from-red-50 to-rose-50 border-2 border-red-200 shadow-sm" : "bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 shadow-sm"}>
-                          <CardBody className="p-5">
-                            <div className="flex items-center gap-4">
+                {/* Status Display */}
+                {txStatus !== TX_STATUS.IDLE && (
+                        <Card className={isComplete ? "bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 shadow-md" : isFailed ? "bg-gradient-to-br from-red-50 to-rose-50 border-2 border-red-300 shadow-md" : "bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-300 shadow-md"}>
+                          <CardBody className="p-4">
+                            <div className="flex items-center gap-3">
                               {isProcessing && (
-                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center shadow-md">
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
                                   <Spinner size="sm" className="text-white" />
-                                </div>
+                    </div>
                               )}
                               {isComplete && (
-                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-emerald-400 flex items-center justify-center shadow-md">
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
                                   <CheckCircle2 className="w-6 h-6 text-white" />
                                 </div>
                               )}
                               {isFailed && (
-                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-400 to-rose-400 flex items-center justify-center shadow-md">
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg">
                                   <AlertCircle className="w-6 h-6 text-white" />
                                 </div>
                               )}
                               <div className="flex-1">
-                                <p className={`text-base font-bold ${getStatusColor()}`}>{getStatusLabel()}</p>
-                                {txHash && (
-                                  <a
-                                    href={getAxelarscanUrl(txHash)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs text-indigo-600 hover:text-indigo-700 hover:underline flex items-center gap-1 mt-2"
-                                  >
-                                    <img src="/assets/axelar.png" alt="Axelar" className="w-4 h-4 rounded-full" />
-                                    View on Axelarscan <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                )}
+                                <p className={`text-base font-bold ${getStatusColor()} mb-1`}>{getStatusLabel()}</p>
+                    {txHash && (
+                      <a
+                        href={getAxelarscanUrl(txHash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs hover:underline flex items-center gap-1"
+                        style={{ color: '#0d08e3' }}
+                      >
+                        <img src="/assets/axelar.png" alt="Axelar" className="w-4 h-4 rounded-full" />
+                        View on Axelarscan <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                            </div>
+                          </CardBody>
+                        </Card>
+                )}
+
+                {/* Error Display */}
+                {error && (
+                        <Card className="bg-gradient-to-br from-red-50 via-rose-50 to-pink-50 border-2 border-red-300 shadow-xl">
+                          <CardBody className="p-5">
+                            <div className="flex items-center gap-4">
+                              <div className="relative">
+                                <div className="absolute inset-0 bg-red-400 rounded-full blur-lg opacity-30"></div>
+                                <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg">
+                                  <AlertCircle className="w-6 h-6 text-white" />
+                  </div>
                               </div>
+                              <span className="text-base text-red-800 font-bold">{error}</span>
                             </div>
                           </CardBody>
                         </Card>
-                      )}
+                )}
 
-                      {/* Error Display */}
-                      {error && (
-                        <Card className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200">
-                          <CardBody className="p-4">
-                            <div className="flex items-center gap-2">
-                              <AlertCircle className="w-5 h-5 text-red-600" />
-                              <span className="text-sm text-red-700">{error}</span>
-                            </div>
-                          </CardBody>
-                        </Card>
-                      )}
-
-                      {/* Send Button */}
+                {/* Send Button */}
                       <div className="pt-2">
-                        <Button
-                          onClick={handleSendPayment}
-                          isLoading={loading}
-                          isDisabled={!evmAddress || !isOnSepolia || !sourceChain || !destinationChain || !recipientAddress || !amount || isProcessing}
-                          className="w-full h-14 font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg hover:shadow-xl hover:from-indigo-500 hover:to-purple-500 transition-all text-base"
-                          size="lg"
+                <Button
+                  onClick={handleSendPayment}
+                  isLoading={loading}
+                  isDisabled={!evmAddress || !isOnSepolia || !sourceChain || !destinationChain || !recipientAddress || !amount || isProcessing}
+                          className="w-full h-14 font-bold text-white shadow-xl hover:scale-[1.01] transition-all"
+                          style={{ backgroundColor: '#0d08e3' }}
+                  size="lg"
                           startContent={!loading && (
                             <div className="flex items-center gap-2">
                               <img src="/assets/axelar.png" alt="Axelar" className="w-5 h-5 rounded-full" />
                               <Send className="w-5 h-5" />
                             </div>
                           )}
-                        >
-                          {!evmAddress ? "Connect Wallet First" : isProcessing ? "Processing..." : "Send Cross-Chain Payment"}
-                        </Button>
+                >
+                          {!evmAddress ? "Connect Wallet First" : isProcessing ? "Processing..." : "Send Payment"}
+                </Button>
                       </div>
 
-                      {/* Reset Button (show after completion/failure) */}
-                      {(isComplete || isFailed) && (
-                        <Button
+                {/* Reset Button (show after completion/failure) */}
+                {(isComplete || isFailed) && (
+                  <Button
                           variant="bordered"
-                          onClick={reset}
-                          className="w-full rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50"
-                        >
-                          New Payment
-                        </Button>
-                      )}
-                    </>
-                  )}
+                    onClick={reset}
+                          className="w-full rounded-xl border-2 border-gray-300 bg-white/80 text-gray-700 hover:bg-gray-100 hover:border-gray-400 font-semibold h-12 shadow-md"
+                  >
+                    New Payment
+                  </Button>
+                )}
+              </>
+            )}
                 </div>
               </Tab>
 
@@ -1044,135 +1061,152 @@ export default function CrossChainPaymentPage() {
                   </div>
                 }
               >
-                <div className="p-6 space-y-6">
-                  <p className="text-sm text-gray-600 text-center">
-                    Scan for private payments sent to your stealth address.
-                  </p>
+                <div className="p-6 space-y-5 bg-white">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-600">
+                  Scan for private payments sent to your stealth address.
+                </p>
+                  </div>
 
-                  {/* Stealth Registration Section */}
-                  {evmAddress && !isRegistered && (
-                    <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 shadow-sm">
+                {/* Stealth Registration Section */}
+                {evmAddress && !isRegistered && (
+                    <Card className="bg-gradient-to-br from-indigo-500/10 via-indigo-500/10 to-indigo-500/10 border-2 border-indigo-300/50 shadow-xl backdrop-blur-sm">
                       <CardBody className="p-6">
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                          <div className="flex items-center gap-4 flex-1">
-                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center flex-shrink-0 shadow-lg">
-                              <Shield className="w-7 h-7 text-white" />
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                          <div className="flex items-center gap-5 flex-1">
+                            <div className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 shadow-xl" style={{ backgroundColor: '#0d08e3' }}>
+                              <Shield className="w-8 h-8 text-white" />
                             </div>
                             <div>
-                              <span className="font-bold text-gray-900 block text-base">Enable Stealth Payments</span>
-                              <span className="text-xs text-gray-600">Register to receive private payments</span>
+                              <span className="font-extrabold text-gray-900 block text-base mb-1">Enable Stealth Payments</span>
+                              <span className="text-sm text-gray-600">Register to receive private payments securely</span>
                             </div>
-                          </div>
-                          <Button
-                            className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:from-indigo-500 hover:to-purple-500 w-full md:w-auto h-12 shadow-md"
-                            onClick={handleRegisterWithSignature}
-                            isLoading={registering}
+                      </div>
+                      <Button
+                            className="text-white font-bold hover:scale-105 w-full md:w-auto h-12 shadow-xl transition-all"
+                            style={{ backgroundColor: '#0d08e3' }}
+                        onClick={handleRegisterWithSignature}
+                        isLoading={registering}
                             startContent={!registering && <Shield className="w-5 h-5" />}
-                          >
-                            Sign to Register
-                          </Button>
-                        </div>
+                            onMouseEnter={(e) => !registering && (e.currentTarget.style.backgroundColor = '#0a06b8')}
+                            onMouseLeave={(e) => !registering && (e.currentTarget.style.backgroundColor = '#0d08e3')}
+                      >
+                            {registering ? "Registering..." : "Sign to Register"}
+                      </Button>
+                    </div>
                       </CardBody>
                     </Card>
-                  )}
+                )}
 
-                  {evmAddress && isRegistered && (
-                    <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 shadow-sm">
-                      <CardBody className="p-5">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-emerald-400 flex items-center justify-center shadow-md">
-                            <CheckCircle2 className="w-6 h-6 text-white" />
-                          </div>
+                {evmAddress && isRegistered && (
+                    <Card className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 border-2 border-green-300 shadow-xl">
+                      <CardBody className="p-6">
+                        <div className="flex items-center gap-5">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-green-400 rounded-full blur-lg opacity-40"></div>
+                            <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-xl">
+                              <CheckCircle2 className="w-8 h-8 text-white" />
+                    </div>
+                  </div>
                           <div>
-                            <span className="text-sm font-bold text-green-900 block">Registered for Stealth</span>
-                            <span className="text-xs text-green-700">You can receive private payments</span>
+                            <span className="text-base font-extrabold text-green-900 block mb-1">Registered for Stealth</span>
+                            <span className="text-sm text-green-700">You can receive private payments</span>
                           </div>
                         </div>
                       </CardBody>
                     </Card>
-                  )}
+                )}
 
-                  {/* Scan Button */}
+                {/* Scan Button */}
                   {evmAddress && (
-                    <Button
-                      onClick={handleScanPayments}
-                      isLoading={scanning}
-                      className="w-full h-14 font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg hover:shadow-xl hover:from-indigo-500 hover:to-purple-500 transition-all text-base"
-                      size="lg"
+                <Button
+                  onClick={handleScanPayments}
+                  isLoading={scanning}
+                      className="w-full h-14 font-bold text-white shadow-xl hover:scale-[1.01] transition-all"
+                      style={{ backgroundColor: '#0d08e3' }}
+                  size="lg"
                       startContent={!scanning && (
                         <div className="flex items-center gap-2">
                           <Shield className="w-5 h-5" />
                           <Eye className="w-5 h-5" />
                         </div>
                       )}
-                    >
-                      {scanning ? "Scanning Blockchain..." : "Scan for Payments"}
-                    </Button>
+                      onMouseEnter={(e) => !scanning && (e.currentTarget.style.backgroundColor = '#0a06b8')}
+                      onMouseLeave={(e) => !scanning && (e.currentTarget.style.backgroundColor = '#0d08e3')}
+                >
+                  {scanning ? "Scanning Blockchain..." : "Scan for Payments"}
+                </Button>
                   )}
 
-                  {/* Results List */}
-                  {scannedPayments.length > 0 && (
+                {/* Results List */}
+                {scannedPayments.length > 0 && (
                     <div className="flex flex-col gap-4">
                       <div className="flex items-center gap-2 mb-2">
                         <CheckCircle2 className="w-5 h-5 text-green-600" />
-                        <h3 className="font-bold text-gray-900 text-lg">Found Payments ({scannedPayments.length})</h3>
+                        <h3 className="font-bold text-gray-900 text-base">Found Payments ({scannedPayments.length})</h3>
                       </div>
-                      {scannedPayments.map((payment, idx) => (
-                        <Card key={idx} className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 shadow-md">
-                          <CardBody className="p-5">
-                            <div className="flex justify-between items-start mb-4">
-                              <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center shadow-lg">
-                                  <img src="/assets/usdc.png" alt={payment.symbol} className="w-8 h-8 rounded-full" />
+                    {scannedPayments.map((payment, idx) => (
+                        <Card key={idx} className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 shadow-xl backdrop-blur-sm">
+                          <CardBody className="p-6">
+                            <div className="flex justify-between items-start mb-5">
+                              <div className="flex items-center gap-5">
+                                <div className="relative">
+                                  <div className="absolute inset-0 bg-indigo-400 rounded-full blur-lg opacity-30"></div>
+                                  <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-xl">
+                                    <img src="/assets/usdc.png" alt={payment.symbol} className="w-10 h-10 rounded-full" />
+                            </div>
                                 </div>
                                 <div>
-                                  <span className="font-bold text-2xl text-gray-900 block">
+                                  <span className="font-extrabold text-3xl text-gray-900 block mb-2">
                                     {(Number(payment.amount) / 1e6).toFixed(6)} {payment.symbol}
-                                  </span>
-                                  <div className="flex items-center gap-2 mt-2">
-                                    <Chip size="sm" color="success" variant="flat" className="h-auto py-1">
-                                      <CheckCircle2 className="w-3 h-3 mr-1" />
-                                      <span className="leading-tight">Verified</span>
+                            </span>
+                                  <div className="flex items-center gap-3">
+                                    <Chip size="md" color="success" variant="flat" className="h-auto py-1.5">
+                                      <CheckCircle2 className="w-4 h-4 mr-1" />
+                                      <span className="leading-tight font-semibold">Verified</span>
                                     </Chip>
-                                    <span className="text-xs text-gray-500">Block {payment.blockNumber}</span>
-                                  </div>
+                                    <span className="text-sm text-gray-600 font-medium">Block {payment.blockNumber}</span>
+                          </div>
                                 </div>
                               </div>
-                            </div>
+                          </div>
 
-                            <Card className="bg-white border border-gray-200 mb-4">
-                              <CardBody className="p-3">
-                                <p className="text-xs text-gray-500 mb-1 font-semibold">Stealth Address:</p>
-                                <code className="text-xs text-gray-700 break-all font-mono">
+                            <Card className="bg-white/90 border-2 border-gray-200 mb-5 shadow-md">
+                              <CardBody className="p-4">
+                                <p className="text-xs text-gray-600 mb-2 font-bold uppercase tracking-wide">Stealth Address:</p>
+                                <code className="text-sm text-gray-800 break-all font-mono bg-gray-50 p-2 rounded-lg block">
                                   {payment.stealthAddress}
                                 </code>
                               </CardBody>
                             </Card>
 
-                            <Button
-                              className="w-full h-12 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:from-indigo-500 hover:to-purple-500 shadow-md"
-                              onClick={() => handleWithdraw(payment)}
-                              isLoading={withdrawing === payment.txHash}
-                              startContent={!withdrawing && <ArrowDown className="w-5 h-5" />}
-                            >
+                          <Button
+                              className="w-full h-14 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-bold hover:scale-[1.02] shadow-xl transition-all"
+                            onClick={() => handleWithdraw(payment)}
+                            isLoading={withdrawing === payment.txHash}
+                              startContent={!withdrawing && <ArrowDown className="w-6 h-6" />}
+                          >
                               {withdrawing === payment.txHash ? "Withdrawing..." : "Withdraw to Main Wallet"}
-                            </Button>
-                          </CardBody>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
+                          </Button>
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </div>
+                )}
 
                   {scannedPayments.length === 0 && !scanning && evmAddress && (
-                    <Card className="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200">
-                      <CardBody className="p-12">
-                        <div className="flex flex-col items-center gap-4 text-center">
-                          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
-                            <Eye className="w-10 h-10 text-gray-400" />
-                          </div>
+                    <Card className="bg-gradient-to-br from-gray-50/80 to-gray-100/80 border-2 border-gray-300 shadow-lg backdrop-blur-sm">
+                      <CardBody className="p-16">
+                        <div className="flex flex-col items-center gap-5 text-center">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-gray-300 rounded-full blur-xl opacity-30"></div>
+                            <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center shadow-xl">
+                              <Eye className="w-12 h-12 text-gray-500" />
+                  </div>
+              </div>
                           <div>
-                            <p className="text-gray-700 font-semibold mb-1">No Pending Payments</p>
-                            <p className="text-gray-500 text-sm">Scan again later to check for new payments.</p>
+                            <p className="text-gray-800 font-bold text-lg mb-2">No Pending Payments</p>
+                            <p className="text-gray-600 text-base">Scan again later to check for new payments.</p>
                           </div>
                         </div>
                       </CardBody>
@@ -1184,48 +1218,48 @@ export default function CrossChainPaymentPage() {
           </CardBody>
         </Card>
 
-        {/* Info Card */}
-        <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 shadow-sm rounded-3xl">
-          <CardBody className="p-6">
-            <div className="flex items-center gap-3 mb-6">
+        {/* Info Card - Compact */}
+        <Card className="bg-gradient-to-br from-indigo-500/10 via-indigo-500/10 to-indigo-500/10 border-2 border-indigo-300/50 shadow-xl rounded-2xl backdrop-blur-xl">
+          <CardBody className="p-5">
+            <div className="flex items-center gap-3 mb-4">
               <img src="/assets/axelar.png" alt="Axelar" className="w-10 h-10 rounded-full" />
-              <h3 className="font-bold text-gray-900 text-lg">How It Works</h3>
+              <h3 className="font-bold text-gray-900 text-base">How It Works</h3>
             </div>
-            <div className="space-y-4 text-sm text-gray-700">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-md">
+            <div className="grid md:grid-cols-2 gap-3">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 backdrop-blur-sm border border-indigo-200">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0" style={{ backgroundColor: '#0d08e3' }}>
                   1
                 </div>
                 <div className="flex-1 pt-1">
-                  <p className="font-semibold text-gray-900 mb-1">Select Chains</p>
-                  <p className="text-gray-600">Choose source and destination blockchains</p>
+                  <p className="font-bold text-gray-900 mb-1 text-sm">Select Chains</p>
+                  <p className="text-gray-600 text-xs">Choose source and destination</p>
                 </div>
               </div>
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-md">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 backdrop-blur-sm border border-indigo-200">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0" style={{ backgroundColor: '#0d08e3' }}>
                   2
                 </div>
                 <div className="flex-1 pt-1">
-                  <p className="font-semibold text-gray-900 mb-1">Enter Address</p>
-                  <p className="text-gray-600">Recipient stealth address (or regular address)</p>
+                  <p className="font-bold text-gray-900 mb-1 text-sm">Enter Address</p>
+                  <p className="text-gray-600 text-xs">Recipient stealth or regular address</p>
                 </div>
               </div>
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-md">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 backdrop-blur-sm border border-indigo-200">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0" style={{ backgroundColor: '#0d08e3' }}>
                   3
                 </div>
                 <div className="flex-1 pt-1">
-                  <p className="font-semibold text-gray-900 mb-1">Axelar Routing</p>
-                  <p className="text-gray-600">Payment is routed via Axelar network</p>
+                  <p className="font-bold text-gray-900 mb-1 text-sm">Axelar Routing</p>
+                  <p className="text-gray-600 text-xs">Payment routed via Axelar</p>
                 </div>
               </div>
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-md">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-white/60 backdrop-blur-sm border border-indigo-200">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md flex-shrink-0" style={{ backgroundColor: '#0d08e3' }}>
                   4
                 </div>
                 <div className="flex-1 pt-1">
-                  <p className="font-semibold text-gray-900 mb-1">Private Delivery</p>
-                  <p className="text-gray-600">Recipient receives funds privately (if stealth mode)</p>
+                  <p className="font-bold text-gray-900 mb-1 text-sm">Private Delivery</p>
+                  <p className="text-gray-600 text-xs">Funds delivered privately</p>
                 </div>
               </div>
             </div>

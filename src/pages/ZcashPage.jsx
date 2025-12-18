@@ -31,9 +31,9 @@ export default function ZcashPage() {
         <div className="flex flex-col items-center justify-center w-full min-h-[80vh] gap-8 p-4 pb-24">
             <div className="flex items-center gap-3">
                 <img src="/assets/zcash_logo.png" alt="Zcash" className="w-10 h-10 rounded-full" />
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-500 to-amber-600 bg-clip-text text-transparent">
-                    Zcash Integration
-                </h1>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-500 to-amber-600 bg-clip-text text-transparent">
+                Zcash Integration
+            </h1>
             </div>
 
             <p className="text-gray-600 max-w-lg text-center">
@@ -56,43 +56,43 @@ export default function ZcashPage() {
                             </Chip>
                         </div>
 
-                        <div className="flex flex-col gap-4 w-full">
-                            <Button
+                    <div className="flex flex-col gap-4 w-full">
+                        <Button
                                 className="w-full h-12 font-bold bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg hover:shadow-xl hover:from-yellow-400 hover:to-amber-500 transition-all"
-                                onClick={createWallet}
+                            onClick={createWallet}
                                 startContent={<Wallet className="w-5 h-5" />}
-                            >
-                                Generate New Wallet
-                            </Button>
+                        >
+                            Generate New Wallet
+                        </Button>
 
-                            <div className="relative flex py-2 items-center">
-                                <div className="flex-grow border-t border-gray-300"></div>
-                                <span className="flex-shrink mx-4 text-gray-400 text-sm">Or Import</span>
-                                <div className="flex-grow border-t border-gray-300"></div>
-                            </div>
+                        <div className="relative flex py-2 items-center">
+                            <div className="flex-grow border-t border-gray-300"></div>
+                            <span className="flex-shrink mx-4 text-gray-400 text-sm">Or Import</span>
+                            <div className="flex-grow border-t border-gray-300"></div>
+                        </div>
 
-                            <div className="flex flex-col gap-2">
-                                <Textarea
+                        <div className="flex flex-col gap-2">
+                            <Textarea
                                     placeholder="Enter your 12-word mnemonic phrase..."
-                                    value={mnemonicInput}
-                                    onChange={(e) => setMnemonicInput(e.target.value)}
+                                value={mnemonicInput}
+                                onChange={(e) => setMnemonicInput(e.target.value)}
                                     minRows={3}
-                                    variant="bordered"
+                                variant="bordered"
                                     classNames={{
                                         inputWrapper: "focus-within:border-yellow-400"
                                     }}
-                                />
-                                <Button
+                            />
+                            <Button
                                     variant="bordered"
                                     className="w-full border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-                                    onClick={() => importWallet(mnemonicInput)}
-                                    disabled={!mnemonicInput}
+                                onClick={() => importWallet(mnemonicInput)}
+                                disabled={!mnemonicInput}
                                     startContent={<Shield className="w-4 h-4" />}
-                                >
-                                    Import Wallet
-                                </Button>
-                            </div>
+                            >
+                                Import Wallet
+                            </Button>
                         </div>
+                    </div>
                     </CardBody>
                 </Card>
             ) : (
@@ -113,12 +113,12 @@ export default function ZcashPage() {
                                     </div>
                                     <div className="flex items-center gap-2 mt-2">
                                         <Chip size="sm" variant="flat" color="warning">
-                                            Testnet
+                                    Testnet
                                         </Chip>
                                         <Chip size="sm" variant="flat" color="default">
                                             Transparent Address
                                         </Chip>
-                                    </div>
+                            </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-2">
                                     <button
@@ -205,15 +205,15 @@ export default function ZcashPage() {
                                                                 >
                                                                     {showMnemonic ? <><EyeOff size={12} className="mr-1" /> Hide</> : <><Eye size={12} className="mr-1" /> Show</>}
                                                                 </Button>
-                                                            </div>
-                                                            {showMnemonic && (
+                                </div>
+                                {showMnemonic && (
                                                                 <div className="bg-yellow-100 p-4 rounded-lg border border-yellow-200">
                                                                     <code className="text-sm font-mono text-yellow-900 break-words leading-relaxed">
-                                                                        {zcashAccount.mnemonic}
+                                        {zcashAccount.mnemonic}
                                                                     </code>
-                                                                </div>
-                                                            )}
-                                                        </div>
+                                    </div>
+                                )}
+                            </div>
                                                     </div>
                                                 </CardBody>
                                             </Card>
@@ -282,9 +282,9 @@ export default function ZcashPage() {
                                                                 onClick={() => handleCopy(zcashAccount.address)}
                                                             >
                                                                 {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} className="text-yellow-600" />}
-                                                            </Button>
-                                                        </div>
-                                                    </div>
+                                    </Button>
+                                </div>
+                            </div>
 
                                                     <div>
                                                         <div className="flex justify-between items-center mb-2">
@@ -307,14 +307,14 @@ export default function ZcashPage() {
                                                         )}
                                                     </div>
 
-                                                    <Button
-                                                        color="danger"
-                                                        variant="light"
+                            <Button
+                                color="danger"
+                                variant="light"
                                                         className="w-full mt-4"
-                                                        onClick={disconnect}
-                                                    >
-                                                        Disconnect Wallet
-                                                    </Button>
+                                onClick={disconnect}
+                            >
+                                Disconnect Wallet
+                            </Button>
                                                 </div>
                                             </CardBody>
                                         </Card>
@@ -359,7 +359,7 @@ export default function ZcashPage() {
                                         requires a backend service or heavy WASM client. All transactions are simulated on testnet.
                                     </p>
                                 </div>
-                            </div>
+                    </div>
                         </CardBody>
                     </Card>
                 </div>

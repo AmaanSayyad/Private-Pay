@@ -124,7 +124,7 @@ export default function Stablecoin() {
           </p>
         </div>
 
-        {zecPrice && (
+      {zecPrice && (
           <Card className="bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200 shadow-sm mb-6 rounded-3xl">
             <CardBody className="p-6">
               <div className="flex items-center justify-between">
@@ -139,10 +139,10 @@ export default function Stablecoin() {
                   <TrendingUp className="w-5 h-5 text-yellow-600" />
                   <span className="text-sm font-semibold text-gray-700">Live Price</span>
                 </div>
-              </div>
-            </CardBody>
-          </Card>
-        )}
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
         <Card className="bg-white border border-gray-200 shadow-lg rounded-3xl mb-6">
           <CardBody className="p-0">
@@ -173,14 +173,14 @@ export default function Stablecoin() {
                       <img src="/assets/zcash_logo.png" alt="Zcash" className="w-6 h-6 rounded-full" />
                       <span className="text-gray-700 text-sm font-semibold">Deposit ZEC</span>
                     </div>
-                    <Input
-                      placeholder="0.0"
-                      type="number"
-                      value={zecAmount}
-                      onChange={(e) => {
-                        setZecAmount(e.target.value);
-                        setStablecoinAmount(calculateStablecoin(e.target.value));
-                      }}
+                <Input
+                  placeholder="0.0"
+                  type="number"
+                  value={zecAmount}
+                  onChange={(e) => {
+                    setZecAmount(e.target.value);
+                    setStablecoinAmount(calculateStablecoin(e.target.value));
+                  }}
                       size="lg"
                       classNames={{
                         input: "text-2xl font-bold",
@@ -192,7 +192,7 @@ export default function Stablecoin() {
                           <span className="text-gray-600 font-semibold">ZEC</span>
                         </div>
                       }
-                    />
+                />
                     <div className="flex items-center justify-between mt-3">
                       <Chip size="sm" variant="flat" color="warning" className="text-xs">
                         <Shield className="w-3 h-3 mr-1" />
@@ -202,7 +202,7 @@ export default function Stablecoin() {
                         Minimum: 150% collateralization
                       </p>
                     </div>
-                  </div>
+              </div>
 
                   <div className="flex justify-center -my-2 z-10 relative">
                     <div className="bg-white p-3 rounded-full border-2 border-yellow-300 shadow-lg flex items-center justify-center">
@@ -215,14 +215,14 @@ export default function Stablecoin() {
                       <Coins className="w-6 h-6 text-blue-600" />
                       <span className="text-gray-700 text-sm font-semibold">Receive pZUSD</span>
                     </div>
-                    <Input
-                      placeholder="0.0"
-                      type="number"
-                      value={stablecoinAmount}
-                      onChange={(e) => {
-                        setStablecoinAmount(e.target.value);
-                        setZecAmount(calculateZEC(e.target.value));
-                      }}
+                <Input
+                  placeholder="0.0"
+                  type="number"
+                  value={stablecoinAmount}
+                  onChange={(e) => {
+                    setStablecoinAmount(e.target.value);
+                    setZecAmount(calculateZEC(e.target.value));
+                  }}
                       size="lg"
                       classNames={{
                         input: "text-2xl font-bold",
@@ -234,25 +234,25 @@ export default function Stablecoin() {
                           <span className="text-gray-600 font-semibold">pZUSD</span>
                         </div>
                       }
-                      isReadOnly
-                    />
+                  isReadOnly
+                />
                     <p className="text-xs text-gray-500 mt-3">
                       You will receive this amount of pZUSD stablecoin
-                    </p>
-                  </div>
+                </p>
+              </div>
 
-                  <Button
-                    size="lg"
+              <Button
+                size="lg"
                     className="w-full h-12 font-bold bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg hover:shadow-xl hover:from-yellow-400 hover:to-amber-500 transition-all"
-                    onClick={handleMint}
-                    isLoading={isLoading}
-                    disabled={!zecAmount || parseFloat(zecAmount) <= 0}
+                onClick={handleMint}
+                isLoading={isLoading}
+                disabled={!zecAmount || parseFloat(zecAmount) <= 0}
                     startContent={!isLoading && <ArrowUp className="w-5 h-5" />}
                   >
                     {isLoading ? 'Minting...' : 'Mint pZUSD'}
-                  </Button>
+              </Button>
                 </div>
-              </Tab>
+        </Tab>
 
               <Tab 
                 key="burn" 
@@ -269,14 +269,14 @@ export default function Stablecoin() {
                       <Coins className="w-6 h-6 text-blue-600" />
                       <span className="text-gray-700 text-sm font-semibold">Burn pZUSD</span>
                     </div>
-                    <Input
-                      placeholder="0.0"
-                      type="number"
-                      value={stablecoinAmount}
-                      onChange={(e) => {
-                        setStablecoinAmount(e.target.value);
-                        setZecAmount(calculateZEC(e.target.value));
-                      }}
+                <Input
+                  placeholder="0.0"
+                  type="number"
+                  value={stablecoinAmount}
+                  onChange={(e) => {
+                    setStablecoinAmount(e.target.value);
+                    setZecAmount(calculateZEC(e.target.value));
+                  }}
                       size="lg"
                       classNames={{
                         input: "text-2xl font-bold",
@@ -288,7 +288,7 @@ export default function Stablecoin() {
                           <span className="text-gray-600 font-semibold">pZUSD</span>
                         </div>
                       }
-                    />
+                />
                     <div className="flex items-center justify-between mt-3">
                       <Chip size="sm" variant="flat" color="primary" className="text-xs">
                         <Zap className="w-3 h-3 mr-1" />
@@ -296,9 +296,9 @@ export default function Stablecoin() {
                       </Chip>
                       <p className="text-xs text-gray-500">
                         Fixed 1:1 redemption ratio
-                      </p>
+                </p>
                     </div>
-                  </div>
+              </div>
 
                   <div className="flex justify-center -my-2 z-10 relative">
                     <div className="bg-white p-3 rounded-full border-2 border-blue-300 shadow-lg flex items-center justify-center">
@@ -311,14 +311,14 @@ export default function Stablecoin() {
                       <img src="/assets/zcash_logo.png" alt="Zcash" className="w-6 h-6 rounded-full" />
                       <span className="text-gray-700 text-sm font-semibold">Receive ZEC</span>
                     </div>
-                    <Input
-                      placeholder="0.0"
-                      type="number"
-                      value={zecAmount}
-                      onChange={(e) => {
-                        setZecAmount(e.target.value);
-                        setStablecoinAmount(calculateStablecoin(e.target.value));
-                      }}
+                <Input
+                  placeholder="0.0"
+                  type="number"
+                  value={zecAmount}
+                  onChange={(e) => {
+                    setZecAmount(e.target.value);
+                    setStablecoinAmount(calculateStablecoin(e.target.value));
+                  }}
                       size="lg"
                       classNames={{
                         input: "text-2xl font-bold",
@@ -330,23 +330,23 @@ export default function Stablecoin() {
                           <span className="text-gray-600 font-semibold">ZEC</span>
                         </div>
                       }
-                      isReadOnly
-                    />
+                  isReadOnly
+                />
                     <p className="text-xs text-gray-500 mt-3">
-                      You will receive this amount of ZEC
-                    </p>
-                  </div>
+                  You will receive this amount of ZEC
+                </p>
+              </div>
 
-                  <Button
-                    size="lg"
+              <Button
+                size="lg"
                     className="w-full h-12 font-bold bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg hover:shadow-xl hover:from-yellow-400 hover:to-amber-500 transition-all"
-                    onClick={handleBurn}
-                    isLoading={isLoading}
-                    disabled={!stablecoinAmount || parseFloat(stablecoinAmount) <= 0}
+                onClick={handleBurn}
+                isLoading={isLoading}
+                disabled={!stablecoinAmount || parseFloat(stablecoinAmount) <= 0}
                     startContent={!isLoading && <ArrowDown className="w-5 h-5" />}
                   >
                     {isLoading ? 'Redeeming...' : 'Redeem ZEC'}
-                  </Button>
+              </Button>
                 </div>
               </Tab>
             </Tabs>
@@ -403,18 +403,18 @@ export default function Stablecoin() {
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-amber-400 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                     2
-                  </div>
+            </div>
                   <p className="min-w-0 break-words">Mint pZUSD stablecoin based on ZEC price and collateralization</p>
-                </div>
+            </div>
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-amber-400 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                     3
-                  </div>
+            </div>
                   <p className="min-w-0 break-words">Redeem pZUSD 1:1 for ZEC anytime (subject to collateral ratio)</p>
-                </div>
-              </div>
-            </CardBody>
-          </Card>
+            </div>
+          </div>
+        </CardBody>
+      </Card>
         </div>
       </div>
     </div>

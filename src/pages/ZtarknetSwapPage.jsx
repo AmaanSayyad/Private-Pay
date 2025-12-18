@@ -123,51 +123,49 @@ export default function ZtarknetSwapPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50">
-      <div className="max-w-6xl mx-auto px-4 py-8 pb-24">
+    <div className="min-h-screen bg-white">
+      <div className="max-w-6xl mx-auto px-4 py-6 pb-24">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link
-            to="/starknet"
-            className="p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Atomic Swap</h1>
-            <p className="text-gray-600">Trustless ZEC ↔ Starknet asset swaps</p>
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <img src="/assets/starknet-logo.png" alt="Starknet" className="w-12 h-12 rounded-full" />
+          <div className="text-center">
+            <h1 className="text-2xl font-bold" style={{ color: '#0d08e3' }}>Atomic Swap</h1>
+            <p className="text-gray-600 text-sm">Trustless ZEC ↔ Starknet asset swaps</p>
           </div>
         </div>
 
         {/* How it Works */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-8">
-          <h3 className="font-semibold mb-4">How Atomic Swaps Work</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium">1</div>
+        <div className="bg-white/80 backdrop-blur-xl border-2 border-indigo-200 shadow-xl rounded-2xl p-5 mb-6">
+          <h3 className="font-bold mb-4 text-gray-900 flex items-center gap-2">
+            <Shield className="w-5 h-5" style={{ color: '#0d08e3' }} />
+            How Atomic Swaps Work
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="flex items-start gap-2">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: '#0d08e3' }}>1</div>
               <div>
-                <p className="font-medium text-sm">Create Swap</p>
+                <p className="font-bold text-sm">Create Swap</p>
                 <p className="text-xs text-gray-500">Lock assets with hashlock</p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium">2</div>
+            <div className="flex items-start gap-2">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: '#0d08e3' }}>2</div>
               <div>
-                <p className="font-medium text-sm">Counterparty Locks</p>
+                <p className="font-bold text-sm">Counterparty Locks</p>
                 <p className="text-xs text-gray-500">Other party locks their assets</p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium">3</div>
+            <div className="flex items-start gap-2">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: '#0d08e3' }}>3</div>
               <div>
-                <p className="font-medium text-sm">Reveal Preimage</p>
+                <p className="font-bold text-sm">Reveal Preimage</p>
                 <p className="text-xs text-gray-500">Claim with secret preimage</p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium">4</div>
+            <div className="flex items-start gap-2">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: '#0d08e3' }}>4</div>
               <div>
-                <p className="font-medium text-sm">Complete Swap</p>
+                <p className="font-bold text-sm">Complete Swap</p>
                 <p className="text-xs text-gray-500">Both parties receive assets</p>
               </div>
             </div>
@@ -178,13 +176,18 @@ export default function ZtarknetSwapPage() {
           {/* Left: Actions */}
           <div className="space-y-6">
             {!isConnected ? (
-              <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 text-center">
-                <Wallet className="w-12 h-12 mx-auto mb-4 text-indigo-500" />
-                <h3 className="text-lg font-semibold mb-2">Connect Wallet</h3>
-                <p className="text-gray-500 mb-4">Connect your Starknet wallet to start swapping</p>
+              <div className="bg-gradient-to-br from-indigo-500/10 via-indigo-500/10 to-indigo-500/10 border-2 border-indigo-300/50 shadow-xl backdrop-blur-sm rounded-2xl p-8 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center shadow-xl" style={{ backgroundColor: '#0d08e3' }}>
+                  <Wallet className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-bold mb-2 text-gray-900">Connect Wallet</h3>
+                <p className="text-gray-600 text-sm mb-4">Connect your Starknet wallet to start swapping</p>
                 <button
                   onClick={() => connect("argentX")}
-                  className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2 justify-center"
+                  className="mx-auto px-6 py-3 text-white rounded-xl hover:scale-105 transition-all shadow-xl font-bold flex items-center gap-2 justify-center"
+                  style={{ backgroundColor: '#0d08e3' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0a06b8'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#0d08e3'}
                 >
                   <img src="/assets/argentx_logo.png" alt="ArgentX" className="w-5 h-5 rounded-full" />
                   Connect Wallet
@@ -193,26 +196,28 @@ export default function ZtarknetSwapPage() {
             ) : (
               <>
                 {/* Tab Selector */}
-                <div className="bg-white rounded-2xl p-2 shadow-lg border border-gray-100">
-                  <div className="flex">
+                <div className="bg-white/80 backdrop-blur-xl border-2 border-gray-200 shadow-xl rounded-2xl p-2">
+                  <div className="flex gap-2">
                     <button
                       onClick={() => setActiveTab("create")}
-                      className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${
+                      className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
                         activeTab === "create"
-                          ? "bg-indigo-600 text-white"
+                          ? "text-white shadow-lg"
                           : "text-gray-600 hover:bg-gray-100"
                       }`}
+                      style={activeTab === "create" ? { backgroundColor: '#0d08e3' } : {}}
                     >
                       <ArrowRightLeft className="w-4 h-4 inline mr-2" />
                       Create Swap
                     </button>
                     <button
                       onClick={() => setActiveTab("claim")}
-                      className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all ${
+                      className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${
                         activeTab === "claim"
-                          ? "bg-indigo-600 text-white"
+                          ? "text-white shadow-lg"
                           : "text-gray-600 hover:bg-gray-100"
                       }`}
+                      style={activeTab === "claim" ? { backgroundColor: '#0d08e3' } : {}}
                     >
                       <CheckCircle className="w-4 h-4 inline mr-2" />
                       Claim Swap
@@ -222,25 +227,35 @@ export default function ZtarknetSwapPage() {
 
                 {/* Create Swap Form */}
                 {activeTab === "create" && (
-                  <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                    <h3 className="text-lg font-semibold mb-4">Create Atomic Swap</h3>
+                  <div className="bg-white/80 backdrop-blur-xl border-2 border-indigo-200 shadow-xl rounded-2xl p-5">
+                    <h3 className="text-base font-bold mb-4 text-gray-900 flex items-center gap-2">
+                      <ArrowRightLeft className="w-5 h-5" style={{ color: '#0d08e3' }} />
+                      Create Atomic Swap
+                    </h3>
 
                     <div className="space-y-4">
                       {/* From */}
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <label className="block text-sm font-medium text-gray-500 mb-2">You Send</label>
-                        <div className="flex gap-3">
+                      <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-xl p-4">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">You Send</label>
+                        <div className="flex gap-3 items-center">
+                          <img 
+                            src={fromAsset === "ZEC" ? "/assets/zcash_logo.png" : fromAsset === "ETH" ? "/assets/eth-logo.png" : "/assets/starknet-logo.png"} 
+                            alt={fromAsset} 
+                            className="w-8 h-8 rounded-full flex-shrink-0" 
+                          />
                           <input
                             type="number"
                             value={fromAmount}
                             onChange={(e) => setFromAmount(e.target.value)}
                             placeholder="0.0"
-                            className="flex-1 bg-transparent text-2xl font-medium focus:outline-none"
+                            className="flex-1 bg-transparent text-2xl font-bold focus:outline-none"
                           />
                           <select
                             value={fromAsset}
                             onChange={(e) => setFromAsset(e.target.value)}
-                            className="px-4 py-2 bg-white rounded-lg border border-gray-200"
+                            className="px-4 py-2 bg-white rounded-lg border-2 border-gray-200 font-semibold"
+                            onFocus={(e) => e.currentTarget.style.borderColor = '#0d08e3'}
+                            onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                           >
                             <option value="ZEC">ZEC</option>
                             <option value="ETH">ETH</option>
@@ -251,26 +266,33 @@ export default function ZtarknetSwapPage() {
 
                       {/* Arrow */}
                       <div className="flex justify-center">
-                        <div className="p-2 bg-indigo-100 rounded-full">
-                          <ArrowRightLeft className="w-5 h-5 text-indigo-600" />
+                        <div className="p-2 rounded-full" style={{ backgroundColor: '#0d08e3' }}>
+                          <ArrowRightLeft className="w-5 h-5 text-white" />
                         </div>
                       </div>
 
                       {/* To */}
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <label className="block text-sm font-medium text-gray-500 mb-2">You Receive</label>
-                        <div className="flex gap-3">
+                      <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 rounded-xl p-4">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">You Receive</label>
+                        <div className="flex gap-3 items-center">
+                          <img 
+                            src={toAsset === "ZEC" ? "/assets/zcash_logo.png" : toAsset === "ETH" ? "/assets/eth-logo.png" : "/assets/starknet-logo.png"} 
+                            alt={toAsset} 
+                            className="w-8 h-8 rounded-full flex-shrink-0" 
+                          />
                           <input
                             type="number"
                             value={toAmount}
                             onChange={(e) => setToAmount(e.target.value)}
                             placeholder="0.0"
-                            className="flex-1 bg-transparent text-2xl font-medium focus:outline-none"
+                            className="flex-1 bg-transparent text-2xl font-bold focus:outline-none"
                           />
                           <select
                             value={toAsset}
                             onChange={(e) => setToAsset(e.target.value)}
-                            className="px-4 py-2 bg-white rounded-lg border border-gray-200"
+                            className="px-4 py-2 bg-white rounded-lg border-2 border-gray-200 font-semibold"
+                            onFocus={(e) => e.currentTarget.style.borderColor = '#0d08e3'}
+                            onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                           >
                             <option value="ETH">ETH</option>
                             <option value="ZEC">ZEC</option>
@@ -281,14 +303,16 @@ export default function ZtarknetSwapPage() {
 
                       {/* Timelock */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          <Clock className="w-4 h-4 inline mr-1" />
+                        <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                          <Clock className="w-4 h-4" style={{ color: '#0d08e3' }} />
                           Timelock Duration
                         </label>
                         <select
                           value={timelock}
                           onChange={(e) => setTimelock(e.target.value)}
-                          className="w-full p-3 border border-gray-200 rounded-xl"
+                          className="w-full p-3 border-2 border-gray-200 rounded-xl font-semibold"
+                          onFocus={(e) => e.currentTarget.style.borderColor = '#0d08e3'}
+                          onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                         >
                           <option value="3600">1 Hour</option>
                           <option value="7200">2 Hours</option>
@@ -300,7 +324,10 @@ export default function ZtarknetSwapPage() {
                       <button
                         onClick={handleCreateSwap}
                         disabled={!fromAmount || !toAmount}
-                        className="w-full py-4 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full py-4 text-white rounded-xl font-bold hover:scale-[1.01] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        style={{ backgroundColor: '#0d08e3' }}
+                        onMouseEnter={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = '#0a06b8')}
+                        onMouseLeave={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = '#0d08e3')}
                       >
                         <Lock className="w-4 h-4 inline mr-2" />
                         Create Swap
@@ -311,36 +338,46 @@ export default function ZtarknetSwapPage() {
 
                 {/* Claim Swap Form */}
                 {activeTab === "claim" && (
-                  <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                    <h3 className="text-lg font-semibold mb-4">Claim Swap</h3>
+                  <div className="bg-white/80 backdrop-blur-xl border-2 border-indigo-200 shadow-xl rounded-2xl p-5">
+                    <h3 className="text-base font-bold mb-4 text-gray-900 flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5" style={{ color: '#0d08e3' }} />
+                      Claim Swap
+                    </h3>
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Swap ID</label>
+                        <label className="block text-sm font-bold text-gray-800 mb-2">Swap ID</label>
                         <input
                           type="text"
                           value={claimSwapId}
                           onChange={(e) => setClaimSwapId(e.target.value)}
                           placeholder="Enter swap ID..."
-                          className="w-full p-3 border border-gray-200 rounded-xl"
+                          className="w-full p-3 border-2 border-gray-200 rounded-xl font-semibold"
+                          onFocus={(e) => e.currentTarget.style.borderColor = '#0d08e3'}
+                          onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Preimage (Secret)</label>
+                        <label className="block text-sm font-bold text-gray-800 mb-2">Preimage (Secret)</label>
                         <input
                           type="text"
                           value={preimage}
                           onChange={(e) => setPreimage(e.target.value)}
                           placeholder="Enter preimage to claim..."
-                          className="w-full p-3 border border-gray-200 rounded-xl font-mono text-sm"
+                          className="w-full p-3 border-2 border-gray-200 rounded-xl font-mono text-sm"
+                          onFocus={(e) => e.currentTarget.style.borderColor = '#0d08e3'}
+                          onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                         />
                       </div>
 
                       <button
                         onClick={handleClaimSwap}
                         disabled={!claimSwapId || !preimage}
-                        className="w-full py-4 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full py-4 text-white rounded-xl font-bold hover:scale-[1.01] transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        style={{ backgroundColor: '#0d08e3' }}
+                        onMouseEnter={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = '#0a06b8')}
+                        onMouseLeave={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = '#0d08e3')}
                       >
                         <CheckCircle className="w-4 h-4 inline mr-2" />
                         Claim Swap
@@ -353,25 +390,31 @@ export default function ZtarknetSwapPage() {
           </div>
 
           {/* Right: Swap History */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-              <h3 className="text-lg font-semibold mb-4">Your Swaps</h3>
+          <div className="space-y-5">
+            <div className="bg-white/80 backdrop-blur-xl border-2 border-gray-200 shadow-xl rounded-2xl p-5">
+              <h3 className="text-base font-bold mb-4 text-gray-900 flex items-center gap-2">
+                <ArrowRightLeft className="w-5 h-5" style={{ color: '#0d08e3' }} />
+                Your Swaps
+              </h3>
 
               {swaps.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <ArrowRightLeft className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No swaps yet</p>
+                <div className="text-center py-12 text-gray-500">
+                  <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                    <ArrowRightLeft className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="font-medium">No swaps yet</p>
+                  <p className="text-sm text-gray-400 mt-1">Create a swap to get started</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {swaps.map((swap) => (
-                    <div key={swap.id} className="p-4 rounded-xl border border-gray-200 hover:border-indigo-200 transition-colors">
+                    <div key={swap.id} className="p-4 rounded-xl border-2 border-indigo-200 bg-indigo-50 hover:border-indigo-300 transition-colors">
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColor(swap.status)}`}>
+                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${getStatusColor(swap.status)}`}>
                             {swap.status.charAt(0).toUpperCase() + swap.status.slice(1)}
                           </span>
-                          <p className="font-medium mt-2">
+                          <p className="font-bold mt-2">
                             {swap.fromAmount} {swap.fromAsset} → {swap.toAmount} {swap.toAsset}
                           </p>
                           <p className="text-xs text-gray-500 font-mono mt-1">
@@ -381,7 +424,7 @@ export default function ZtarknetSwapPage() {
                         <div className="text-right">
                           <div className="flex items-center gap-1 text-gray-600">
                             <Clock className="w-4 h-4" />
-                            <span className="text-sm">{getTimeRemaining(swap.createdAt, swap.timelock)}</span>
+                            <span className="text-sm font-semibold">{getTimeRemaining(swap.createdAt, swap.timelock)}</span>
                           </div>
                         </div>
                       </div>
@@ -389,7 +432,7 @@ export default function ZtarknetSwapPage() {
                       {swap.status === "pending" && (
                         <button
                           onClick={() => handleRefundSwap(swap.id)}
-                          className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                          className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-200 transition-colors"
                         >
                           <RefreshCw className="w-4 h-4 inline mr-1" />
                           Refund (after timelock)
@@ -402,10 +445,14 @@ export default function ZtarknetSwapPage() {
             </div>
 
             {/* Security Info */}
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white">
-              <Shield className="w-8 h-8 mb-3" />
-              <h3 className="text-lg font-semibold mb-2">Trustless & Secure</h3>
-              <p className="text-indigo-100 text-sm">
+            <div className="rounded-2xl p-5 text-white shadow-xl" style={{ backgroundColor: '#0d08e3' }}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-bold">Trustless & Secure</h3>
+              </div>
+              <p className="text-indigo-100 text-sm leading-relaxed">
                 Atomic swaps use Hash Time-Locked Contracts (HTLCs). Either both parties
                 complete the swap, or both get refunded. No trusted third party required.
               </p>
