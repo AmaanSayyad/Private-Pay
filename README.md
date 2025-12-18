@@ -1,6 +1,6 @@
 # PrivatePay 🐙
 
-> **The first on-chain untraceable, unidentifiable private payments on Arcium + Aztec + Mina**
+> **The first on-chain untraceable, unidentifiable private payments on Arcium + Aztec + Mina + Axelar + Zcash + Starknet + Osmosis + Miden + Near Protocol + Helius + Fhenix**
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Built with Kiro](https://img.shields.io/badge/Built%20with-Kiro%20AI-purple)](https://kiro.ai/)
@@ -45,10 +45,10 @@ Powered by ECDH + secp256k1 + BIP 0352/EIP 5564 + ROFL DarkPool Mixer
 
 ### Core Benefits
 
-✨ **Sender privacy**: Your wallet is never linked to the transaction
-✨ **Receiver privacy**: Recipients' identities remain hidden
-✨ **Observer blindness**: Third parties see nothing linkable
-✨ **Simple UX**: Like Stripe links, but every transaction is a new, invisible wallet
+- ✨ **Sender privacy**: Your wallet is never linked to the transaction
+- ✨ **Receiver privacy**: Recipients' identities remain hidden
+- ✨ **Observer blindness**: Third parties see nothing linkable
+- ✨ **Simple UX**: Like Stripe links, but every transaction is a new, invisible wallet
 
 ### Key Features
 
