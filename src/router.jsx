@@ -28,6 +28,8 @@ const ZcashMinaBridgePage = lazy(() => import("./pages/ZcashMinaBridgePage.jsx")
 // Axelar Cross-Chain Payments
 const CrossChainPaymentPage = lazy(() => import("./pages/CrossChainPaymentPage.jsx"));
 const OsmosisPage = lazy(() => import("./pages/OsmosisPage.jsx"));
+// Unstoppable Wallet - Self-Custody with Zcash Privacy
+const UnstoppableDashboard = lazy(() => import("./pages/UnstoppableDashboard.jsx"));
 
 // Loading component
 const PageLoader = () => (
@@ -180,6 +182,11 @@ export const router = createBrowserRouter([
       {
         path: "/osmosis",
         element: <LazyRoute Component={OsmosisPage} />,
+      },
+      // Unstoppable Wallet - Zcash Self-Custody
+      {
+        path: "/unstoppable",
+        element: <LazyRoute Component={UnstoppableDashboard} />,
       },
     ],
   },
