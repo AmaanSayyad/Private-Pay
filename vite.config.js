@@ -65,23 +65,12 @@ export default defineConfig(({ mode }) => {
         transformMixedEsModules: true,
         include: [/node_modules/],
       },
-      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         plugins: [],
         output: {
-          manualChunks: (id) => {
-            // Split large vendor libraries into separate chunks
-            if (id.includes('node_modules')) {
-              if (id.includes('@solana')) return 'vendor-solana';
-              if (id.includes('ethers')) return 'vendor-ethers';
-              if (id.includes('starknet')) return 'vendor-starknet';
-              if (id.includes('@aptos')) return 'vendor-aptos';
-              if (id.includes('@cosmjs') || id.includes('osmojs')) return 'vendor-cosmos';
-              if (id.includes('o1js')) return 'vendor-mina';
-              if (id.includes('@nextui-org')) return 'vendor-ui';
-              return 'vendor';
-            }
-          },
+          // Let Vite handle chunking automatically to avoid circular dependencies
+          // and execution order issues (like "id is not a function").
+          manualChunks: undefined,
         },
       },
     },
