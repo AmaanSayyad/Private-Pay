@@ -37,11 +37,14 @@ export default function OsmosisPage() {
     <div className="min-h-screen bg-white text-black p-8 mt-20">
         <div className="max-w-6xl mx-auto space-y-8 ">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-800/20 pb-6 gap-4">
+                <div className="flex items-center gap-3">
+                    <img src="/assets/osmosis-logo.png" alt="Osmosis" className="w-10 h-10 rounded-full" />
                 <div>
                     <h1 className="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-pink-600">
                         Osmosis Privacy Layer
                     </h1>
                     <p className="text-gray-400 mt-2">Interchain Shielded Pool & Asset Bridge</p>
+                    </div>
                 </div>
                 <div className="flex items-center gap-4">
                     <button 

@@ -15,7 +15,7 @@ export default function PrivacyNavbar() {
                         `${location.pathname.startsWith("/mina") ? "bg-orange-500 text-white hover:bg-orange-600 shadow-md shadow-orange-200" : "text-gray-600"}`
                     )}
                 >
-                    <span className="text-lg">🟠</span>
+                    <img src="/assets/mina_logo.png" alt="Mina" className="w-5 h-5 rounded-full" />
                     Mina
                 </Link>
                 <Link
@@ -25,7 +25,7 @@ export default function PrivacyNavbar() {
                         `${location.pathname.startsWith("/zcash") && !location.pathname.includes("bridge") ? "bg-yellow-500 text-white hover:bg-yellow-600 shadow-md shadow-yellow-200" : "text-gray-600"}`
                     )}
                 >
-                    <span className="text-lg">🟡</span>
+                    <img src="/assets/zcash_logo.png" alt="Zcash" className="w-5 h-5 rounded-full" />
                     Zcash
                 </Link>
                 <Link

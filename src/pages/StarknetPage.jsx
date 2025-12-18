@@ -164,7 +164,7 @@ export default function StarknetPage() {
                   onClick={() => handleConnect("argentX")}
                   isLoading={isConnecting}
                   isDisabled={!availableWallets.argentX && !isConnecting}
-                  startContent={<Wallet className="w-5 h-5" />}
+                  startContent={<img src="/assets/argentx_logo.png" alt="ArgentX" className="w-5 h-5 rounded-full" />}
                 >
                   {availableWallets.argentX ? "Connect ArgentX" : "Install ArgentX"}
                 </Button>

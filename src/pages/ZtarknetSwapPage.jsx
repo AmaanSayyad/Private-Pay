@@ -184,8 +184,9 @@ export default function ZtarknetSwapPage() {
                 <p className="text-gray-500 mb-4">Connect your Starknet wallet to start swapping</p>
                 <button
                   onClick={() => connect("argentX")}
-                  className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors"
+                  className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2 justify-center"
                 >
+                  <img src="/assets/argentx_logo.png" alt="ArgentX" className="w-5 h-5 rounded-full" />
                   Connect Wallet
                 </button>
               </div>

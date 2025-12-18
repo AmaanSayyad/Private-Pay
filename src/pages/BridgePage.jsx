@@ -8,7 +8,7 @@ import { sendAptTransfer } from "../lib/aptos";
 import { sendMinaPayment } from "../components/mina-protocol/mina"; // Mock for receiving
 import { Icons } from "../components/shared/Icons";
 import toast from "react-hot-toast";
-import { ArrowRight, ArrowLeftRight, CheckCircle2, Lock, Unlock } from "lucide-react";
+import { ArrowRight, ArrowLeftRight, CheckCircle2, Lock, Unlock, Shield, Zap, Loader2 } from "lucide-react";
 
 // Mock Bridge Treasury Addresses
 const BRIDGE_TREASURY_APTOS = import.meta.env.VITE_TREASURY_WALLET_ADDRESS || "0x123...bridge"; // Fallback if env not set
@@ -198,181 +198,428 @@ export default function BridgePage() {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center w-full min-h-[85vh] gap-8 p-4 py-12">
-            <div className="text-center space-y-2">
-                <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+        <div className="flex flex-col items-center justify-center w-full min-h-[80vh] gap-8 p-4 pb-24">
+            <div className="flex items-center gap-3">
+                <Shield className="w-10 h-10 text-indigo-500" />
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                     Privacy Bridge
                 </h1>
-                <p className="text-gray-500 text-lg">
-                    Move assets securely from Public Chains to Privacy Layers
-                </p>
             </div>
 
-            <Card className="w-full max-w-xl shadow-xl border border-neutral-200 bg-white/80 backdrop-blur-md">
-                <CardBody className="gap-6 p-6">
+            <p className="text-gray-600 max-w-lg text-center">
+                Move assets securely from public chains to privacy layers with zero-knowledge proofs.
+            </p>
+
+            {/* Bridge Flow Diagram */}
+            <Card className="w-full max-w-2xl shadow-xl border border-gray-200 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 rounded-3xl mb-4">
+                <CardBody className="p-6">
+                    <h3 className="text-center font-semibold text-gray-700 mb-4">Bridge Flow</h3>
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex flex-col items-center gap-2 flex-1">
+                            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border-2 border-blue-200">
+                                <img src="/assets/aptos-logo.png" alt="Aptos" className="w-12 h-12 object-contain" />
+                            </div>
+                            <span className="text-sm font-semibold text-gray-700">Aptos</span>
+                            <span className="text-xs text-gray-500">Public Chain</span>
+                        </div>
+
+                        <div className="flex-1 flex items-center justify-center">
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="w-20 h-12 rounded-lg bg-gradient-to-r from-indigo-100 to-purple-100 flex items-center justify-center border border-indigo-200">
+                                    <Zap className="text-indigo-600" size={20} />
+                                </div>
+                                <span className="text-xs text-gray-500 font-medium">ZK Proof</span>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col items-center gap-2 flex-1">
+                            <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center overflow-hidden border-2 border-purple-200">
+                                <img 
+                                    src={destChain === "mina" ? "/assets/mina_logo.png" : "/assets/zcash_logo.png"} 
+                                    alt={destChain === "mina" ? "Mina" : "Zcash"} 
+                                    className="w-12 h-12 object-contain" 
+                                />
+                            </div>
+                            <span className="text-sm font-semibold text-gray-700">
+                                {destChain === "mina" ? "Mina" : "Zcash"}
+                            </span>
+                            <span className="text-xs text-gray-500">Privacy Chain</span>
+                        </div>
+                    </div>
+                </CardBody>
+            </Card>
+
+            <Card className="w-full max-w-2xl shadow-xl border border-gray-200 bg-white rounded-3xl">
+                <CardBody className="gap-6 p-8">
 
                     {/* Source Section */}
                     <div className="flex flex-col gap-3">
-                        <div className="flex justify-between items-center text-sm font-semibold text-gray-500">
-                            <span>From (Public Lock)</span>
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Source</span>
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <p className="text-sm font-semibold text-gray-700">From (Public Chain)</p>
+                                <p className="text-xs text-gray-500">Lock assets on source chain</p>
+                            </div>
+                            <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium">Source</span>
                         </div>
-                        <div className="flex gap-4 p-4 border border-neutral-200 rounded-2xl bg-neutral-50 items-center">
-                            <Select
-                                selectedKeys={[sourceChain]}
-                                onChange={(e) => setSourceChain(e.target.value)}
-                                className="w-40"
-                                aria-label="Source Chain"
-                                disallowEmptySelection
-                            >
-                                <SelectItem key="aptos" startContent={<span className="text-xl">🔵</span>}>Aptos</SelectItem>
-                            </Select>
+                        <div className="flex gap-4 p-5 border border-gray-200 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 items-center">
+                            <div className="relative">
+                                <img 
+                                    src="/assets/aptos-logo.png" 
+                                    alt="Aptos" 
+                                    className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full z-10 pointer-events-none" 
+                                />
+                                <Select
+                                    selectedKeys={[sourceChain]}
+                                    onSelectionChange={(keys) => {
+                                        const selected = Array.from(keys)[0];
+                                        if (selected) setSourceChain(selected);
+                                    }}
+                                    className="w-40"
+                                    aria-label="Source Chain"
+                                    disallowEmptySelection
+                                    classNames={{
+                                        trigger: "bg-white border-gray-200 pl-10",
+                                        value: "flex items-center"
+                                    }}
+                                >
+                                    <SelectItem 
+                                        key="aptos" 
+                                        value="aptos"
+                                        textValue="Aptos"
+                                        startContent={<img src="/assets/aptos-logo.png" alt="Aptos" className="w-5 h-5 rounded-full" />}
+                                    >
+                                        Aptos
+                                    </SelectItem>
+                                </Select>
+                            </div>
 
                             <div className="flex-1 text-right">
                                 {isSourceConnected ? (
-                                    <div className="flex flex-col items-end">
-                                        <span className="font-mono text-xs text-gray-500">{aptos.account?.slice(0, 6)}...</span>
-                                        <span className="text-green-600 text-xs font-bold">Connected</span>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <span className="font-mono text-sm text-gray-700 font-medium">{aptos.account?.slice(0, 8)}...{aptos.account?.slice(-6)}</span>
+                                        <span className="text-green-600 text-xs font-semibold flex items-center gap-1">
+                                            <CheckCircle2 size={12} /> Connected
+                                        </span>
                                     </div>
                                 ) : (
-                                    <Button size="sm" color="primary" onClick={handleConnectSource}>Connect</Button>
+                                    <Button 
+                                        size="md" 
+                                        color="primary" 
+                                        onClick={handleConnectSource}
+                                        className="font-semibold"
+                                    >
+                                        Connect Wallet
+                                    </Button>
                                 )}
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex justify-center -my-3 z-10">
-                        <div className="bg-white p-2 rounded-full border border-gray-200 shadow-sm text-gray-400">
-                            <ArrowLeftRight size={20} />
+                    <div className="flex justify-center -my-2 z-10 relative">
+                        <div className="bg-white p-4 rounded-full border-2 border-indigo-200 shadow-lg flex items-center justify-center">
+                            <div className="flex items-center gap-2">
+                                <img 
+                                    src="/assets/aptos-logo.png" 
+                                    alt="Aptos" 
+                                    className="w-6 h-6 rounded-full" 
+                                />
+                                <ArrowLeftRight size={20} className="text-indigo-600" />
+                                <img 
+                                    src={destChain === "mina" ? "/assets/mina_logo.png" : "/assets/zcash_logo.png"} 
+                                    alt={destChain === "mina" ? "Mina" : "Zcash"} 
+                                    className="w-6 h-6 rounded-full" 
+                                />
+                            </div>
                         </div>
                     </div>
 
                     {/* Destination Section */}
                     <div className="flex flex-col gap-3">
-                        <div className="flex justify-between items-center text-sm font-semibold text-gray-500">
-                            <span>To (Private Mint)</span>
-                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Destination</span>
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <p className="text-sm font-semibold text-gray-700">To (Privacy Chain)</p>
+                                <p className="text-xs text-gray-500">Receive shielded tokens</p>
+                            </div>
+                            <span className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-medium">Destination</span>
                         </div>
-                        <div className="flex gap-4 p-4 border border-neutral-200 rounded-2xl bg-neutral-50 items-center">
-                            <Select
-                                selectedKeys={[destChain]}
-                                onChange={(e) => setDestChain(e.target.value)}
-                                className="w-40"
-                                aria-label="Destination Chain"
-                                disallowEmptySelection
-                            >
-                                <SelectItem key="mina" startContent={<span className="text-xl">🟠</span>}>Mina</SelectItem>
-                                <SelectItem key="zcash" startContent={<span className="text-xl">🟡</span>}>Zcash</SelectItem>
-                            </Select>
+                        <div className="flex gap-4 p-5 border border-gray-200 rounded-2xl bg-gradient-to-br from-purple-50 to-pink-50 items-center">
+                            <div className="relative">
+                                <img 
+                                    src={destChain === "mina" ? "/assets/mina_logo.png" : "/assets/zcash_logo.png"} 
+                                    alt={destChain === "mina" ? "Mina" : "Zcash"} 
+                                    className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full z-10 pointer-events-none" 
+                                />
+                                <Select
+                                    selectedKeys={[destChain]}
+                                    onSelectionChange={(keys) => {
+                                        const selected = Array.from(keys)[0];
+                                        if (selected) setDestChain(selected);
+                                    }}
+                                    className="w-40"
+                                    aria-label="Destination Chain"
+                                    disallowEmptySelection
+                                    classNames={{
+                                        trigger: "bg-white border-gray-200 pl-10",
+                                        value: "flex items-center"
+                                    }}
+                                >
+                                    <SelectItem 
+                                        key="mina" 
+                                        value="mina"
+                                        textValue="Mina"
+                                        startContent={<img src="/assets/mina_logo.png" alt="Mina" className="w-5 h-5 rounded-full" />}
+                                    >
+                                        Mina
+                                    </SelectItem>
+                                    <SelectItem 
+                                        key="zcash" 
+                                        value="zcash"
+                                        textValue="Zcash"
+                                        startContent={<img src="/assets/zcash_logo.png" alt="Zcash" className="w-5 h-5 rounded-full" />}
+                                    >
+                                        Zcash
+                                    </SelectItem>
+                                </Select>
+                            </div>
 
                             <div className="flex-1 text-right">
                                 {isDestConnected ? (
-                                    <div className="flex flex-col items-end">
-                                        <span className="font-mono text-xs text-gray-500">
-                                            {destChain === "mina" ? mina.minaAccount?.slice(0, 6) : zcash.zcashAccount?.address?.slice(0, 6)}...
+                                    <div className="flex flex-col items-end gap-1">
+                                        <span className="font-mono text-sm text-gray-700 font-medium">
+                                            {destChain === "mina" 
+                                                ? `${mina.minaAccount?.slice(0, 8)}...${mina.minaAccount?.slice(-6)}` 
+                                                : `${zcash.zcashAccount?.address?.slice(0, 8)}...${zcash.zcashAccount?.address?.slice(-6)}`}
                                         </span>
-                                        <span className="text-green-600 text-xs font-bold">Connected</span>
+                                        <span className="text-green-600 text-xs font-semibold flex items-center gap-1">
+                                            <CheckCircle2 size={12} /> Connected
+                                        </span>
                                     </div>
                                 ) : (
-                                    <Button size="sm" color="warning" onClick={handleConnectDest}>Connect</Button>
+                                    <Button 
+                                        size="md" 
+                                        color="secondary" 
+                                        onClick={handleConnectDest}
+                                        className="font-semibold"
+                                    >
+                                        Connect Wallet
+                                    </Button>
                                 )}
                             </div>
                         </div>
                     </div>
 
                     {/* Amount Input */}
-                    <div className="space-y-2">
-                        <Input
-                            type="number"
-                            label="Amount"
-                            placeholder="0.00"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            isDisabled={step > 0}
-                            endContent={
-                                <span className="text-gray-500 text-sm">
-                                    {sourceChain === "aptos" ? "APT" : "TOK"}
-                                </span>
-                            }
-                            classNames={{ inputWrapper: "h-14" }}
-                        />
-                        <div className="flex justify-between px-2 text-xs text-gray-500">
-                            <span>Balance: {sourceChain === "aptos" ? "Loading..." : "0"}</span>
-                            <span>Fee: ~0.001 APT</span>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="text-sm font-semibold text-gray-700 mb-2 block">Amount</label>
+                            <div className="relative">
+                                <Input
+                                    type="number"
+                                    placeholder="0.00"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    isDisabled={step > 0}
+                                    endContent={
+                                        <div className="flex items-center gap-1">
+                                            <img 
+                                                src={sourceChain === "aptos" ? "/assets/aptos-logo.png" : "/assets/solana_logo.png"} 
+                                                alt={sourceChain === "aptos" ? "APT" : "TOK"} 
+                                                className="w-5 h-5 rounded-full" 
+                                            />
+                                            <span className="text-gray-600 text-sm font-medium">
+                                                {sourceChain === "aptos" ? "APT" : "TOK"}
+                                            </span>
+                                        </div>
+                                    }
+                                    classNames={{ 
+                                        inputWrapper: "h-14 bg-white border-gray-200",
+                                        input: "text-lg font-semibold"
+                                    }}
+                                    variant="bordered"
+                                />
+                            </div>
                         </div>
+                        <div className="flex justify-between items-center px-2 text-xs">
+                            <span className="text-gray-500">
+                                Balance: <span className="font-medium text-gray-700">{sourceChain === "aptos" ? "Loading..." : "0.00"}</span>
+                            </span>
+                            <span className="text-gray-500">
+                                Fee: <span className="font-medium text-gray-700">~0.001 APT</span>
+                            </span>
+                        </div>
+                        
+                        {/* Estimated Output */}
+                        {amount && parseFloat(amount) > 0 && (
+                            <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200">
+                                <CardBody className="p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Lock className="w-4 h-4 text-purple-600" />
+                                            <span className="text-sm text-gray-600">You'll receive (estimated)</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg font-bold text-gray-900">
+                                                ~{amount}
+                                            </span>
+                                            <img 
+                                                src={destChain === "mina" ? "/assets/mina_logo.png" : "/assets/zcash_logo.png"} 
+                                                alt={destChain === "mina" ? "Mina" : "Zcash"} 
+                                                className="w-5 h-5 rounded-full" 
+                                            />
+                                            <span className="text-sm font-semibold text-gray-700">
+                                                {destChain === "mina" ? "MINA" : "ZEC"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Amount will be encrypted and minted as privacy tokens
+                                    </p>
+                                </CardBody>
+                            </Card>
+                        )}
                     </div>
 
                     {/* Action Button & Status */}
                     {step === 0 && (
                         <Button
-                            className="w-full h-14 text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-200"
+                            className="w-full h-14 text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-200 hover:shadow-xl transition-all"
                             onClick={handleBridge}
-                            disabled={!amount || step > 0}
+                            disabled={!amount || step > 0 || !isSourceConnected || !isDestConnected}
                         >
+                            <Zap className="w-5 h-5 mr-2" />
                             Bridge Assets
                         </Button>
                     )}
 
                     {step > 0 && (
-                        <div className="flex flex-col gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100 animate-in fade-in zoom-in duration-300">
+                        <div className="flex flex-col gap-4 bg-gradient-to-br from-gray-50 to-indigo-50/30 p-6 rounded-2xl border border-gray-200">
+                            <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                                <Shield className="w-5 h-5 text-indigo-600" />
+                                Bridge Progress
+                            </h3>
+                            
                             {/* Step 1: Lock */}
-                            <div className={`flex items-center gap-3 ${step >= 1 ? "opacity-100" : "opacity-40"}`}>
-                                {step > 1 ? (
-                                    <CheckCircle2 className="text-green-500" />
-                                ) : (
-                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                                )}
+                            <div className={`flex items-start gap-4 p-4 rounded-xl bg-white border-2 ${step >= 1 && step < 2 ? "border-indigo-300" : step > 1 ? "border-green-200" : "border-gray-200"} transition-all`}>
+                                <div className="flex-shrink-0 mt-0.5">
+                                    {step > 1 ? (
+                                        <CheckCircle2 className="text-green-500 w-6 h-6" />
+                                    ) : step === 1 ? (
+                                        <Loader2 className="text-indigo-600 w-6 h-6 animate-spin" />
+                                    ) : (
+                                        <div className="w-6 h-6 rounded-full border-2 border-gray-300"></div>
+                                    )}
+                                </div>
                                 <div className="flex-1">
-                                    <p className="font-semibold text-gray-800">Locking on Aptos</p>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <img src="/assets/aptos-logo.png" alt="Aptos" className="w-5 h-5 rounded-full" />
+                                        <p className="font-semibold text-gray-900">Step 1: Locking Assets</p>
+                                    </div>
+                                    <p className="text-sm text-gray-600 mb-2">Locking {amount} APT on Aptos chain</p>
                                     {completedTx.lock && (
                                         <a
                                             href={`https://explorer.aptoslabs.com/txn/${completedTx.lock}?network=testnet`}
                                             target="_blank"
-                                            className="text-xs text-blue-500 hover:underline"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-indigo-600 hover:text-indigo-700 hover:underline font-medium inline-flex items-center gap-1"
                                         >
-                                            View TX: {completedTx.lock.slice(0, 6)}...
+                                            View Transaction <ArrowRight size={12} />
                                         </a>
                                     )}
                                 </div>
                             </div>
 
                             {/* Step 2: Relay */}
-                            <div className={`flex items-center gap-3 ${step >= 2 ? "opacity-100" : "opacity-40"}`}>
-                                {step > 2 ? (
-                                    <CheckCircle2 className="text-green-500" />
-                                ) : (
-                                    step === 2 && <div className="animate-pulse h-5 w-5 bg-purple-400 rounded-full"></div>
-                                )}
-                                <p className="font-semibold text-gray-800">Verifying Proof (ZK Relay)</p>
+                            <div className={`flex items-start gap-4 p-4 rounded-xl bg-white border-2 ${step >= 2 && step < 3 ? "border-purple-300" : step > 2 ? "border-green-200" : "border-gray-200"} transition-all`}>
+                                <div className="flex-shrink-0 mt-0.5">
+                                    {step > 2 ? (
+                                        <CheckCircle2 className="text-green-500 w-6 h-6" />
+                                    ) : step === 2 ? (
+                                        <div className="w-6 h-6 rounded-full bg-purple-400 animate-pulse"></div>
+                                    ) : (
+                                        <div className="w-6 h-6 rounded-full border-2 border-gray-300"></div>
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Zap className="w-5 h-5 text-purple-600" />
+                                        <p className="font-semibold text-gray-900">Step 2: Verifying Proof</p>
+                                    </div>
+                                    <p className="text-sm text-gray-600">Zero-knowledge proof verification in progress...</p>
+                                </div>
                             </div>
 
                             {/* Step 3: Release */}
-                            <div className={`flex items-center gap-3 ${step >= 3 ? "opacity-100" : "opacity-40"}`}>
-                                {step === 4 ? (
-                                    <CheckCircle2 className="text-green-500" />
-                                ) : (
-                                    step === 3 && <div className="h-5 w-5 rounded-full border-2 border-orange-400 animate-ping"></div>
-                                )}
+                            <div className={`flex items-start gap-4 p-4 rounded-xl bg-white border-2 ${step >= 3 && step < 4 ? "border-orange-300" : step === 4 ? "border-green-200" : "border-gray-200"} transition-all`}>
+                                <div className="flex-shrink-0 mt-0.5">
+                                    {step === 4 ? (
+                                        <CheckCircle2 className="text-green-500 w-6 h-6" />
+                                    ) : step === 3 ? (
+                                        <div className="w-6 h-6 rounded-full border-2 border-orange-400 animate-ping"></div>
+                                    ) : (
+                                        <div className="w-6 h-6 rounded-full border-2 border-gray-300"></div>
+                                    )}
+                                </div>
                                 <div className="flex-1">
-                                    <p className="font-semibold text-gray-800">Releasing on {destChain === "mina" ? "Mina" : "Zcash"}</p>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <img 
+                                            src={destChain === "mina" ? "/assets/mina_logo.png" : "/assets/zcash_logo.png"} 
+                                            alt={destChain === "mina" ? "Mina" : "Zcash"} 
+                                            className="w-5 h-5 rounded-full" 
+                                        />
+                                        <p className="font-semibold text-gray-900">Step 3: Releasing Tokens</p>
+                                    </div>
+                                    <p className="text-sm text-gray-600 mb-3">
+                                        Minting privacy tokens on {destChain === "mina" ? "Mina" : "Zcash"}
+                                    </p>
                                     {step === 3 && (
                                         <Button
-                                            size="sm"
-                                            color="warning"
-                                            className="mt-2 w-full text-white font-bold"
+                                            size="md"
+                                            className="w-full bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold shadow-md hover:shadow-lg transition-all"
                                             onClick={handleRelease}
                                         >
+                                            <Lock className="w-4 h-4 mr-2" />
                                             Sign to Claim Privacy Tokens
                                         </Button>
                                     )}
                                     {completedTx.release && (
-                                        <p className="text-xs text-green-600">Tokens Received!</p>
+                                        <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
+                                            <CheckCircle2 size={16} />
+                                            Tokens Received Successfully!
+                                        </div>
                                     )}
                                 </div>
                             </div>
 
                             {step === 4 && (
-                                <Button size="sm" variant="flat" onClick={reset}>Bridge More</Button>
+                                <div className="pt-4 border-t border-gray-200 space-y-3">
+                                    <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200">
+                                        <CardBody className="p-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                                                    <CheckCircle2 className="w-8 h-8 text-green-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className="font-bold text-green-900">Bridge Complete!</p>
+                                                    <p className="text-sm text-green-700">
+                                                        Your {amount} APT has been successfully bridged to {destChain === "mina" ? "Mina" : "Zcash"} privacy tokens.
+                                                    </p>
+                                                </div>
+                                                <img 
+                                                    src={destChain === "mina" ? "/assets/mina_logo.png" : "/assets/zcash_logo.png"} 
+                                                    alt={destChain === "mina" ? "Mina" : "Zcash"} 
+                                                    className="w-10 h-10 rounded-full" 
+                                                />
+                                            </div>
+                                        </CardBody>
+                                    </Card>
+                                    <Button 
+                                        variant="bordered" 
+                                        className="w-full font-semibold border-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                                        onClick={reset}
+                                    >
+                                        Bridge More Assets
+                                    </Button>
+                                </div>
                             )}
                         </div>
                     )}

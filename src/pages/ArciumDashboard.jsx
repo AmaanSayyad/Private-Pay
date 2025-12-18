@@ -80,6 +80,8 @@ export default function ArciumDashboard() {
             >
               <Icons.back className="w-5 h-5" />
             </Button>
+            <div className="flex items-center gap-3">
+              <img src="/assets/arcium.png" alt="Arcium" className="w-10 h-10 rounded-full" />
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
                 <span className="text-primary">Arcium</span>
@@ -90,6 +92,7 @@ export default function ArciumDashboard() {
               <p className="text-gray-500 text-sm mt-1">
                 Encrypted computation on Solana
               </p>
+              </div>
             </div>
           </div>
 

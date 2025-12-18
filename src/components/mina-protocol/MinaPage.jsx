@@ -92,6 +92,7 @@ export default function MinaPage() {
                         size="lg"
                         className="font-bold text-white"
                         onClick={handleConnect}
+                        startContent={<img src="/assets/auro_logo.png" alt="Auro" className="w-5 h-5 rounded-full" />}
                     >
                         {isInstalled ? "Connect Auro Wallet" : "Install Auro Wallet"}
                     </Button>

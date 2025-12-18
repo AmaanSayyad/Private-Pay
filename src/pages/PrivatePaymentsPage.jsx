@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { Button, Card, CardBody, Input } from "@nextui-org/react";
+import { Button, Card, CardBody, Input, Chip, Tabs, Tab } from "@nextui-org/react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import toast from "react-hot-toast";
 import * as anchor from "@coral-xyz/anchor";
 import { useNavigate } from "react-router-dom";
@@ -18,6 +19,7 @@ import {
   awaitComputationFinalizationSafe,
 } from "../lib/arcium/env.js";
 import { Icons } from "../components/shared/Icons.jsx";
+import { Shield, Lock, Send, Wallet, Eye, EyeOff, CheckCircle2, Info } from "lucide-react";
 
 // Browser-compatible random bytes generator
 const randomBytes = (length) => {
@@ -41,7 +43,11 @@ export default function PrivatePaymentsPage() {
   const arciumClient = useArciumClient();
 
   const [amount, setAmount] = useState("");
+  const [recipient, setRecipient] = useState("");
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("deposit");
+  const [showBalance, setShowBalance] = useState(false);
+  const [balance, setBalance] = useState("0.00");
 
   const provider = useMemo(() => {
     if (!arciumClient?.provider) return null;
@@ -291,73 +297,267 @@ export default function PrivatePaymentsPage() {
 
   return (
     <div className="flex min-h-screen w-full items-start justify-center py-20 px-4 md:px-10 bg-gradient-to-br from-white to-indigo-50/30">
-      <div className="relative flex flex-col gap-4 w-full max-w-md">
-        <Card className="bg-white border border-gray-200 shadow-sm rounded-3xl p-6">
-          <CardBody className="flex flex-col gap-4">
-            <div className="flex items-center justify-between w-full mb-2">
-              <h1 className="font-bold text-xl text-gray-900">Private Payments</h1>
-              <Button
-                onClick={() => navigate("/arcium")}
-                className="bg-white border border-gray-200 rounded-full px-4 h-10 flex items-center gap-2"
-                variant="flat"
-              >
-                <Icons.back className="size-4" />
-                <span className="text-sm">Back</span>
-              </Button>
-            </div>
-
-            {!connected ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <p className="text-gray-500 text-center mb-4">
-                  Connect your Solana wallet to use private payments
+      <div className="relative flex flex-col gap-6 w-full max-w-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Button
+              isIconOnly
+              variant="light"
+              className="text-gray-600"
+              onClick={() => navigate("/arcium")}
+            >
+              <Icons.back className="w-5 h-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <img src="/assets/arcium.png" alt="Arcium" className="w-8 h-8 rounded-full" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  Private Payments
+                  <Chip size="sm" color="primary" variant="flat">
+                    Encrypted
+                  </Chip>
+                </h1>
+                <p className="text-gray-500 text-sm">
+                  Send encrypted payments with hidden amounts
                 </p>
               </div>
-            ) : (
-              <>
-                <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg space-y-1">
-                  <div className="font-medium mb-2">Debug Info:</div>
-                  <div>Connected: {connected ? "✓" : "✗"}</div>
-                  <div>Public Key: {publicKey ? publicKey.toBase58().slice(0, 8) + "..." : "N/A"}</div>
-                  <div>Arcium Client: {arciumClient ? "✓" : "✗"}</div>
-                  <div>Program: {program ? "✓" : "✗"}</div>
-                  <div className="mt-2 pt-2 border-t border-gray-200">
-                    <div className="font-medium mb-1">Program IDs:</div>
-                    <div>Arcium: {ARCIUM_PROGRAM_ID?.toBase58?.() ?? "N/A"}</div>
-                    <div>Private Pay: {PRIVATE_PAY_PROGRAM_ID?.toBase58?.() ?? "N/A"}</div>
+            </div>
+          </div>
+          <WalletMultiButton className="!bg-primary !rounded-xl !h-10" />
+        </div>
+
+        {!connected ? (
+          <Card className="bg-white border border-gray-200 shadow-sm rounded-3xl">
+            <CardBody className="flex flex-col items-center justify-center py-12">
+              <Wallet className="w-16 h-16 text-gray-400 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Connect Wallet</h3>
+              <p className="text-gray-500 text-center mb-6 max-w-sm">
+                Connect your Solana wallet to use private payments with encrypted amounts
+              </p>
+              <WalletMultiButton className="!bg-primary !rounded-xl !px-8 !py-3" />
+            </CardBody>
+          </Card>
+        ) : (
+          <>
+            {/* Balance Card */}
+            <Card className="bg-gradient-to-br from-primary/10 to-indigo-50/50 border border-primary/20 shadow-sm rounded-3xl">
+              <CardBody className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Private Balance</p>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-3xl font-bold text-gray-900">
+                        {showBalance ? balance : "****"}
+                      </h2>
+                      <div className="flex items-center gap-1">
+                        <img src="/assets/solana_logo.png" alt="SOL" className="w-6 h-6 rounded-full" />
+                        <span className="text-lg font-semibold text-gray-600">SOL</span>
+                      </div>
+                    </div>
                   </div>
+                  <Button
+                    isIconOnly
+                    variant="light"
+                    onClick={() => setShowBalance(!showBalance)}
+                    className="text-gray-600"
+                  >
+                    {showBalance ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </Button>
                 </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <Shield className="w-4 h-4 text-primary" />
+                  <span>Amounts are encrypted using MPC</span>
+                </div>
+              </CardBody>
+            </Card>
 
-                <Button 
-                  color="primary" 
-                  onClick={handleInitBalance} 
-                  isLoading={loading} 
-                  isDisabled={!connected}
-                  className="w-full"
+            {/* Main Card */}
+            <Card className="bg-white border border-gray-200 shadow-sm rounded-3xl">
+              <CardBody className="p-6">
+                <Tabs
+                  selectedKey={activeTab}
+                  onSelectionChange={setActiveTab}
+                  className="mb-6"
+                  classNames={{
+                    tabList: "bg-gray-50",
+                    tab: "text-gray-600",
+                    cursor: "bg-primary",
+                  }}
                 >
-                  Init Balance Account
-                </Button>
+                  <Tab
+                    key="deposit"
+                    title={
+                      <span className="flex items-center gap-2">
+                        <Wallet className="w-4 h-4" /> Deposit
+                      </span>
+                    }
+                  >
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                          Amount
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          variant="bordered"
+                          classNames={{
+                            inputWrapper: "h-14",
+                            input: "text-lg font-semibold"
+                          }}
+                          endContent={
+                            <div className="flex items-center gap-1">
+                              <img src="/assets/solana_logo.png" alt="SOL" className="w-5 h-5 rounded-full" />
+                              <span className="text-gray-600 text-sm font-medium">SOL</span>
+                            </div>
+                          }
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Amount will be encrypted before deposit
+                        </p>
+                      </div>
 
-                <Input
-                  label="Deposit Amount (lamports)"
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0"
-                  variant="bordered"
-                />
-                <Button 
-                  color="primary" 
-                  onClick={handleDeposit} 
-                  isLoading={loading} 
-                  isDisabled={!connected}
-                  className="w-full"
-                >
-                  Deposit
-                </Button>
-              </>
-            )}
-          </CardBody>
-        </Card>
+                      <Card className="bg-primary/10 border border-primary/20">
+                        <CardBody className="p-4">
+                          <div className="flex items-start gap-3">
+                            <Lock className="w-5 h-5 text-primary mt-0.5" />
+                            <div>
+                              <p className="text-primary text-sm font-medium mb-1">
+                                Encrypted Deposit
+                              </p>
+                              <p className="text-gray-600 text-xs">
+                                Your deposit amount is encrypted using Arcium MPC. The actual amount is hidden from the blockchain until you withdraw.
+                              </p>
+                            </div>
+                          </div>
+                        </CardBody>
+                      </Card>
+
+                      <div className="flex gap-3">
+                        <Button
+                          color="default"
+                          variant="bordered"
+                          className="flex-1"
+                          onClick={handleInitBalance}
+                          isLoading={loading}
+                          isDisabled={!connected}
+                        >
+                          Init Account
+                        </Button>
+                        <Button
+                          color="primary"
+                          className="flex-1 font-semibold h-12"
+                          onClick={handleDeposit}
+                          isLoading={loading}
+                          isDisabled={!connected || !amount || Number(amount) <= 0}
+                        >
+                          Deposit Privately
+                        </Button>
+                      </div>
+                    </div>
+                  </Tab>
+
+                  <Tab
+                    key="send"
+                    title={
+                      <span className="flex items-center gap-2">
+                        <Send className="w-4 h-4" /> Send Payment
+                      </span>
+                    }
+                  >
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                          Recipient Address
+                        </label>
+                        <Input
+                          placeholder="Enter Solana address..."
+                          value={recipient}
+                          onChange={(e) => setRecipient(e.target.value)}
+                          variant="bordered"
+                          classNames={{
+                            inputWrapper: "h-12"
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-semibold text-gray-700 mb-2 block">
+                          Amount
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          variant="bordered"
+                          classNames={{
+                            inputWrapper: "h-14",
+                            input: "text-lg font-semibold"
+                          }}
+                          endContent={
+                            <div className="flex items-center gap-1">
+                              <img src="/assets/solana_logo.png" alt="SOL" className="w-5 h-5 rounded-full" />
+                              <span className="text-gray-600 text-sm font-medium">SOL</span>
+                            </div>
+                          }
+                        />
+                      </div>
+
+                      <Card className="bg-emerald-50 border border-emerald-200">
+                        <CardBody className="p-4">
+                          <div className="flex items-start gap-3">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5" />
+                            <div>
+                              <p className="text-emerald-900 text-sm font-medium mb-1">
+                                Private Transfer
+                              </p>
+                              <p className="text-emerald-700 text-xs">
+                                The recipient will receive the payment, but the amount remains encrypted and hidden from public view.
+                              </p>
+                            </div>
+                          </div>
+                        </CardBody>
+                      </Card>
+
+                      <Button
+                        color="primary"
+                        className="w-full font-semibold h-12"
+                        onClick={() => toast.info("Send payment functionality coming soon")}
+                        isDisabled={!recipient || !amount || Number(amount) <= 0}
+                      >
+                        <Send className="w-4 h-4 mr-2" />
+                        Send Private Payment
+                      </Button>
+                    </div>
+                  </Tab>
+                </Tabs>
+
+                {/* Info Card */}
+                <Card className="bg-gray-50 border border-gray-200 mt-4">
+                  <CardBody className="p-4">
+                    <div className="flex items-start gap-3">
+                      <Info className="w-5 h-5 text-gray-500 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-gray-900 text-sm font-medium mb-1">
+                          How Private Payments Work
+                        </p>
+                        <p className="text-gray-600 text-xs">
+                          All amounts are encrypted using Arcium's Multi-Party Computation (MPC). 
+                          Your balance and transaction amounts are hidden from the blockchain, 
+                          providing complete privacy while maintaining full functionality.
+                        </p>
+                      </div>
+                    </div>
+                  </CardBody>
+                </Card>
+              </CardBody>
+            </Card>
+          </>
+        )}
       </div>
     </div>
   );

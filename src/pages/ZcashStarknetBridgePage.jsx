@@ -227,8 +227,8 @@ export default function ZcashStarknetBridgePage() {
           <h3 className="text-center font-bold text-gray-700 mb-4">Bridge Architecture</h3>
           <div className="flex items-center justify-between gap-4">
             <div className="flex flex-col items-center gap-2">
-              <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center">
-                <span className="text-2xl">⚡</span>
+              <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center overflow-hidden">
+                <img src="/assets/zcash_logo.png" alt="Zcash" className="w-12 h-12 object-contain" />
               </div>
               <span className="text-sm font-semibold">Zcash</span>
               <span className="text-xs text-gray-500">Shielded Pool</span>
@@ -251,8 +251,8 @@ export default function ZcashStarknetBridgePage() {
             </div>
 
             <div className="flex flex-col items-center gap-2">
-              <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center">
-                <span className="text-2xl">🔮</span>
+              <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center overflow-hidden">
+                <img src="/assets/starknet-logo.png" alt="Starknet" className="w-12 h-12 object-contain" />
               </div>
               <span className="text-sm font-semibold">Starknet</span>
               <span className="text-xs text-gray-500">sZEC Token</span>
