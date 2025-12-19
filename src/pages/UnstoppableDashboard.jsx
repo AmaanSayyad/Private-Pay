@@ -77,6 +77,7 @@ export default function UnstoppableDashboard() {
     solanaPublicKey,
     aztecAddress,
     minaPublicKey,
+    ethereumAddress,
   } = useUnstoppable();
 
   // Modals
@@ -712,6 +713,30 @@ export default function UnstoppableDashboard() {
                         </div>
                       </div>
                     )}
+
+                    {ethereumAddress && (
+                      <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-6 h-6 rounded bg-indigo-100 flex items-center justify-center">
+                            <span className="text-xs font-bold text-indigo-600">ETH</span>
+                          </div>
+                          <p className="text-indigo-800 text-xs font-medium">Ethereum</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-gray-900 font-mono text-xs truncate flex-1">
+                            {ethereumAddress}
+                          </p>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            onClick={() => copyToClipboard(ethereumAddress, "Ethereum Address")}
+                          >
+                            <Copy className="w-3 h-3 text-gray-500" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -767,7 +792,7 @@ export default function UnstoppableDashboard() {
                   </div>
                 </CardBody>
               </Card>
-              
+
               <div>
                 <Input
                   type="password"
@@ -790,8 +815,8 @@ export default function UnstoppableDashboard() {
                     className="h-2"
                   />
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium" style={{ 
-                      color: passwordStrength >= 75 ? '#10b981' : passwordStrength >= 50 ? '#f59e0b' : '#ef4444' 
+                    <p className="text-sm font-medium" style={{
+                      color: passwordStrength >= 75 ? '#10b981' : passwordStrength >= 50 ? '#f59e0b' : '#ef4444'
                     }}>
                       {passwordStrength < 50 ? "🔴 Weak password" : passwordStrength < 75 ? "🟡 Medium password" : "🟢 Strong password"}
                     </p>
@@ -801,7 +826,7 @@ export default function UnstoppableDashboard() {
                   </div>
                 </div>
               </div>
-              
+
               <Input
                 type="password"
                 label="Confirm Password"
@@ -818,8 +843,8 @@ export default function UnstoppableDashboard() {
             </div>
           </ModalBody>
           <ModalFooter className="pt-4">
-            <Button 
-              variant="bordered" 
+            <Button
+              variant="bordered"
               className="border-2 font-semibold"
               style={{ borderColor: '#0d08e3', color: '#0d08e3' }}
               onClick={onCreateClose}
@@ -866,7 +891,7 @@ export default function UnstoppableDashboard() {
                   </div>
                 </CardBody>
               </Card>
-              
+
               <div>
                 <Textarea
                   label="Recovery Phrase"
@@ -888,7 +913,7 @@ export default function UnstoppableDashboard() {
                   </p>
                 )}
               </div>
-              
+
               <div className="pt-2">
                 <p className="text-sm font-semibold text-gray-700 mb-3">Set a password to encrypt your wallet:</p>
                 <div className="space-y-4">
@@ -923,8 +948,8 @@ export default function UnstoppableDashboard() {
             </div>
           </ModalBody>
           <ModalFooter className="pt-4">
-            <Button 
-              variant="bordered" 
+            <Button
+              variant="bordered"
               className="border-2 font-semibold"
               style={{ borderColor: '#0d08e3', color: '#0d08e3' }}
               onClick={onImportClose}
@@ -976,13 +1001,12 @@ export default function UnstoppableDashboard() {
               {/* Compact Recovery Phrase Grid */}
               <div className="relative">
                 <div
-                  className={`p-4 bg-white rounded-xl font-mono grid grid-cols-4 gap-2 border-2 shadow-lg transition-all ${
-                    !showMnemonic ? "blur-md select-none border-gray-300" : "border-indigo-300"
-                  }`}
+                  className={`p-4 bg-white rounded-xl font-mono grid grid-cols-4 gap-2 border-2 shadow-lg transition-all ${!showMnemonic ? "blur-md select-none border-gray-300" : "border-indigo-300"
+                    }`}
                 >
                   {(newMnemonic || wallet?.mnemonic || "").split(" ").map((word, i) => (
-                    <div 
-                      key={i} 
+                    <div
+                      key={i}
                       className="flex items-center gap-1.5 p-2 bg-indigo-50 rounded-lg border border-indigo-200"
                     >
                       <span className="text-indigo-400 text-xs font-bold">{i + 1}.</span>
@@ -1075,7 +1099,7 @@ export default function UnstoppableDashboard() {
                   </div>
                 </CardBody>
               </Card>
-              
+
               <Input
                 type="password"
                 label="Password"
@@ -1095,8 +1119,8 @@ export default function UnstoppableDashboard() {
             </div>
           </ModalBody>
           <ModalFooter className="pt-4">
-            <Button 
-              variant="bordered" 
+            <Button
+              variant="bordered"
               className="border-2 font-semibold border-amber-500 text-amber-700"
               onClick={onUnlockClose}
             >

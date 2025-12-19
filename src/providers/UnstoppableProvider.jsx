@@ -18,6 +18,9 @@ import {
 // Import multi-chain key derivation
 import { deriveAllChainKeys } from "../lib/unstoppable/multichain";
 
+// Import balance fetching service
+import { fetchAllBalances, updateAssetsWithBalances } from "../lib/unstoppable/balanceService";
+
 // Utility functions
 const hexToBytes = (hex) => {
   if (!hex || typeof hex !== 'string') {
@@ -256,6 +259,10 @@ const generateMasterKeys = (mnemonic) => {
       aztecPrivateKey: multiChainKeys?.aztec?.privateKey || null,
       minaPublicKey: multiChainKeys?.mina?.publicKey || null,
       minaPrivateKey: multiChainKeys?.mina?.privateKey || null,
+      // Ethereum
+      ethereumAddress: multiChainKeys?.ethereum?.address || null,
+      ethereumPublicKey: multiChainKeys?.ethereum?.publicKey || null,
+      ethereumPrivateKey: multiChainKeys?.ethereum?.privateKey || null,
     };
   } catch (error) {
     console.error("Error generating master keys:", error);
@@ -296,6 +303,36 @@ export default function UnstoppableProvider({ children }) {
   // Privacy analytics (local only, no tracking)
   const [privacyScore, setPrivacyScore] = useState(0);
   const [txHistory, setTxHistory] = useState([]);
+
+  // Balance fetching state
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false);
+
+  // Fetch real balances when wallet is connected
+  useEffect(() => {
+    if (!isConnected || !wallet || isLoadingBalances) return;
+
+    const loadBalances = async () => {
+      try {
+        setIsLoadingBalances(true);
+        console.log('🔄 Fetching real balances from blockchain...');
+
+        const balances = await fetchAllBalances(wallet);
+        console.log('✅ Balances fetched:', balances);
+
+        setAssets(currentAssets => updateAssetsWithBalances(currentAssets, balances));
+      } catch (error) {
+        console.error('Failed to fetch balances:', error);
+      } finally {
+        setIsLoadingBalances(false);
+      }
+    };
+
+    loadBalances();
+
+    // Refresh balances every 30 seconds
+    const interval = setInterval(loadBalances, 30000);
+    return () => clearInterval(interval);
+  }, [isConnected, wallet, isLoadingBalances]);
 
   // Load wallet from encrypted storage
   useEffect(() => {
@@ -740,11 +777,13 @@ export default function UnstoppableProvider({ children }) {
     isValidZcashAddress,
     createShieldedProof,
 
-    // Multi-chain addresses (Solana, Aztec, Mina)
+    // Multi-chain addresses (Solana, Aztec, Mina, Ethereum)
     solanaPublicKey: wallet?.solanaPublicKey || null,
     solanaSecretKey: wallet?.solanaSecretKey || null,
     aztecAddress: wallet?.aztecAddress || null,
     minaPublicKey: wallet?.minaPublicKey || null,
+    ethereumAddress: wallet?.ethereumAddress || null,
+    ethereumPublicKey: wallet?.ethereumPublicKey || null,
   }), [
     wallet,
     isConnected,
