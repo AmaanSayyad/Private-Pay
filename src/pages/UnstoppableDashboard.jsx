@@ -42,6 +42,7 @@ import {
   Settings,
   Sparkles,
   Zap,
+  ExternalLink,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -626,6 +627,14 @@ export default function UnstoppableDashboard() {
                         isIconOnly
                         size="sm"
                         variant="light"
+                        onClick={() => window.open(`https://chain.so/address/ZECTEST/${zcashAddress}`, '_blank')}
+                      >
+                        <ExternalLink className="w-4 h-4 text-gray-500" />
+                      </Button>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="light"
                         onClick={() => copyToClipboard(zcashAddress, "Zcash Address")}
                       >
                         <Copy className="w-4 h-4 text-gray-500" />
@@ -658,7 +667,15 @@ export default function UnstoppableDashboard() {
                             isIconOnly
                             size="sm"
                             variant="light"
-                            onClick={() => copyToClipboard(solanaPublicKey, "Solana Address")}
+                            onClick={() => window.open(`https://solscan.io/account/${solanaPublicKey}?cluster=devnet`, '_blank')}
+                          >
+                            <ExternalLink className="w-3 h-3 text-gray-500" />
+                          </Button>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            onClick={() => copyToClipboard(solanaPublicKey, "Solana Public Key")}
                           >
                             <Copy className="w-3 h-3 text-gray-500" />
                           </Button>
@@ -726,6 +743,14 @@ export default function UnstoppableDashboard() {
                           <p className="text-gray-900 font-mono text-xs truncate flex-1">
                             {ethereumAddress}
                           </p>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            onClick={() => window.open(`https://sepolia.etherscan.io/address/${ethereumAddress}`, '_blank')}
+                          >
+                            <ExternalLink className="w-3 h-3 text-gray-500" />
+                          </Button>
                           <Button
                             isIconOnly
                             size="sm"
