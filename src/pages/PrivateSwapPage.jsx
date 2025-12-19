@@ -19,6 +19,7 @@ import {
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useArcium } from "../providers/SolanaProvider";
+import { useZcash } from "../providers/ZcashProvider";
 import { Icons } from "../components/shared/Icons";
 import {
   ArrowDownUp,
@@ -49,6 +50,13 @@ import {
   getComputationAccAddressSafe,
   awaitComputationFinalizationSafe,
 } from "@/lib/arcium/env.js";
+import { 
+  executeZcashPrivateSwap,
+
+  isZcashSwapAvailable,
+  getSwapPrivacyLevel
+} from "@/lib/zcash/privateSwap.js";
+import { MobilePageWrapper } from "../components/shared/MobileNav";
 
 // Arcium client functions will be imported dynamically
 let arciumClientLib = null;
@@ -66,10 +74,32 @@ const loadArciumClient = async () => {
 
 // Available tokens for swap
 const TOKENS = [
-  { id: "sol", name: "SOL", symbol: "SOL", icon: "/assets/solana_logo.png", decimals: 9 },
-  { id: "usdc", name: "USD Coin", symbol: "USDC", icon: "/assets/usdc.png", decimals: 6 },
-  { id: "usdt", name: "Tether", symbol: "USDT", icon: "/assets/usdt_logo.png", decimals: 6 },
+  { id: "sol", name: "SOL", symbol: "SOL", icon: "◎", decimals: 9, privacy: "mpc" },
+  { id: "usdc", name: "USD Coin", symbol: "USDC", icon: "$", decimals: 6, privacy: "standard" },
+  { id: "usdt", name: "Tether", symbol: "USDT", icon: "₮", decimals: 6, privacy: "standard" },
+  { id: "zec", name: "Zcash", symbol: "ZEC", icon: "Ⓩ", decimals: 8, privacy: "shielded" },
 ];
+
+const PRIVACY_LEVELS = {
+  shielded: {
+    label: "Fully Shielded",
+    badge: "🔒",
+    color: "text-green-400",
+    description: "Maximum privacy via Zcash shielded pools"
+  },
+  mpc: {
+    label: "MPC Encrypted",
+    badge: "🔐",
+    color: "text-blue-400",
+    description: "High privacy via Arcium MPC"
+  },
+  standard: {
+    label: "Transparent",
+    badge: "⚠️",
+    color: "text-yellow-400",
+    description: "Standard blockchain transaction"
+  }
+};
 
 const SIGN_PDA_SEED = "SignerAccount";
 
@@ -80,6 +110,14 @@ export default function PrivateSwapPage() {
   const { isInitialized } = useArcium();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const arciumClient = useArciumClient();
+  
+  // Zcash wallet integration
+  const { 
+    isConnected: zcashConnected,
+    shieldedAccount,
+    walletInstance: zcashWallet,
+    balance: zcashBalance
+  } = useZcash();
 
   // Swap state
   const [inputToken, setInputToken] = useState("sol");
@@ -136,22 +174,22 @@ export default function PrivateSwapPage() {
 
   const ensureReady = () => {
     if (!connected || !publicKey) {
-      toast.error("Cüzdan bağlayın.");
+      toast.error("Connect your wallet.");
       return false;
     }
     
     if (!arciumClient) {
-      toast.error("Arcium client oluşturulamadı. Lütfen sayfayı yenileyin.");
+      toast.error("Could not create Arcium client. Please refresh the page.");
       return false;
     }
     
     if (!program) {
-      toast.error("Program yüklenemedi. Program ID kontrol edin.");
+      toast.error("Failed to load program. Please check program ID.");
       return false;
     }
     
     if (!PRIVATE_PAY_PROGRAM_ID) {
-      toast.error("Private Pay Program ID yapılandırılmamış.");
+      toast.error("Private Pay Program ID not configured.");
       return false;
     }
     
@@ -185,8 +223,8 @@ export default function PrivateSwapPage() {
 
   // Execute swap
   const handleSwap = useCallback(async () => {
-    if (!ensureReady() || !inputAmount || Number(inputAmount) <= 0) {
-      toast.error("Geçerli bir miktar girin.");
+    if (!inputAmount || Number(inputAmount) <= 0) {
+      toast.error("Enter a valid amount");
       return;
     }
 
@@ -194,10 +232,48 @@ export default function PrivateSwapPage() {
     setSwapStatus("encrypting");
 
     try {
+      // Check if this is a Zcash swap
+      const isZcashSwap = isZcashSwapAvailable(inputToken, outputToken);
+      
+      if (isZcashSwap) {
+        // Route to Zcash shielded swap
+        console.log('Routing to Zcash private swap');
+        
+        if (!zcashConnected || !shieldedAccount || !zcashWallet) {
+          throw new Error("Zcash shielded wallet not connected");
+        }
+        
+        setSwapStatus("processing");
+        
+        const zcashSwapResult = await executeZcashPrivateSwap({
+          from: inputToken,
+          to: outputToken,
+          amount: parseFloat(inputAmount),
+          shieldedAddress: shieldedAccount.address,
+          walletInstance: zcashWallet,
+        });
+        
+        setSwapStatus("success");
+        
+        toast.success(
+          `Private swap completed! ${zcashSwapResult.outputAmount} ${outputToken.toUpperCase()} via shielded pool`
+        );
+        
+        onOpen(); // Show success modal
+        setIsSwapping(false);
+        return;
+      }
+      
+      // Standard Arcium MPC swap for non-Zcash pairs
+      if (!ensureReady()) {
+        setIsSwapping(false);
+        return;
+      }
+      
       // Step 1: Get MXE public key and encrypt swap data
       const arciumLib = await loadArciumClient();
       if (!arciumLib) {
-        throw new Error("@arcium-hq/client kütüphanesi yüklenmemiş. Lütfen npm install @arcium-hq/client yapın.");
+        throw new Error("@arcium-hq/client library is not loaded. Please run npm install @arcium-hq/client.");
       }
 
       const mxePublicKey = await arciumLib.getMXEPublicKeyWithRetry(
@@ -265,22 +341,22 @@ export default function PrivateSwapPage() {
 
       const sig = await sendTransaction(tx, provider.connection);
       await provider.connection.confirmTransaction(sig, "confirmed");
-      toast.success(`Swap transaction gönderildi: ${sig}`);
+      toast.success(`Swap transaction sent: ${sig}`);
 
       setSwapStatus("computing");
 
       // Step 3: Wait for MPC computation
-      toast.loading("MPC hesaplaması bekleniyor...");
+      toast.loading("Waiting for MPC computation...");
       await awaitComputationFinalizationSafe(provider.connection, compOffset, PRIVATE_PAY_PROGRAM_ID, "confirmed");
       
       setSwapStatus("success");
-      toast.success("Private swap başarıyla tamamlandı!");
+      toast.success("Private swap completed successfully!");
       onOpen(); // Show success modal
 
     } catch (error) {
       console.error("Swap failed:", error);
       setSwapStatus("error");
-      toast.error(error.message || "Swap başarısız. Lütfen tekrar deneyin.");
+      toast.error(error.message || "Swap failed. Please try again.");
     } finally {
       setIsSwapping(false);
     }
@@ -296,7 +372,8 @@ export default function PrivateSwapPage() {
   };
 
   return (
-    <div className="flex min-h-screen w-full items-start justify-center py-20 px-4 md:px-10 bg-gradient-to-br from-white to-indigo-50/30">
+    <MobilePageWrapper>
+      <div className="flex min-h-screen w-full items-start justify-center py-20 px-4 md:px-10 bg-gradient-to-br from-white to-indigo-50/30">
       <div className="relative flex flex-col gap-4 w-full max-w-lg">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
@@ -364,6 +441,7 @@ export default function PrivateSwapPage() {
                     }}
                     className="w-full"
                   variant="bordered"
+                  aria-label="Input token"
                     startContent={
                       <img 
                         src={TOKENS.find(t => t.id === inputToken)?.icon} 
@@ -376,6 +454,18 @@ export default function PrivateSwapPage() {
                       value: "flex items-center"
                     }}
                 >
+                  {TOKENS.map((token) => {
+                    const privacyInfo = PRIVACY_LEVELS[token.privacy];
+                    return (
+                      <SelectItem 
+                        key={token.id} 
+                        value={token.id}
+                        startContent={<span title={privacyInfo?.description}>{privacyInfo?.badge}</span>}
+                      >
+                        {token.icon} {token.symbol}
+                      </SelectItem>
+                    );
+                  })}
                   {TOKENS.map((token) => (
                     <SelectItem 
                       key={token.id} 
@@ -412,8 +502,8 @@ export default function PrivateSwapPage() {
               </div>
             </div>
 
-            {/* Swap Direction Button */}
-            <div className="flex justify-center my-4">
+            {/* Swap Direction Button with Privacy Level */}
+            <div className="flex flex-col items-center my-4 gap-2">
               <Button
                 isIconOnly
                 variant="light"
@@ -422,6 +512,22 @@ export default function PrivateSwapPage() {
               >
                 <ArrowDownUp className="w-5 h-5" />
               </Button>
+              {/* Privacy Level Indicator */}
+              {(() => {
+                const privacyLevel = getSwapPrivacyLevel(inputToken, outputToken);
+                const privacyInfo = PRIVACY_LEVELS[privacyLevel];
+                return (
+                  <div className={`text-xs px-3 py-1 rounded-full border ${
+                    privacyLevel === 'shielded' ? 'bg-green-50 border-green-300 text-green-700' : 
+                    privacyLevel === 'mpc' ? 'bg-blue-50 border-blue-300 text-blue-700' : 
+                    'bg-yellow-50 border-yellow-300 text-yellow-700'
+                  }`} title={privacyInfo.description}>
+                    <span>
+                      {privacyInfo.badge} {privacyInfo.label}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Output Token */}
@@ -454,16 +560,18 @@ export default function PrivateSwapPage() {
                       value: "flex items-center"
                     }}
                 >
-                  {TOKENS.filter((t) => t.id !== inputToken).map((token) => (
-                    <SelectItem 
-                      key={token.id} 
-                      value={token.id}
-                      textValue={token.symbol}
-                      startContent={<img src={token.icon} alt={token.name} className="w-5 h-5 rounded-full" />}
-                    >
-                      {token.symbol}
-                    </SelectItem>
-                  ))}
+                  {TOKENS.filter((t) => t.id !== inputToken).map((token) => {
+                    const privacyInfo = PRIVACY_LEVELS[token.privacy];
+                    return (
+                      <SelectItem 
+                        key={token.id} 
+                        value={token.id}
+                        startContent={<span title={privacyInfo?.description}>{privacyInfo?.badge}</span>}
+                      >
+                        {token.icon} {token.symbol}
+                      </SelectItem>
+                    );
+                  })}
                 </Select>
                 </div>
                 <div className="flex-1 bg-gray-50 rounded-xl border border-gray-200 px-4 py-3 text-right flex items-center justify-end gap-2 min-h-[56px]">
@@ -620,6 +728,7 @@ export default function PrivateSwapPage() {
         </ModalContent>
       </Modal>
     </div>
+    </MobilePageWrapper>
   );
 }
 

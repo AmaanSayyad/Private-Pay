@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Tabs, Tab } from "@nextui-org/react";
 import { Icons } from "../components/shared/Icons.jsx";
+import { MobilePageWrapper } from "../components/shared/MobileNav";
 import AptosSendToUsername from "../components/aptos/AptosSendToUsername.jsx";
 import AptosSendPayment from "../components/aptos/AptosSendPayment.jsx";
 
@@ -10,7 +11,8 @@ export default function SendPage() {
   const [selectedTab, setSelectedTab] = useState("username");
 
   return (
-    <div className="flex min-h-screen w-full items-start justify-center py-20 px-4 md:px-10">
+    <MobilePageWrapper>
+      <div className="flex min-h-screen w-full items-start justify-center py-20 px-4 md:px-10">
       <div className="relative flex flex-col gap-4 w-full max-w-md items-start justify-center bg-[#F9F9FA] rounded-[32px] p-4 md:p-6">
         <div className="flex items-center justify-between w-full mb-2">
           <h1 className="font-bold text-lg text-[#19191B]">Send Payment</h1>
@@ -46,5 +48,6 @@ export default function SendPage() {
         </Tabs>
       </div>
     </div>
+    </MobilePageWrapper>
   );
 }
