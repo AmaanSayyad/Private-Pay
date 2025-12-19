@@ -79,6 +79,8 @@ export default function UnstoppableDashboard() {
     aztecAddress,
     minaPublicKey,
     ethereumAddress,
+    // Transaction history
+    txHistory,
   } = useUnstoppable();
 
   // Modals
@@ -547,6 +549,92 @@ export default function UnstoppableDashboard() {
                         </Button>
                       </div>
                     ))}
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+
+            {/* Transaction History */}
+            <Card className="bg-white border border-gray-200 shadow-sm mb-8">
+              <CardBody className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-gray-900 font-bold text-lg flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5" />
+                    Transaction History
+                    <Chip size="sm" color="primary" variant="flat">
+                      {txHistory?.length || 0}
+                    </Chip>
+                  </h3>
+                </div>
+
+                {txHistory && txHistory.length > 0 ? (
+                  <div className="space-y-3">
+                    {txHistory.map((tx, index) => (
+                      <div
+                        key={tx.hash || index}
+                        className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-primary-300 transition-all"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`px-2 py-1 rounded text-xs font-medium ${tx.chain === 'Solana' ? 'bg-purple-100 text-purple-700' :
+                                tx.chain === 'Ethereum' ? 'bg-indigo-100 text-indigo-700' :
+                                  'bg-yellow-100 text-yellow-700'
+                              }`}>
+                              {tx.chain}
+                            </div>
+                            <div className={`px-2 py-1 rounded text-xs font-medium ${tx.status === 'success' || tx.status === 'confirmed'
+                                ? 'bg-green-100 text-green-700'
+                                : tx.status === 'failed'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-yellow-100 text-yellow-700'
+                              }`}>
+                              {tx.status}
+                            </div>
+                          </div>
+                          {tx.timestamp && (
+                            <p className="text-xs text-gray-500">
+                              {new Date(tx.timestamp).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="text-gray-900 font-mono text-xs truncate flex-1">
+                            {tx.hash}
+                          </p>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            onClick={() => window.open(tx.explorerUrl, '_blank')}
+                          >
+                            <ExternalLink className="w-3 h-3 text-gray-500" />
+                          </Button>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            onClick={() => copyToClipboard(tx.hash, "Transaction Hash")}
+                          >
+                            <Copy className="w-3 h-3 text-gray-500" />
+                          </Button>
+                        </div>
+
+                        {tx.value && (
+                          <p className="text-xs text-gray-600">
+                            Amount: {tx.value} {tx.chain === 'Ethereum' ? 'ETH' : tx.chain === 'Solana' ? 'SOL' : 'ZEC'}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <TrendingUp className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm">No transactions yet</p>
+                    <p className="text-gray-400 text-xs mt-1">
+                      Your transaction history will appear here
+                    </p>
                   </div>
                 )}
               </CardBody>

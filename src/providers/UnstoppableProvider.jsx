@@ -21,6 +21,9 @@ import { deriveAllChainKeys } from "../lib/unstoppable/multichain";
 // Import balance fetching service
 import { fetchAllBalances, updateAssetsWithBalances } from "../lib/unstoppable/balanceService";
 
+// Import transaction history service
+import { fetchAllTransactions } from "../lib/unstoppable/transactionService";
+
 // Utility functions
 const hexToBytes = (hex) => {
   if (!hex || typeof hex !== 'string') {
@@ -333,6 +336,30 @@ export default function UnstoppableProvider({ children }) {
     const interval = setInterval(loadBalances, 30000);
     return () => clearInterval(interval);
   }, [isConnected, wallet, isLoadingBalances]);
+
+  // Fetch real transaction history when wallet is connected
+  useEffect(() => {
+    if (!isConnected || !wallet) return;
+
+    const loadTransactions = async () => {
+      try {
+        console.log('🔄 Fetching transaction history from blockchain...');
+
+        const transactions = await fetchAllTransactions(wallet);
+        console.log('✅ Transactions fetched:', transactions.length);
+
+        setTxHistory(transactions);
+      } catch (error) {
+        console.error('Failed to fetch transactions:', error);
+      }
+    };
+
+    loadTransactions();
+
+    // Refresh transactions every 60 seconds
+    const interval = setInterval(loadTransactions, 60000);
+    return () => clearInterval(interval);
+  }, [isConnected, wallet]);
 
   // Load wallet from encrypted storage
   useEffect(() => {
