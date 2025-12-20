@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import ReceiveModal from "../components/unstoppable/ReceiveModal";
 import {
   Button,
   Card,
@@ -92,6 +93,7 @@ export default function UnstoppableDashboard() {
   const { isOpen: isBackupOpen, onOpen: onBackupOpen, onClose: onBackupClose } = useDisclosure();
   const { isOpen: isUnlockOpen, onOpen: onUnlockOpen, onClose: onUnlockClose } = useDisclosure();
   const { isOpen: isSendOpen, onOpen: onSendOpen, onClose: onSendClose } = useDisclosure();
+  const { isOpen: isReceiveOpen, onOpen: onReceiveOpen, onClose: onReceiveClose } = useDisclosure();
 
   // Form state
   const [password, setPassword] = useState("");
@@ -250,6 +252,15 @@ export default function UnstoppableDashboard() {
                     <span className="font-bold" style={{ color: '#0d08e3' }}>{privacyScore}%</span>
                   </div>
                 </Tooltip>
+                <Button
+                  variant="bordered"
+                  className="font-semibold border-2"
+                  style={{ borderColor: '#0d08e3', color: '#0d08e3' }}
+                  onClick={onReceiveOpen}
+                >
+                  <Download className="w-4 h-4" />
+                  Receive
+                </Button>
                 <Button
                   variant="solid"
                   className="font-semibold text-white"
@@ -902,7 +913,12 @@ export default function UnstoppableDashboard() {
                 {/* Shielded Notes */}
                 {shieldedNotes && shieldedNotes.length > 0 && (
                   <div className="mt-4">
-                    <p className="text-gray-500 text-xs mb-2">Shielded Notes ({shieldedNotes.length})</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-gray-500 text-xs">Shielded Notes ({shieldedNotes.length})</p>
+                      <Chip size="sm" className="bg-purple-100 text-purple-700 text-xs">
+                        zk-SNARK
+                      </Chip>
+                    </div>
                     <div className="space-y-2 max-h-32 overflow-y-auto">
                       {shieldedNotes.map((note) => (
                         <div key={note.id} className="flex items-center justify-between p-2 bg-emerald-50 rounded-lg border border-emerald-100">
@@ -1429,6 +1445,9 @@ export default function UnstoppableDashboard() {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Receive Modal */}
+      <ReceiveModal isOpen={isReceiveOpen} onClose={onReceiveClose} wallet={wallet} />
     </div>
   );
 }
