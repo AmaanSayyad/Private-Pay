@@ -1,10 +1,9 @@
 /**
- * Balance Fetching Service for Unstoppable Wallet
+ * Transaction Sending Service for Unstoppable Wallet
  * Fetches real balances from blockchain RPCs
  */
 
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { createConfiguredRPCClient } from '../zcash';
 
 // Solana RPC endpoints
 const SOLANA_RPC_ENDPOINTS = {
@@ -39,22 +38,21 @@ export async function fetchSolanaBalance(publicKeyString, network = 'devnet') {
 
 /**
  * Fetch Zcash balance for an address
+ * Note: Requires a running Zcash node with RPC enabled
+ * Returns 0 for now as most users won't have a Zcash node running
  * @param {string} address - Zcash address
  * @param {string} network - Network: 'mainnet' or 'testnet'
  * @returns {Promise<number>} Balance in ZEC
  */
 export async function fetchZcashBalance(address, network = 'testnet') {
     try {
-        // Create RPC client (requires Zcash node running)
-        const rpcClient = createConfiguredRPCClient(network);
-
-        // Get balance from RPC
-        const balance = await rpcClient.getBalance(address);
-
-        return balance;
+        // TODO: Implement Zcash RPC balance fetching
+        // This requires a running Zcash node with RPC enabled
+        // For now, return 0 (graceful degradation)
+        console.log('Zcash balance fetching requires RPC node - returning 0');
+        return 0;
     } catch (error) {
         console.error('Failed to fetch Zcash balance:', error);
-        // Return 0 if RPC not available (graceful degradation)
         return 0;
     }
 }

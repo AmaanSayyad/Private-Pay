@@ -131,7 +131,7 @@ export async function fetchEthereumTransactions(address, network = 'sepolia', li
  */
 export async function fetchZcashTransactions(address, network = 'testnet', limit = 10) {
     try {
-        // Use chain.so API for Zcash testnet
+        // Note: blockexplorer.one doesn't have public API, keeping chain.so for now
         const apiUrl = `https://chain.so/api/v2/get_tx_received/ZECTEST/${address}`;
 
         const response = await fetch(apiUrl);
@@ -145,7 +145,7 @@ export async function fetchZcashTransactions(address, network = 'testnet', limit
                 chain: 'Zcash',
                 value: tx.value,
                 confirmations: tx.confirmations,
-                explorerUrl: `https://chain.so/tx/ZECTEST/${tx.txid}`,
+                explorerUrl: `https://blockexplorer.one/zcash/testnet/tx/${tx.txid}`,
             }));
         }
 

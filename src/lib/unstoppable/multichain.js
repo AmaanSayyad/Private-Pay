@@ -66,8 +66,9 @@ export function deriveAztecKeys(mnemonic) {
         const seed = bip39.mnemonicToSeedSync(mnemonic);
 
         // Aztec uses a custom derivation path
-        // For now, using a similar BIP44 structure
-        const path = "m/44'/60'/0'/0/0"; // Using Ethereum's coin type as placeholder
+        // For now, using a similar BIP44 structure  
+        // NOTE: ed25519-hd-key requires ALL segments to be hardened
+        const path = "m/44'/60'/0'/0'"; // Using Ethereum's coin type as placeholder
 
         // Derive key from path
         const derivedSeed = derivePath(path, seed.toString('hex')).key;
@@ -135,16 +136,13 @@ export function deriveEthereumKeys(mnemonic) {
         // m/44'/60'/0'/0/0 (60 is Ethereum's coin type)
         const path = "m/44'/60'/0'/0/0";
 
-        // Create HD wallet from mnemonic
-        const hdNode = ethers.HDNodeWallet.fromPhrase(mnemonic);
-
-        // Derive Ethereum key at path
-        const derivedNode = hdNode.derivePath(path);
+        // Create HD wallet from mnemonic with path directly
+        const wallet = ethers.HDNodeWallet.fromPhrase(mnemonic, undefined, path);
 
         return {
-            address: derivedNode.address,
-            publicKey: derivedNode.publicKey,
-            privateKey: derivedNode.privateKey,
+            address: wallet.address,
+            publicKey: wallet.publicKey,
+            privateKey: wallet.privateKey,
         };
     } catch (error) {
         console.error('Failed to derive Ethereum keys:', error);

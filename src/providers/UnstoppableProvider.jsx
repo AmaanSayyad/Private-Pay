@@ -24,6 +24,9 @@ import { fetchAllBalances, updateAssetsWithBalances } from "../lib/unstoppable/b
 // Import transaction history service
 import { fetchAllTransactions } from "../lib/unstoppable/transactionService";
 
+// Import send transaction service
+import { sendSolanaTransaction, sendEthereumTransaction, validateAddress } from "../lib/unstoppable/sendService";
+
 // Utility functions
 const hexToBytes = (hex) => {
   if (!hex || typeof hex !== 'string') {
@@ -318,6 +321,11 @@ export default function UnstoppableProvider({ children }) {
       try {
         setIsLoadingBalances(true);
         console.log('🔄 Fetching real balances from blockchain...');
+        console.log('Wallet has:', {
+          solana: !!wallet.solanaPublicKey,
+          ethereum: !!wallet.ethereumAddress,
+          zcash: !!wallet.zcashAddress,
+        });
 
         const balances = await fetchAllBalances(wallet);
         console.log('✅ Balances fetched:', balances);
@@ -392,6 +400,15 @@ export default function UnstoppableProvider({ children }) {
         createdAt: Date.now(),
         version: 1,
       };
+
+      // Debug: Log what keys were generated
+      console.log('🔑 Wallet keys generated:', {
+        hasZcash: !!keys.zcashAddress,
+        hasSolana: !!keys.solanaPublicKey,
+        hasEthereum: !!keys.ethereumAddress,
+        hasMina: !!keys.minaPublicKey,
+        hasAztec: !!keys.aztecAddress,
+      });
 
       // Encrypt and store
       const encrypted = await encryptData(walletData, userPassword);
@@ -755,6 +772,51 @@ export default function UnstoppableProvider({ children }) {
     }
   }, [shieldedNotes]);
 
+  // Send transaction function
+  const sendTransaction = useCallback(async (chain, toAddress, amount) => {
+    try {
+      if (!wallet) throw new Error("No wallet connected");
+
+      // Validate address
+      if (!validateAddress(toAddress, chain)) {
+        throw new Error(`Invalid ${chain} address`);
+      }
+
+      // Validate amount
+      if (!amount || amount <= 0) {
+        throw new Error("Invalid amount");
+      }
+
+      let txHash;
+
+      if (chain === 'Solana') {
+        txHash = await sendSolanaTransaction(
+          wallet.solanaSecretKey,
+          toAddress,
+          amount,
+          'devnet'
+        );
+        toast.success(`Transaction sent! Hash: ${txHash.substring(0, 8)}...`);
+      } else if (chain === 'Ethereum') {
+        txHash = await sendEthereumTransaction(
+          wallet.ethereumPrivateKey,
+          toAddress,
+          amount,
+          'sepolia'
+        );
+        toast.success(`Transaction sent! Hash: ${txHash.substring(0, 10)}...`);
+      } else {
+        throw new Error(`Sending not supported for ${chain}`);
+      }
+
+      return txHash;
+    } catch (error) {
+      console.error("Failed to send transaction:", error);
+      toast.error(`Failed to send: ${error.message}`);
+      throw error;
+    }
+  }, [wallet]);
+
   const value = useMemo(() => ({
     // Wallet state
     wallet: isLocked ? null : wallet,
@@ -811,6 +873,9 @@ export default function UnstoppableProvider({ children }) {
     minaPublicKey: wallet?.minaPublicKey || null,
     ethereumAddress: wallet?.ethereumAddress || null,
     ethereumPublicKey: wallet?.ethereumPublicKey || null,
+
+    // Send transaction
+    sendTransaction,
   }), [
     wallet,
     isConnected,
