@@ -2,9 +2,11 @@
  * Zcash Wallet Manager
  * 
  * Manages shielded addresses, viewing keys, and note tracking
+ * Inspired by Unstoppable Wallet's ZcashAdapter implementation
  */
 
 import { createZcashRPCClient } from './zcashRPC.js';
+import { detectAddressType, isShieldedAddress, AddressType } from '../zcash.js';
 
 /**
  * Zcash Wallet Class
@@ -15,6 +17,16 @@ export class ZcashWallet {
     this.rpc = rpcClient;
     this.addresses = new Map(); // address -> {type, viewingKey, label}
     this.notes = new Map(); // address -> [notes]
+    this.viewingKeys = new Map(); // address -> viewingKey
+    this.balances = new Map(); // address -> {confirmed, unconfirmed}
+    
+    // Transaction tracking
+    this.transactions = [];
+    this.shieldingTransactions = new Map(); // txid -> {direction, amount}
+    
+    // Configuration
+    this.minShieldThreshold = 0.0004; // Minimum balance for auto-shielding (from Unstoppable)
+    this.defaultFee = 0.0001;
   }
 
   /**
@@ -24,14 +36,17 @@ export class ZcashWallet {
     try {
       const addresses = await this.rpc.listAddresses();
       for (const addr of addresses) {
+        const addrType = detectAddressType(addr);
         this.addresses.set(addr, {
-          type: addr.startsWith('z') ? 'shielded' : 'transparent',
+          type: addrType,
+          isShielded: isShieldedAddress(addr),
           label: '',
         });
       }
+      console.log(`Initialized Zcash wallet with ${addresses.length} addresses`);
     } catch (error) {
       console.error('Failed to initialize wallet:', error);
-      throw error;
+      // Don't throw - allow wallet to work in offline mode
     }
   }
 
@@ -82,13 +97,19 @@ export class ZcashWallet {
    */
   async getViewingKey(address) {
     try {
-      if (!address.startsWith('z')) {
+      if (!isShieldedAddress(address)) {
         throw new Error('Viewing keys only available for shielded addresses');
+      }
+
+      // Return cached if available
+      if (this.viewingKeys.has(address)) {
+        return this.viewingKeys.get(address);
       }
 
       const viewingKey = await this.rpc.exportViewingKey(address);
       
       // Cache viewing key
+      this.viewingKeys.set(address, viewingKey);
       const addrInfo = this.addresses.get(address) || {};
       addrInfo.viewingKey = viewingKey;
       this.addresses.set(address, addrInfo);
@@ -99,30 +120,37 @@ export class ZcashWallet {
       throw error;
     }
   }
-
+  
   /**
-   * Import viewing key to monitor an address
+   * Import viewing key
+   * Allows monitoring shielded transactions without spending capability
    * @param {string} viewingKey - Viewing key to import
-   * @param {string} label - Label for the address
+   * @param {string} label - Optional label
+   * @param {boolean} rescan - Whether to rescan blockchain
    * @returns {Promise<string>} Imported address
    */
-  async importViewingKey(viewingKey, label = '') {
+  async importViewingKey(viewingKey, label = '', rescan = false) {
     try {
-      const address = await this.rpc.importViewingKey(viewingKey, label, true);
+      const address = await this.rpc.importViewingKey(viewingKey, label, rescan);
       
+      // Add to tracked addresses
       this.addresses.set(address, {
-        type: 'shielded',
-        viewingKey,
+        type: detectAddressType(address),
+        isShielded: true,
+        viewingOnly: true,
         label,
-        imported: true,
       });
-
+      
+      this.viewingKeys.set(address, viewingKey);
+      
+      console.log(`Imported viewing key for address: ${address}`);
       return address;
     } catch (error) {
       console.error('Failed to import viewing key:', error);
       throw error;
     }
   }
+
 
   /**
    * Get balance for an address
@@ -209,6 +237,156 @@ export class ZcashWallet {
     } catch (error) {
       console.error('Failed to get transaction:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Shield funds (move from transparent to shielded address)
+   * Inspired by Unstoppable Wallet's proposeShielding implementation
+   * @param {string} fromTransparentAddress - Source transparent address
+   * @param {string} toShieldedAddress - Destination shielded address
+   * @param {number} amount - Amount to shield (if null, shields all available)
+   * @param {string} memo - Optional memo
+   * @returns {Promise<string>} Transaction ID
+   */
+  async shieldFunds(fromTransparentAddress, toShieldedAddress, amount = null, memo = '') {
+    try {
+      // Validate addresses
+      if (!fromTransparentAddress.startsWith('t')) {
+        throw new Error('Source must be a transparent address');
+      }
+      if (!isShieldedAddress(toShieldedAddress)) {
+        throw new Error('Destination must be a shielded address');
+      }
+      
+      // Get transparent balance
+      const balance = await this.rpc.getBalance(fromTransparentAddress);
+      
+      // If amount not specified, shield all (minus fee)
+      const amountToShield = amount || (balance - this.defaultFee);
+      
+      // Check minimum threshold (from Unstoppable: 0.0004 ZEC)
+      if (amountToShield < this.minShieldThreshold) {
+        throw new Error(`Amount must be at least ${this.minShieldThreshold} ZEC`);
+      }
+      
+      // Create shielding transaction
+      const recipients = [{
+        address: toShieldedAddress,
+        amount: amountToShield,
+        memo: memo || ''
+      }];
+      
+      const txid = await this.rpc.sendShieldedTransaction(
+        fromTransparentAddress,
+        recipients,
+        1, // minConf
+        this.defaultFee
+      );
+      
+      // Track as shielding transaction
+      this.shieldingTransactions.set(txid, {
+        direction: 'shield',
+        from: fromTransparentAddress,
+        to: toShieldedAddress,
+        amount: amountToShield,
+        timestamp: Date.now()
+      });
+      
+      console.log(`Shielding ${amountToShield} ZEC: ${txid}`);
+      return txid;
+    } catch (error) {
+      console.error('Failed to shield funds:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Unshield funds (move from shielded to transparent address)
+   * @param {string} fromShieldedAddress - Source shielded address
+   * @param {string} toTransparentAddress - Destination transparent address
+   * @param {number} amount - Amount to unshield
+   * @param {string} memo - Optional memo
+   * @returns {Promise<string>} Transaction ID
+   */
+  async unshieldFunds(fromShieldedAddress, toTransparentAddress, amount, memo = '') {
+    try {
+      // Validate addresses
+      if (!isShieldedAddress(fromShieldedAddress)) {
+        throw new Error('Source must be a shielded address');
+      }
+      if (!toTransparentAddress.startsWith('t')) {
+        throw new Error('Destination must be a transparent address');
+      }
+      
+      if (!amount || amount <= 0) {
+        throw new Error('Amount must be greater than 0');
+      }
+      
+      // Create unshielding transaction
+      const recipients = [{
+        address: toTransparentAddress,
+        amount: amount,
+        memo: memo || ''
+      }];
+      
+      const txid = await this.rpc.sendShieldedTransaction(
+        fromShieldedAddress,
+        recipients,
+        1, // minConf
+        this.defaultFee
+      );
+      
+      // Track as unshielding transaction
+      this.shieldingTransactions.set(txid, {
+        direction: 'unshield',
+        from: fromShieldedAddress,
+        to: toTransparentAddress,
+        amount: amount,
+        timestamp: Date.now()
+      });
+      
+      console.log(`Unshielding ${amount} ZEC: ${txid}`);
+      return txid;
+    } catch (error) {
+      console.error('Failed to unshield funds:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Get shielding transaction fee estimate
+   * @param {number} amount - Amount to shield
+   * @returns {Promise<number>} Estimated fee
+   */
+  async getShieldingFeeEstimate(amount) {
+    // Zcash has fixed fees typically
+    return this.defaultFee;
+  }
+  
+  /**
+   * Check if address has sufficient balance for shielding
+   * @param {string} address - Transparent address
+   * @returns {Promise<Object>} Shielding info
+   */
+  async canShield(address) {
+    try {
+      const balance = await this.rpc.getBalance(address);
+      const canShield = balance >= (this.minShieldThreshold + this.defaultFee);
+      
+      return {
+        canShield,
+        balance,
+        minThreshold: this.minShieldThreshold,
+        maxShieldable: Math.max(0, balance - this.defaultFee),
+        fee: this.defaultFee
+      };
+    } catch (error) {
+      return {
+        canShield: false,
+        balance: 0,
+        error: error.message
+      };
     }
   }
 

@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Button, Card, CardBody, Input, Textarea, Chip, Tabs, Tab } from "@nextui-org/react";
 import { useZcash } from "../providers/ZcashProvider";
+import { usePrivacy } from "../providers/PrivacyProvider";
+import { useSeedPhraseBackup } from "../hooks/useSeedPhraseBackup";
+import SeedPhraseBackupModal from "../components/wallet/SeedPhraseBackupModal";
+import { MobilePageWrapper } from "../components/shared/MobileNav";
 import toast from "react-hot-toast";
 import { Copy, Check, Eye, EyeOff, RefreshCw, Wallet, Shield, Send, History, ExternalLink } from "lucide-react";
 
@@ -9,15 +13,18 @@ export default function ZcashPage() {
         zcashAccount,
         isConnected,
         createWallet,
+        finalizeWalletCreation,
         importWallet,
         disconnect,
         balance
     } = useZcash();
 
+    const { balanceHidden, toggleBalanceVisibility } = usePrivacy();
+    const { pendingWallet, showBackupModal, initiateBackup, handleBackupComplete, cancelBackup } = useSeedPhraseBackup();
+
     const [mnemonicInput, setMnemonicInput] = useState("");
     const [copied, setCopied] = useState(false);
     const [showMnemonic, setShowMnemonic] = useState(false);
-    const [showBalance, setShowBalance] = useState(true);
     const [activeTab, setActiveTab] = useState('overview');
 
     const handleCopy = (text) => {
@@ -27,13 +34,24 @@ export default function ZcashPage() {
         toast.success("Copied to clipboard!");
     };
 
+    const handleCreateWallet = () => {
+        const wallet = createWallet(12);
+        if (wallet) {
+            // Initiate backup flow - wallet won't be saved until backup is verified
+            initiateBackup(wallet, (verifiedWallet) => {
+                finalizeWalletCreation(verifiedWallet);
+            });
+        }
+    };
+
     return (
-        <div className="flex flex-col items-center justify-center w-full min-h-[80vh] gap-8 p-4 pb-24">
+        <MobilePageWrapper>
+            <div className="flex flex-col items-center justify-center w-full min-h-[80vh] gap-8 p-4 pb-24">
             <div className="flex items-center gap-3">
                 <img src="/assets/zcash_logo.png" alt="Zcash" className="w-10 h-10 rounded-full" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-500 to-amber-600 bg-clip-text text-transparent">
-                Zcash Integration
-            </h1>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-500 to-amber-600 bg-clip-text text-transparent">
+                    Zcash Integration
+                </h1>
             </div>
 
             <p className="text-gray-600 max-w-lg text-center">
@@ -56,43 +74,43 @@ export default function ZcashPage() {
                             </Chip>
                         </div>
 
-                    <div className="flex flex-col gap-4 w-full">
-                        <Button
+                        <div className="flex flex-col gap-4 w-full">
+                            <Button
                                 className="w-full h-12 font-bold bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg hover:shadow-xl hover:from-yellow-400 hover:to-amber-500 transition-all"
-                            onClick={createWallet}
+                                onClick={handleCreateWallet}
                                 startContent={<Wallet className="w-5 h-5" />}
-                        >
-                            Generate New Wallet
-                        </Button>
+                            >
+                                Generate New Wallet
+                            </Button>
 
-                        <div className="relative flex py-2 items-center">
-                            <div className="flex-grow border-t border-gray-300"></div>
-                            <span className="flex-shrink mx-4 text-gray-400 text-sm">Or Import</span>
-                            <div className="flex-grow border-t border-gray-300"></div>
-                        </div>
+                            <div className="relative flex py-2 items-center">
+                                <div className="flex-grow border-t border-gray-300"></div>
+                                <span className="flex-shrink mx-4 text-gray-400 text-sm">Or Import</span>
+                                <div className="flex-grow border-t border-gray-300"></div>
+                            </div>
 
-                        <div className="flex flex-col gap-2">
-                            <Textarea
+                            <div className="flex flex-col gap-2">
+                                <Textarea
                                     placeholder="Enter your 12-word mnemonic phrase..."
-                                value={mnemonicInput}
-                                onChange={(e) => setMnemonicInput(e.target.value)}
+                                    value={mnemonicInput}
+                                    onChange={(e) => setMnemonicInput(e.target.value)}
                                     minRows={3}
-                                variant="bordered"
+                                    variant="bordered"
                                     classNames={{
                                         inputWrapper: "focus-within:border-yellow-400"
                                     }}
-                            />
-                            <Button
+                                />
+                                <Button
                                     variant="bordered"
                                     className="w-full border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-                                onClick={() => importWallet(mnemonicInput)}
-                                disabled={!mnemonicInput}
+                                    onClick={() => importWallet(mnemonicInput)}
+                                    disabled={!mnemonicInput}
                                     startContent={<Shield className="w-4 h-4" />}
-                            >
-                                Import Wallet
-                            </Button>
+                                >
+                                    Import Wallet
+                                </Button>
+                            </div>
                         </div>
-                    </div>
                     </CardBody>
                 </Card>
             ) : (
@@ -105,7 +123,7 @@ export default function ZcashPage() {
                                     <p className="text-sm text-gray-600 mb-1">Total Balance</p>
                                     <div className="flex items-center gap-2">
                                         <h2 className="text-3xl font-bold text-gray-900">
-                                            {showBalance ? balance.available : '****'} <span className="text-lg text-yellow-600">tZEC</span>
+                                            {balanceHidden ? '****' : (balance?.available || 0).toFixed(4)} <span className="text-lg text-yellow-600">tZEC</span>
                                         </h2>
                                         <div className="flex items-center gap-1">
                                             <img src="/assets/zcash_logo.png" alt="ZEC" className="w-6 h-6 rounded-full" />
@@ -113,19 +131,19 @@ export default function ZcashPage() {
                                     </div>
                                     <div className="flex items-center gap-2 mt-2">
                                         <Chip size="sm" variant="flat" color="warning">
-                                    Testnet
+                                            Testnet
                                         </Chip>
                                         <Chip size="sm" variant="flat" color="default">
                                             Transparent Address
                                         </Chip>
-                            </div>
+                                    </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-2">
                                     <button
-                                        onClick={() => setShowBalance(!showBalance)}
+                                        onClick={toggleBalanceVisibility}
                                         className="p-2 rounded-lg hover:bg-yellow-100 transition-colors"
                                     >
-                                        {showBalance ? <EyeOff className="w-5 h-5 text-gray-600" /> : <Eye className="w-5 h-5 text-gray-600" />}
+                                        {balanceHidden ? <EyeOff className="w-5 h-5 text-gray-600" /> : <Eye className="w-5 h-5 text-gray-600" />}
                                     </button>
                                     <Button
                                         isIconOnly
@@ -176,24 +194,22 @@ export default function ZcashPage() {
                                                         <Shield className="w-5 h-5 text-yellow-600" />
                                                         Wallet Details
                                                     </h3>
-
                                                     <div className="space-y-4">
                                                         <div>
                                                             <label className="text-xs text-gray-600 font-semibold mb-2 block">Address (Transparent)</label>
                                                             <div className="flex items-center gap-2 bg-white p-3 rounded-lg border border-yellow-200">
-                                                                <code className="text-sm font-mono text-gray-700 flex-1 truncate">{zcashAccount.address}</code>
+                                                                <code className="text-sm font-mono text-gray-700 flex-1 truncate">{zcashAccount?.transparentAddress || zcashAccount?.address}</code>
                                                                 <Button
                                                                     isIconOnly
                                                                     size="sm"
                                                                     variant="light"
-                                                                    onClick={() => handleCopy(zcashAccount.address)}
+                                                                    onClick={() => handleCopy(zcashAccount?.transparentAddress || zcashAccount?.address)}
                                                                     className="min-w-8"
                                                                 >
                                                                     {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} className="text-yellow-600" />}
                                                                 </Button>
                                                             </div>
                                                         </div>
-
                                                         <div>
                                                             <div className="flex justify-between items-center mb-2">
                                                                 <label className="text-xs text-gray-600 font-semibold">Mnemonic Phrase</label>
@@ -205,15 +221,15 @@ export default function ZcashPage() {
                                                                 >
                                                                     {showMnemonic ? <><EyeOff size={12} className="mr-1" /> Hide</> : <><Eye size={12} className="mr-1" /> Show</>}
                                                                 </Button>
-                                </div>
-                                {showMnemonic && (
+                                                            </div>
+                                                            {showMnemonic && (
                                                                 <div className="bg-yellow-100 p-4 rounded-lg border border-yellow-200">
                                                                     <code className="text-sm font-mono text-yellow-900 break-words leading-relaxed">
-                                        {zcashAccount.mnemonic}
+                                                                        {zcashAccount?.mnemonic}
                                                                     </code>
-                                    </div>
-                                )}
-                            </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </CardBody>
                                             </Card>
@@ -225,7 +241,6 @@ export default function ZcashPage() {
                                                         <Send className="w-5 h-5 text-yellow-600" />
                                                         Quick Actions
                                                     </h3>
-
                                                     <div className="space-y-3">
                                                         <Button
                                                             className="w-full justify-start bg-gradient-to-r from-yellow-500 to-amber-600 text-white"
@@ -246,7 +261,7 @@ export default function ZcashPage() {
                                                             variant="bordered"
                                                             className="w-full justify-start border-gray-300 text-gray-700 hover:bg-gray-50"
                                                             startContent={<ExternalLink className="w-4 h-4" />}
-                                                            onClick={() => window.open(`https://blockexplorer.one/zcash/testnet/address/${zcashAccount.address}`, '_blank')}
+                                                            onClick={() => window.open(`https://blockexplorer.one/zcash/testnet/address/${zcashAccount?.transparentAddress || zcashAccount?.address}`, '_blank')}
                                                         >
                                                             View on Explorer
                                                         </Button>
@@ -274,17 +289,23 @@ export default function ZcashPage() {
                                                     <div>
                                                         <label className="text-xs text-gray-600 font-semibold mb-2 block">Address (Transparent)</label>
                                                         <div className="flex items-center gap-2 bg-white p-3 rounded-lg border border-yellow-200">
-                                                            <code className="text-sm font-mono text-gray-700 flex-1 truncate">{zcashAccount.address}</code>
+                                                            <code className="text-sm font-mono text-gray-700 flex-1 truncate">{zcashAccount?.transparentAddress || zcashAccount?.address}</code>
                                                             <Button
                                                                 isIconOnly
                                                                 size="sm"
                                                                 variant="light"
-                                                                onClick={() => handleCopy(zcashAccount.address)}
+                                                                onClick={() => handleCopy(zcashAccount?.transparentAddress || zcashAccount?.address)}
                                                             >
                                                                 {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} className="text-yellow-600" />}
-                                    </Button>
-                                </div>
-                            </div>
+                                                            </Button>
+                                                        </div>
+                                                        {/* Show Simulated balance if not hidden */}
+                                                        {!balanceHidden && balance?.simulated > 0 && (
+                                                            <div className="text-xs text-gray-500 mt-1">
+                                                                (Simulated: +{balance.simulated.toFixed(4)} tZEC)
+                                                            </div>
+                                                        )}
+                                                    </div>
 
                                                     <div>
                                                         <div className="flex justify-between items-center mb-2">
@@ -301,20 +322,20 @@ export default function ZcashPage() {
                                                         {showMnemonic && (
                                                             <div className="bg-yellow-100 p-4 rounded-lg border border-yellow-200">
                                                                 <code className="text-sm font-mono text-yellow-900 break-words leading-relaxed">
-                                                                    {zcashAccount.mnemonic}
+                                                                    {zcashAccount?.mnemonic}
                                                                 </code>
                                                             </div>
                                                         )}
                                                     </div>
 
-                            <Button
-                                color="danger"
-                                variant="light"
+                                                    <Button
+                                                        color="danger"
+                                                        variant="light"
                                                         className="w-full mt-4"
-                                onClick={disconnect}
-                            >
-                                Disconnect Wallet
-                            </Button>
+                                                        onClick={disconnect}
+                                                    >
+                                                        Disconnect Wallet
+                                                    </Button>
                                                 </div>
                                             </CardBody>
                                         </Card>
@@ -359,11 +380,22 @@ export default function ZcashPage() {
                                         requires a backend service or heavy WASM client. All transactions are simulated on testnet.
                                     </p>
                                 </div>
-                    </div>
+                            </div>
                         </CardBody>
                     </Card>
                 </div>
             )}
+
+            {/* Backup Modal */}
+            <SeedPhraseBackupModal
+                isOpen={showBackupModal}
+                mnemonic={pendingWallet?.mnemonic}
+                onBackupComplete={handleBackupComplete}
+                onClose={cancelBackup}
+                walletType="Zcash Wallet"
+                canSkip={false}
+            />
         </div>
+        </MobilePageWrapper>
     );
 }

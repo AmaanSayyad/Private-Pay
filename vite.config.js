@@ -38,6 +38,23 @@ export default defineConfig(({ mode }) => {
       }),
     ],
     server: serverConfig,
+    // Enable WebAssembly and top-level await support for Zcash shielded transactions
+    optimizeDeps: {
+      include: [
+        "readable-stream",
+        "buffer",
+      ],
+      esbuildOptions: {
+        define: {
+          global: "globalThis",
+        },
+        target: 'esnext',
+      },
+      exclude: ['@chainsafe/webzjs-wallet', '@chainsafe/webzjs-keys'],
+    },
+    worker: {
+      format: 'es',
+    },
     define: {
       "process.env": {},
       global: "globalThis",
@@ -49,18 +66,8 @@ export default defineConfig(({ mode }) => {
         "readable-stream": "readable-stream",
       },
     },
-    optimizeDeps: {
-      include: [
-        "readable-stream",
-        "buffer",
-      ],
-      esbuildOptions: {
-        define: {
-          global: "globalThis",
-        },
-      },
-    },
     build: {
+      target: 'esnext',
       commonjsOptions: {
         transformMixedEsModules: true,
         include: [/node_modules/],

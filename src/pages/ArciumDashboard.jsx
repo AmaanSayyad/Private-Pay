@@ -5,6 +5,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useArcium } from "../providers/SolanaProvider";
 import { Icons } from "../components/shared/Icons";
+import { MobilePageWrapper } from "../components/shared/MobileNav";
 import { 
   Shield, 
   ArrowLeftRight, 
@@ -67,7 +68,8 @@ export default function ArciumDashboard() {
   ];
 
   return (
-    <div className="flex min-h-screen w-full items-start justify-center py-20 px-4 md:px-10 bg-gradient-to-br from-white to-indigo-50/30">
+    <MobilePageWrapper>
+      <div className="flex min-h-screen w-full items-start justify-center py-20 px-4 md:px-10 bg-gradient-to-br from-white to-indigo-50/30">
       <div className="w-full max-w-6xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -314,5 +316,6 @@ export default function ArciumDashboard() {
         )}
       </div>
     </div>
+    </MobilePageWrapper>
   );
 }

@@ -136,25 +136,25 @@ export default function PrivateSwapPage() {
 
   const ensureReady = () => {
     if (!connected || !publicKey) {
-      toast.error("Cüzdan bağlayın.");
+      toast.error("Please connect your wallet.");
       return false;
     }
-    
+
     if (!arciumClient) {
-      toast.error("Arcium client oluşturulamadı. Lütfen sayfayı yenileyin.");
+      toast.error("Failed to initialize Arcium client. Please refresh the page.");
       return false;
     }
-    
+
     if (!program) {
-      toast.error("Program yüklenemedi. Program ID kontrol edin.");
+      toast.error("Failed to load program. Please check the program ID.");
       return false;
     }
-    
+
     if (!PRIVATE_PAY_PROGRAM_ID) {
-      toast.error("Private Pay Program ID yapılandırılmamış.");
+      toast.error("Private Pay Program ID is not configured.");
       return false;
     }
-    
+
     return true;
   };
 
@@ -186,7 +186,7 @@ export default function PrivateSwapPage() {
   // Execute swap
   const handleSwap = useCallback(async () => {
     if (!ensureReady() || !inputAmount || Number(inputAmount) <= 0) {
-      toast.error("Geçerli bir miktar girin.");
+      toast.error("Please enter a valid amount.");
       return;
     }
 
@@ -197,7 +197,7 @@ export default function PrivateSwapPage() {
       // Step 1: Get MXE public key and encrypt swap data
       const arciumLib = await loadArciumClient();
       if (!arciumLib) {
-        throw new Error("@arcium-hq/client kütüphanesi yüklenmemiş. Lütfen npm install @arcium-hq/client yapın.");
+        throw new Error("Failed to load @arcium-hq/client library. Please run 'npm install @arcium-hq/client'.");
       }
 
       const mxePublicKey = await arciumLib.getMXEPublicKeyWithRetry(
@@ -265,22 +265,22 @@ export default function PrivateSwapPage() {
 
       const sig = await sendTransaction(tx, provider.connection);
       await provider.connection.confirmTransaction(sig, "confirmed");
-      toast.success(`Swap transaction gönderildi: ${sig}`);
+      toast.success(`Swap transaction sent: ${sig}`);
 
       setSwapStatus("computing");
 
       // Step 3: Wait for MPC computation
-      toast.loading("MPC hesaplaması bekleniyor...");
+      toast.loading("Waiting for MPC computation...");
       await awaitComputationFinalizationSafe(provider.connection, compOffset, PRIVATE_PAY_PROGRAM_ID, "confirmed");
-      
+
       setSwapStatus("success");
-      toast.success("Private swap başarıyla tamamlandı!");
+      toast.success("Private swap executed successfully!");
       onOpen(); // Show success modal
 
     } catch (error) {
       console.error("Swap failed:", error);
       setSwapStatus("error");
-      toast.error(error.message || "Swap başarısız. Lütfen tekrar deneyin.");
+      toast.error(error.message || "Swap failed. Please try again.");
     } finally {
       setIsSwapping(false);
     }
@@ -622,7 +622,4 @@ export default function PrivateSwapPage() {
     </div>
   );
 }
-
-
-
 
