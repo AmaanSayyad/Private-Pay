@@ -3,9 +3,9 @@
  * Runs in background to detect stealth payments
  */
 
-import { scanTransactionsForPayments } from '../lib/unstoppable/stealthReceiver';
-import { fetchAllTransactions } from '../lib/unstoppable/transactionService';
-import { getAllReceivedPayments } from '../lib/unstoppable/indexedDB';
+import { scanTransactionsForPayments } from './stealthReceiver';
+import { fetchAllTransactions } from './transactionService';
+import { getAllReceivedPayments } from './indexedDB';
 
 class StealthScanner {
     constructor() {
