@@ -4,9 +4,9 @@
  */
 
 import { secp256k1 } from '@noble/curves/secp256k1';
-import { sha256 } from '@noble/hashes/sha256';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
-import { storeReceivedPayment, transactionExists } from './indexedDB'; // Now uses Supabase
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
+import { storeReceivedPayment, transactionExists } from './indexedDB';
 
 /**
  * Generate stealth address from keys (matching generation logic)
