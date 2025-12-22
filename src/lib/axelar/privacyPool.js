@@ -25,10 +25,15 @@ export function modField(x) {
 }
 
 export async function buildMimcHash2() {
-  const {buildMimcSponge} = await import("circomlibjs");
-  const mimc = await buildMimcSponge();
-  const F = mimc.F;
-  return (a, b) => BigInt(F.toObject(mimc.hash(a, b, 0).xL));
+  try {
+    const {buildMimcSponge} = await import("circomlibjs");
+    const mimc = await buildMimcSponge();
+    const F = mimc.F;
+    return (a, b) => BigInt(F.toObject(mimc.hash(a, b, 0).xL));
+  } catch (error) {
+    console.error("Failed to load circomlibjs:", error);
+    throw new Error("Privacy pool cryptographic library failed to load. Please refresh the page.");
+  }
 }
 
 export function randomBigInt31() {

@@ -1132,15 +1132,21 @@ export default function CrossChainPaymentPage() {
                       </ol>
                       <p><strong className="font-semibold">Tip:</strong> Waiting &gt;= 24h and/or multiple deposits increases privacy.</p>
                     </div>
-                    <AxelarPrivacyPoolPanel
-                      evmAddress={evmAddress}
-                      chainId={chainId}
-                      sourceChainKey={sourceChain}
-                      destinationChainKey={destinationChain}
-                      recipientAddress={recipientAddress}
-                      recipientMetaAddress={recipientMetaAddress}
-                      connectedBridgeAddress={sourceBridgeAddress}
-                    />
+                    {sourceChain && destinationChain && sourceBridgeAddress ? (
+                      <AxelarPrivacyPoolPanel
+                        evmAddress={evmAddress}
+                        chainId={chainId}
+                        sourceChainKey={sourceChain}
+                        destinationChainKey={destinationChain}
+                        recipientAddress={recipientAddress || ""}
+                        recipientMetaAddress={recipientMetaAddress}
+                        connectedBridgeAddress={sourceBridgeAddress}
+                      />
+                    ) : (
+                      <div className="text-center py-4 text-sm text-gray-600">
+                        Please select source and destination chains first
+                      </div>
+                    )}
                   </div>
                 )}
 

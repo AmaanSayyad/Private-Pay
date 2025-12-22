@@ -225,12 +225,17 @@ export default function Payment() {
               <h1 className="font-medium text-xl mb-2 text-center">
                 Send to{" "}
                 <span className="font-semibold text-primary">
-                  {paymentLinkData?.username || alias}
+                  {alias}
                 </span>
               </h1>
 
               <p className="text-sm text-gray-500 mb-6">
                 {alias}.privatepay.me
+                {paymentLinkData?.username && paymentLinkData.username !== alias && (
+                  <span className="text-xs text-gray-400 ml-2">
+                    ({paymentLinkData.username})
+                  </span>
+                )}
               </p>
 
               {/* Wallet Connection */}

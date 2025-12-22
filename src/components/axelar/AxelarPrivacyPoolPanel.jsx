@@ -50,6 +50,15 @@ export function AxelarPrivacyPoolPanel({
   recipientMetaAddress,
   connectedBridgeAddress,
 }) {
+  // Early return if required props are missing
+  if (!sourceChainKey || !destinationChainKey) {
+    return (
+      <div className="text-center py-4 text-sm text-gray-600">
+        Please select source and destination chains
+      </div>
+    );
+  }
+
   const poolAddress = import.meta.env.VITE_AXELAR_PRIVACY_POOL_BASE_SEPOLIA || "";
   const zkWasmUrl = import.meta.env.VITE_AXELAR_POOL_WASM_URL || "/zk/axelar-pool/WithdrawAndBridge.wasm";
   const zkZkeyUrl = import.meta.env.VITE_AXELAR_POOL_ZKEY_URL || "/zk/axelar-pool/WithdrawAndBridge_final.zkey";
@@ -76,8 +85,17 @@ export function AxelarPrivacyPoolPanel({
   const [anonymitySetSize, setAnonymitySetSize] = useState(0);
   const [loadingAnonymitySet, setLoadingAnonymitySet] = useState(false);
 
-  const srcConfig = AXELAR_CHAINS[sourceChainKey];
-  const dstConfig = AXELAR_CHAINS[destinationChainKey];
+  const srcConfig = AXELAR_CHAINS[sourceChainKey] || null;
+  const dstConfig = AXELAR_CHAINS[destinationChainKey] || null;
+  
+  // Early return if chain configs are missing
+  if (!srcConfig || !dstConfig) {
+    return (
+      <div className="text-center py-4 text-sm text-gray-600">
+        Invalid chain configuration
+      </div>
+    );
+  }
 
   const isConfigured = !!poolAddress;
   const requiredChainId = srcConfig?.chainId;
