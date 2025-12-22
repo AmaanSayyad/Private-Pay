@@ -25,7 +25,21 @@ export async function initFhenixFhe(provider?: unknown, signer?: unknown): Promi
     // If already initialized but provider/signer provided, reinitialize
     if (provider && signer) {
       try {
-        const result = await cofhejsInstance.initialize({ provider, signer });
+        let result;
+        if (cofhejsInstance.initializeWithEthers) {
+          result = await cofhejsInstance.initializeWithEthers({
+            ethersProvider: provider,
+            ethersSigner: signer,
+            environment: "TESTNET",
+          });
+        } else {
+          result = await cofhejsInstance.initialize({
+            provider,
+            signer,
+            environment: "TESTNET",
+          });
+        }
+        
         if (result.success === false) {
           console.warn("CoFHE re-initialization returned error:", result.error);
           return false;
@@ -57,7 +71,24 @@ export async function initFhenixFhe(provider?: unknown, signer?: unknown): Promi
     // Initialize with provider and signer if available
     if (provider && signer) {
       console.log("Initializing CoFHE with provider and signer...");
-      const result = await cofhejsInstance.initialize({ provider, signer });
+      // Use initializeWithEthers if available, otherwise use initialize with environment
+      let result;
+      if (cofhejsInstance.initializeWithEthers) {
+        // Use the helper function if available
+        result = await cofhejsInstance.initializeWithEthers({
+          ethersProvider: provider,
+          ethersSigner: signer,
+          environment: "TESTNET",
+        });
+      } else {
+        // Fallback to direct initialize with environment
+        result = await cofhejsInstance.initialize({
+          provider,
+          signer,
+          environment: "TESTNET",
+        });
+      }
+      
       if (result.success === false) {
         console.error("CoFHE initialization returned error:", result.error);
         // Don't fail completely - module is loaded, just permit creation failed
@@ -129,22 +160,66 @@ export async function encryptAmountFallback(amount: number): Promise<FhenixEncry
 
 export async function encryptAmount(amount: number): Promise<FhenixEncryptionResult> {
   try {
+    // Check if CoFHE is initialized
     if (!cofheInitialized || !cofhejsInstance || !EncryptableClass) {
+      console.warn("⚠️ CoFHE not initialized, attempting to initialize...");
       const initialized = await initFhenixFhe();
       if (!initialized) {
-        return encryptAmountFallback(amount);
+        console.error("❌ CoFHE initialization failed. Cannot encrypt for confidential transfer.");
+        throw new Error("CoFHE is not initialized. Please ensure your wallet is connected and CoFHE is properly set up. Confidential transfers require CoFHE encryption.");
       }
     }
 
     const units = BigInt(Math.floor(amount * 1_000_000)); // FHPAY 6 decimals
-    const encryptResult = await cofhejsInstance!.encrypt(EncryptableClass!.uint64(units));
+    console.log("🔐 Encrypting amount:", amount, "units:", units.toString());
+    
+    // cofhejs.encrypt() expects an array and returns an array
+    const encryptResult = await cofhejsInstance!.encrypt([EncryptableClass!.uint64(units)]);
 
     if (encryptResult.success === false) {
-      console.warn("CoFHE encryption failed:", encryptResult.error);
-      return encryptAmountFallback(amount);
+      console.error("❌ CoFHE encryption failed:", encryptResult.error);
+      throw new Error(`CoFHE encryption failed: ${encryptResult.error || "Unknown error"}. Confidential transfers require CoFHE encryption.`);
     }
 
-    const encryptedInput = encryptResult.data;
+    // encryptResult.data is an array of CoFheInUint64, get the first element
+    const encryptedArray = encryptResult.data;
+    
+    console.log("🔐 CoFHE encrypt result - full result:", encryptResult);
+    console.log("🔐 CoFHE encrypt result - data type:", typeof encryptedArray, Array.isArray(encryptedArray));
+    console.log("🔐 CoFHE encrypt result - data length:", Array.isArray(encryptedArray) ? encryptedArray.length : "not an array");
+    
+    const encryptedInput = Array.isArray(encryptedArray) && encryptedArray.length > 0 
+      ? encryptedArray[0] 
+      : encryptedArray;
+    
+    console.log("🔐 CoFHE encrypt result - first element:", encryptedInput);
+    console.log("🔐 CoFHE encrypt result - first element type:", typeof encryptedInput);
+    
+    if (encryptedInput && typeof encryptedInput === "object") {
+      console.log("🔐 CoFHE encrypted input keys:", Object.keys(encryptedInput));
+      console.log("🔐 CoFHE encrypted input full object:", encryptedInput);
+      console.log("🔐 CoFHE encrypted input structured:", {
+        ctHash: encryptedInput.ctHash?.toString(),
+        securityZone: encryptedInput.securityZone,
+        utype: encryptedInput.utype,
+        signature: encryptedInput.signature,
+        hasData: "data" in encryptedInput,
+      });
+      
+      // Validate that ctHash exists
+      if (!encryptedInput.ctHash) {
+        console.error("❌ CoFHE encryption result is missing ctHash!");
+        console.error("❌ This usually means encryption failed or CoFHE is not properly initialized");
+        console.error("❌ Full encrypted input:", encryptedInput);
+        throw new Error("CoFHE encryption result is missing ctHash - encryption may have failed. Please ensure CoFHE is properly initialized.");
+      }
+      
+      console.log("✅ CoFHE encryption successful! ctHash:", encryptedInput.ctHash.toString());
+    } else {
+      console.error("❌ CoFHE encrypted input is not an object:", encryptedInput);
+      console.error("❌ Type:", typeof encryptedInput, Array.isArray(encryptedInput));
+      throw new Error("CoFHE encryption result is not in expected format. Expected CoFheInUint64 object.");
+    }
     let encryptedBytes: number[];
 
     if (encryptedInput && typeof encryptedInput === "object" && "data" in encryptedInput) {
@@ -190,18 +265,60 @@ function serializeEncryptedValue(value: unknown): number[] {
   }
 }
 
-export async function unsealValue(sealedValue: unknown): Promise<bigint | null> {
+export async function unsealValue(sealedValue: unknown, signerAddress?: string): Promise<bigint | null> {
   if (!cofheInitialized || !cofhejsInstance) {
     console.error("CoFHE not initialized for unsealing");
     return null;
   }
+  
   try {
-    const result = await cofhejsInstance.unseal(sealedValue);
-    if (result.success === false) {
-      console.error("Unseal failed:", result.error);
+    // Import FheTypes
+    const { FheTypes } = await import("cofhejs/web");
+    
+    // Check if cofhejs is properly initialized (has publicKey/CRS)
+    // If not, we can't unseal
+    try {
+      // Try to get permit first - this will fail if not initialized
+      let permit = null;
+      if (signerAddress) {
+        const permitResult = await cofhejsInstance.createPermit({
+          type: "self",
+          issuer: signerAddress,
+        });
+        
+        if (permitResult.success && permitResult.data) {
+          permit = permitResult.data;
+        } else {
+          console.warn("Failed to create permit for unsealing:", permitResult.error);
+          // Still try to unseal without permit
+        }
+      }
+      
+      // Unseal with FheTypes.Uint64
+      // If permit available, use it; otherwise try without
+      let result;
+      if (permit && permit.data && permit.data.issuer && permit.data.getHash) {
+        result = await cofhejsInstance.unseal(
+          sealedValue,
+          FheTypes.Uint64,
+          permit.data.issuer,
+          permit.data.getHash()
+        );
+      } else {
+        // Try unseal without permit (might work if already permitted or public data)
+        result = await cofhejsInstance.unseal(sealedValue, FheTypes.Uint64);
+      }
+      
+      if (result.success === false) {
+        console.error("Unseal failed:", result.error);
+        return null;
+      }
+      
+      return BigInt(result.data.toString());
+    } catch (initError) {
+      console.error("CoFHE not properly initialized for unsealing (publicKey/CRS missing):", initError);
       return null;
     }
-    return result.data as bigint;
   } catch (error) {
     console.error("Failed to unseal value:", error);
     return null;

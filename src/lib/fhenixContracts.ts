@@ -67,6 +67,7 @@ export async function getFHPAYContract(): Promise<ethers.Contract> {
 
 /**
  * Convert encrypted value to InEuint64 tuple format for contract calls
+ * cofhejs.encrypt() returns an array, we need the first element which is InEuint64
  */
 function formatInEuint64(encryptedValue: unknown): {
   ctHash: bigint;
@@ -74,49 +75,45 @@ function formatInEuint64(encryptedValue: unknown): {
   utype: number;
   signature: string;
 } {
-  // CoFHE returns encrypted value in a specific format
-  // We need to extract ctHash, securityZone, utype, and signature
-  if (encryptedValue && typeof encryptedValue === "object") {
-    const enc = encryptedValue as any;
-    
-    // Try to extract from cofhejs format
-    if (enc.ctHash !== undefined) {
-      return {
-        ctHash: BigInt(enc.ctHash),
-        securityZone: enc.securityZone || 0,
-        utype: enc.utype || 0,
-        signature: enc.signature || "0x",
-      };
-    }
-    
-    // Fallback: construct from data if available
-    if (enc.data) {
-      const dataBytes = enc.data instanceof Uint8Array 
-        ? Array.from(enc.data) 
-        : Array.isArray(enc.data) 
-          ? enc.data 
-          : [];
-      
-      // Simple hash for ctHash (in production, use proper Poseidon hash)
-      let ctHash = BigInt(0);
-      for (let i = 0; i < Math.min(32, dataBytes.length); i++) {
-        ctHash = (ctHash << BigInt(8)) | BigInt(dataBytes[i] || 0);
-      }
-      
-      return {
-        ctHash,
-        securityZone: enc.securityZone || 0,
-        utype: enc.utype || 0,
-        signature: enc.signature || "0x",
-      };
-    }
+  // cofhejs.encrypt() returns an array, the first element is the encrypted value
+  let encValue = encryptedValue;
+  if (Array.isArray(encryptedValue) && encryptedValue.length > 0) {
+    encValue = encryptedValue[0];
   }
   
-  // Default fallback
+  console.log("Formatting encrypted value:", encValue);
+  console.log("Type:", typeof encValue, Array.isArray(encValue));
+  
+  // The encrypted value should be an object with ctHash, securityZone, utype, signature
+  if (encValue && typeof encValue === "object" && !Array.isArray(encValue)) {
+    const enc = encValue as any;
+    
+    console.log("Encrypted object keys:", Object.keys(enc));
+    console.log("ctHash:", enc.ctHash);
+    console.log("securityZone:", enc.securityZone);
+    console.log("utype:", enc.utype);
+    console.log("signature:", enc.signature);
+    
+    // Extract the InEuint64 struct fields
+    // utype should be 1 for uint64 (as per Fhenix documentation)
+    const result = {
+      ctHash: enc.ctHash !== undefined ? BigInt(enc.ctHash.toString()) : BigInt(0),
+      securityZone: enc.securityZone !== undefined ? Number(enc.securityZone) : 0,
+      utype: enc.utype !== undefined ? Number(enc.utype) : 1, // Default to 1 for uint64
+      signature: enc.signature || (enc.signature === "" ? "0x" : "0x"),
+    };
+    
+    console.log("Formatted result:", result);
+    return result;
+  }
+  
+  // Fallback: if it's not in the expected format
+  console.warn("Encrypted value is not in expected format, using fallback");
+  console.warn("Value:", JSON.stringify(encValue, null, 2));
   return {
     ctHash: BigInt(0),
     securityZone: 0,
-    utype: 0,
+    utype: 1, // uint64 type
     signature: "0x",
   };
 }
@@ -135,26 +132,175 @@ export async function confidentialTransfer(
   const signer = await getArbitrumSepoliaSigner();
   const account = await signer.getAddress();
 
-  // Format encrypted value as InEuint64 tuple
-  const inEuint64 = formatInEuint64(encryptedAmount.encryptedValue);
-
-  // Simulate transaction first
-  try {
-    await contract.confidentialTransfer.staticCall(to, inEuint64);
-  } catch (error) {
-    console.error("Transaction simulation failed:", error);
-    throw new Error(`Transaction would fail: ${error}`);
+  // cofhejs.encrypt() returns { success: true, data: CoFheInUint64[] }
+  // encryptedAmount.encryptedValue should be the CoFheInUint64 object directly
+  let inEuint64 = encryptedAmount.encryptedValue;
+  
+  console.log("🔍 Raw encrypted value from encryptAmount:", inEuint64);
+  console.log("🔍 Type:", typeof inEuint64, Array.isArray(inEuint64));
+  
+  // If it's an array, get the first element (CoFheInUint64)
+  if (Array.isArray(inEuint64) && inEuint64.length > 0) {
+    inEuint64 = inEuint64[0];
+    console.log("🔍 Extracted first element from array:", inEuint64);
+  }
+  
+  // Check if it's already in the correct format (CoFheInUint64 with ctHash, securityZone, utype, signature)
+  if (inEuint64 && typeof inEuint64 === "object" && !Array.isArray(inEuint64)) {
+    const enc = inEuint64 as any;
+    
+    console.log("🔍 Encrypted object keys:", Object.keys(enc));
+    console.log("🔍 Encrypted object full structure:", enc);
+    
+    // Check all possible property names for ctHash
+    const ctHash = enc.ctHash ?? enc.ct_hash ?? enc.hash ?? enc.ciphertextHash;
+    const securityZone = enc.securityZone ?? enc.security_zone ?? enc.zone ?? 0;
+    const utype = enc.utype ?? enc.type ?? enc.fheType;
+    const signature = enc.signature ?? enc.sig ?? "0x";
+    
+    console.log("🔍 Extracted values:", {
+      ctHash: ctHash?.toString(),
+      securityZone,
+      utype,
+      signature,
+    });
+    
+    // Import FheTypes to get the correct utype value
+    const { FheTypes } = await import("cofhejs/web");
+    
+    // If ctHash is still missing, the encrypted value might be in a different format
+    // Check if it has a 'data' property (like fallback encryption)
+    if (!ctHash && enc.data) {
+      console.warn("⚠️ Encrypted value has 'data' property but no ctHash - this might be fallback encryption");
+      console.warn("⚠️ Fallback encryption cannot be used for confidentialTransfer");
+      throw new Error("Encrypted value is in fallback format (has 'data' but no 'ctHash'). CoFHE encryption is required for confidential transfers.");
+    }
+    
+    // Make sure all fields are present and in correct format
+    if (!ctHash || ctHash === BigInt(0) || ctHash === 0 || ctHash === null || ctHash === undefined) {
+      console.error("❌ ctHash is missing or zero!");
+      console.error("❌ Full encrypted object:", JSON.stringify(enc, (key, value) => 
+        typeof value === "bigint" ? value.toString() : value
+      ));
+      throw new Error("ctHash is missing from encrypted value - CoFHE encryption may have failed");
+    }
+    
+    // Format signature - must be a hex string starting with 0x
+    let formattedSignature = "0x";
+    if (signature) {
+      if (typeof signature === "string") {
+        formattedSignature = signature.startsWith("0x") ? signature : `0x${signature}`;
+      } else if (signature instanceof Uint8Array || Array.isArray(signature)) {
+        // Convert bytes array to hex string
+        const bytes = Array.isArray(signature) ? signature : Array.from(signature);
+        formattedSignature = "0x" + bytes.map(b => b.toString(16).padStart(2, "0")).join("");
+      }
+    }
+    
+    const formatted = {
+      ctHash: typeof ctHash === "bigint" ? ctHash : BigInt(ctHash.toString()),
+      securityZone: securityZone !== undefined ? Number(securityZone) : 0,
+      utype: utype !== undefined 
+        ? (typeof utype === "number" ? utype : Number(utype))
+        : (FheTypes?.Uint64 ?? 1), // Use FheTypes.Uint64 if available, otherwise default to 1
+      signature: formattedSignature,
+    };
+    
+    // Validate ctHash is not zero
+    if (formatted.ctHash === BigInt(0)) {
+      console.error("❌ ctHash is zero! Encrypted value is invalid.");
+      throw new Error("Encrypted value has zero ctHash - encryption may have failed");
+    }
+    
+    console.log("✅ Formatted InEuint64 for transfer:", {
+      ctHash: formatted.ctHash.toString(),
+      securityZone: formatted.securityZone,
+      utype: formatted.utype,
+      signature: formatted.signature,
+    });
+    console.log("📍 Recipient address:", to);
+    
+    inEuint64 = formatted;
+  } else {
+    console.error("❌ Invalid encrypted value format:", inEuint64);
+    console.error("❌ Type:", typeof inEuint64, Array.isArray(inEuint64));
+    throw new Error("Invalid encrypted value format - expected CoFheInUint64 object");
   }
 
-  // Send transaction
-  const tx = await contract.confidentialTransfer(to, inEuint64);
-  console.log("Transaction sent:", tx.hash);
+  // Use getFunction with explicit signature to avoid ambiguity
+  // There are two overloads: confidentialTransfer(address, InEuint64) and confidentialTransfer(address, euint64)
+  // We want the InEuint64 version: confidentialTransfer(address,(uint256,uint8,uint8,bytes))
+  const transferFunction = contract.getFunction("confidentialTransfer(address,(uint256,uint8,uint8,bytes))");
+  
+  // Simulate transaction first
+  try {
+    const simulationResult = await transferFunction.staticCall(to, inEuint64);
+    console.log("✅ Transaction simulation successful, result:", simulationResult);
+  } catch (error: any) {
+    console.error("❌ Transaction simulation failed:", error);
+    console.error("❌ Error details:", JSON.stringify(error, null, 2));
+    
+    // Try to decode the revert reason
+    if (error?.data) {
+      console.error("❌ Revert data:", error.data);
+    }
+    
+    const errorMessage = error?.reason || error?.message || String(error);
+    throw new Error(`Transaction would fail: ${errorMessage}`);
+  }
 
-  // Wait for confirmation
-  const receipt = await tx.wait();
-  console.log("Transaction confirmed:", receipt);
+  // Send transaction with better error handling
+  try {
+    // Estimate gas first
+    let gasEstimate: bigint;
+    try {
+      gasEstimate = await transferFunction.estimateGas(to, inEuint64);
+      console.log("⛽ Gas estimate:", gasEstimate.toString());
+    } catch (gasError: any) {
+      console.error("❌ Gas estimation failed:", gasError);
+      const gasErrorMessage = gasError?.reason || gasError?.message || String(gasError);
+      throw new Error(`Gas estimation failed: ${gasErrorMessage}. This usually means the transaction would revert.`);
+    }
 
-  return tx.hash;
+    // Send transaction with increased gas limit
+    const tx = await transferFunction(to, inEuint64, {
+      gasLimit: gasEstimate * BigInt(120) / BigInt(100), // Add 20% buffer
+    });
+    console.log("Transaction sent:", tx.hash);
+
+    // Wait for confirmation
+    const receipt = await tx.wait();
+    console.log("Transaction confirmed:", receipt);
+
+    return tx.hash;
+  } catch (error: any) {
+    console.error("Transaction failed:", error);
+    
+    // Try to extract more detailed error information
+    let errorMessage = error?.reason || error?.message || String(error);
+    
+    // Check for revert reason
+    if (error?.data) {
+      console.error("Transaction error data:", error.data);
+    }
+    
+    // Check for transaction receipt (if transaction was sent but reverted)
+    if (error?.receipt) {
+      console.error("Transaction receipt:", error.receipt);
+    }
+    
+    // Check for transaction hash (if transaction was sent)
+    if (error?.transaction) {
+      console.error("Transaction hash:", error.transaction.hash);
+    }
+    
+    // Provide more helpful error message
+    if (errorMessage.includes("Internal JSON-RPC error")) {
+      errorMessage = "Transaction reverted on-chain. This could be due to: insufficient balance, invalid encrypted input, or contract error. Check the console for more details.";
+    }
+    
+    throw new Error(`Transaction failed: ${errorMessage}`);
+  }
 }
 
 /**
@@ -188,6 +334,7 @@ export async function confidentialTransferFrom(
 
 /**
  * Get indicated balance (public indicator, not actual encrypted balance)
+ * WARNING: This is just an indicator (0.0000-0.9999), not the real balance!
  * @param account Account address
  * @returns Indicated balance (uint256)
  */
@@ -197,6 +344,41 @@ export async function getBalance(account: string): Promise<bigint> {
   
   const balance = await contract.balanceOf(account);
   return BigInt(balance.toString());
+}
+
+/**
+ * Get real encrypted balance and unseal it using already initialized cofhejs
+ * @param account Account address
+ * @param signer Signer for permit creation
+ * @returns Real balance (bigint) or null if unsealing fails
+ */
+export async function getRealBalance(account: string, signer?: ethers.Signer): Promise<bigint | null> {
+  const provider = getArbitrumSepoliaProvider();
+  const contract = new ethers.Contract(FHPAY_ADDRESS, FHPAY_ABI.abi, provider);
+  
+  // Get encrypted balance
+  const encBalance = await contract.confidentialBalanceOf(account);
+  
+  // If no signer provided, return null (can't unseal without permit)
+  if (!signer) {
+    return null;
+  }
+  
+  try {
+    // Use unsealValue from fhenixFhe.ts which uses already initialized cofhejs
+    const { unsealValue } = await import("./fhenixFhe");
+    const signerAddress = await signer.getAddress();
+    const unsealed = await unsealValue(encBalance, signerAddress);
+    
+    if (unsealed === null) {
+      return null;
+    }
+    
+    return unsealed;
+  } catch (error) {
+    console.error("Error unsealing balance:", error);
+    return null;
+  }
 }
 
 /**
@@ -318,14 +500,55 @@ export async function checkWalletConnection(): Promise<{
   }
 
   try {
-    const provider = new ethers.BrowserProvider((window as any).ethereum);
+    const ethereum = (window as any).ethereum;
+    const provider = new ethers.BrowserProvider(ethereum);
     const accounts = await provider.listAccounts();
-    const network = await provider.getNetwork();
     
     const isConnected = accounts.length > 0;
     const account = isConnected ? accounts[0].address : null;
-    const chainId = Number(network.chainId);
-    const isCorrectNetwork = chainId === ARBITRUM_SEPOLIA_CHAIN_ID;
+    
+    // Get chain ID directly from MetaMask (more reliable)
+    let chainId: number;
+    let chainIdHex: string;
+    try {
+      // Try to get chainId from ethereum provider directly
+      chainIdHex = await ethereum.request({ method: "eth_chainId" });
+      // Handle both string and number formats
+      if (typeof chainIdHex === "string") {
+        chainId = parseInt(chainIdHex, 16);
+      } else {
+        chainId = Number(chainIdHex);
+      }
+    } catch (err) {
+      console.warn("Failed to get chainId from eth_chainId, trying getNetwork():", err);
+      // Fallback to provider.getNetwork()
+      const network = await provider.getNetwork();
+      const chainIdBigInt = network.chainId;
+      chainId = typeof chainIdBigInt === "bigint" ? Number(chainIdBigInt) : Number(chainIdBigInt);
+      chainIdHex = `0x${chainId.toString(16)}`;
+    }
+    
+    // Compare as both number and string to handle edge cases
+    const isCorrectNetwork = chainId === ARBITRUM_SEPOLIA_CHAIN_ID || 
+                            chainId.toString() === ARBITRUM_SEPOLIA_CHAIN_ID.toString() ||
+                            chainIdHex?.toLowerCase() === `0x${ARBITRUM_SEPOLIA_CHAIN_ID.toString(16)}`.toLowerCase();
+    
+    // Debug logging
+    console.log("🔍 Wallet connection check:", {
+      chainId,
+      chainIdType: typeof chainId,
+      chainIdHex: chainIdHex || `0x${chainId.toString(16)}`,
+      expectedChainId: ARBITRUM_SEPOLIA_CHAIN_ID,
+      expectedChainIdHex: `0x${ARBITRUM_SEPOLIA_CHAIN_ID.toString(16)}`,
+      isCorrectNetwork,
+      account,
+      isConnected,
+      comparison: {
+        number: chainId === ARBITRUM_SEPOLIA_CHAIN_ID,
+        string: chainId.toString() === ARBITRUM_SEPOLIA_CHAIN_ID.toString(),
+        hex: chainIdHex?.toLowerCase() === `0x${ARBITRUM_SEPOLIA_CHAIN_ID.toString(16)}`.toLowerCase(),
+      },
+    });
     
     return {
       isInstalled: true,
@@ -335,7 +558,7 @@ export async function checkWalletConnection(): Promise<{
       isCorrectNetwork,
     };
   } catch (error) {
-    console.error("Error checking wallet:", error);
+    console.error("❌ Error checking wallet:", error);
     return {
       isInstalled: true,
       isConnected: false,
@@ -373,44 +596,91 @@ export async function connectWallet(): Promise<string> {
 }
 
 /**
- * Request test tokens from backend
- * Backend will mint tokens using owner wallet and send to user
- * @param userAddress User's wallet address
- * @param amount Amount of tokens to request
- * @returns Transaction hash from backend
+ * Request test tokens - mint directly from frontend using owner private key
+ * WARNING: This uses private key in frontend - ONLY FOR TESTING!
+ * @param userAddress User's wallet address to receive tokens
+ * @param amount Amount of tokens to mint
+ * @returns Transaction hash
  */
 export async function requestTestTokens(
   userAddress: string,
   amount: number = 100
 ): Promise<{ txHash: string; success: boolean; message?: string }> {
-  const apiUrl = import.meta.env.VITE_FHENIX_API_URL || "http://localhost:3001/api/fhenix";
+  // Get private key from environment (must start with VITE_ to be accessible in frontend)
+  const privateKey = import.meta.env.VITE_ARBITRUM_TREASURY_PRIVATE_KEY;
   
+  if (!privateKey) {
+    throw new Error(
+      "VITE_ARBITRUM_TREASURY_PRIVATE_KEY is not set in environment variables. " +
+      "Add it to your .env file (WARNING: This exposes private key in frontend - only for testing!)"
+    );
+  }
+
   try {
-    const response = await fetch(`${apiUrl}/mint`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        address: userAddress,
-        amount: amount,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Request failed" }));
-      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    // Create provider and wallet from private key
+    const rpcUrl = FHENIX_CONFIG.arbitrumSepolia.rpcUrl;
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const wallet = new ethers.Wallet(privateKey, provider);
+    
+    // Create contract instance
+    const contract = new ethers.Contract(FHPAY_ADDRESS, FHPAY_ABI.abi, wallet);
+    
+    // Verify we are the owner
+    const owner = await contract.owner();
+    const walletAddress = await wallet.getAddress();
+    
+    if (owner.toLowerCase() !== walletAddress.toLowerCase()) {
+      throw new Error(
+        `Wallet address (${walletAddress}) is not the contract owner (${owner}). ` +
+        "Only contract owner can mint tokens."
+      );
     }
-
-    const data = await response.json();
+    
+    // Get decimals
+    const decimals = await contract.decimals();
+    const decimalsMultiplier = BigInt(10 ** Number(decimals));
+    const amountInUnits = BigInt(Math.floor(amount * Number(decimalsMultiplier)));
+    
+    console.log(`📝 Minting ${amount} FHPAY to ${userAddress}...`);
+    
+    // Check balance before mint
+    const balanceBefore = await provider.getBalance(walletAddress);
+    console.log(`   Wallet balance: ${ethers.formatEther(balanceBefore)} ETH`);
+    
+    if (balanceBefore < ethers.parseEther("0.001")) {
+      throw new Error(
+        "Insufficient ETH in treasury wallet for gas fees. " +
+        "Please add some ETH to: " + walletAddress
+      );
+    }
+    
+    // Call devMintPlain
+    const tx = await contract.devMintPlain(userAddress, amountInUnits);
+    console.log(`   Transaction sent: ${tx.hash}`);
+    
+    // Wait for confirmation
+    const receipt = await tx.wait();
+    console.log(`   ✅ Transaction confirmed in block ${receipt.blockNumber}`);
+    
     return {
-      txHash: data.txHash,
+      txHash: tx.hash,
       success: true,
-      message: data.message,
+      message: `Successfully minted ${amount} FHPAY to ${userAddress}`,
     };
   } catch (error: any) {
-    console.error("Request test tokens error:", error);
-    throw new Error(error.message || "Failed to request test tokens");
+    console.error("Mint error:", error);
+    
+    // Provide user-friendly error messages
+    let errorMessage = "Failed to mint tokens";
+    if (error.message.includes("insufficient funds")) {
+      errorMessage = "Insufficient funds in treasury wallet for gas fees";
+    } else if (error.message.includes("nonce")) {
+      errorMessage = "Transaction nonce error. Please retry.";
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    throw new Error(errorMessage);
   }
 }
 

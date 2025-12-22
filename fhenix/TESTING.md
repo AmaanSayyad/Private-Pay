@@ -228,3 +228,4 @@ Sorun yaşarsanız:
 - **Encryption:** Amount'lar FHE ile şifrelenir, sadece sender ve recipient decrypt edebilir
 - **Owner Mint:** Sadece kontrat owner'ı test token'ları mint edebilir
 
+

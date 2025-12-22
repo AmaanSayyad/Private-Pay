@@ -36,8 +36,29 @@ export default defineConfig(({ mode }) => {
         },
         protocolImports: true,
       }),
+      // Plugin to fix WebAssembly MIME type for CoFHE
+      {
+        name: 'configure-response-headers',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            // Fix WASM MIME type for all WASM files (including in node_modules/.vite/deps/)
+            if (req.url.endsWith('.wasm') || req.url.includes('.wasm')) {
+              res.setHeader('Content-Type', 'application/wasm');
+              res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+              res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+            }
+            next();
+          });
+        },
+      },
     ],
-    server: serverConfig,
+    server: {
+      ...serverConfig,
+      headers: {
+        'Cross-Origin-Embedder-Policy': 'require-corp',
+        'Cross-Origin-Opener-Policy': 'same-origin',
+      },
+    },
     // Enable WebAssembly and top-level await support for Zcash shielded transactions
     optimizeDeps: {
       include: [
@@ -50,7 +71,7 @@ export default defineConfig(({ mode }) => {
         },
         target: 'esnext',
       },
-      exclude: ['@chainsafe/webzjs-wallet', '@chainsafe/webzjs-keys'],
+      exclude: ['@chainsafe/webzjs-wallet', '@chainsafe/webzjs-keys', 'cofhejs'],
     },
     worker: {
       format: 'es',

@@ -13,6 +13,7 @@ import {
   connectWallet,
   requestTestTokens
 } from "../lib/fhenixContracts";
+import { FHENIX_CONFIG } from "../config";
 import { Icons } from "../components/shared/Icons.jsx";
 import { MobilePageWrapper } from "../components/shared/MobileNav";
 import { usePrivacy } from "../providers/PrivacyProvider";
@@ -37,6 +38,7 @@ export default function FhenixPayments() {
   const [mintAmount, setMintAmount] = useState("100");
   const [isRequestingTokens, setIsRequestingTokens] = useState(false);
   const [requestAmount, setRequestAmount] = useState("100");
+  const [lastMintTxHash, setLastMintTxHash] = useState(null);
 
   // Check wallet connection on mount
   useEffect(() => {
@@ -51,8 +53,13 @@ export default function FhenixPayments() {
     // Listen for account changes
     if (typeof window !== "undefined" && window.ethereum) {
       window.ethereum.on("accountsChanged", checkConnection);
-      window.ethereum.on("chainChanged", () => {
-        window.location.reload();
+      window.ethereum.on("chainChanged", async () => {
+        // Recheck connection when chain changes
+        const status = await checkWalletConnection();
+        setWalletConnected(status.isConnected);
+        setWalletAccount(status.account);
+        setIsCorrectNetwork(status.isCorrectNetwork);
+        // Don't reload page, just update state
       });
     }
     
@@ -86,9 +93,33 @@ export default function FhenixPayments() {
       const signer = await provider.getSigner();
       const account = await signer.getAddress();
       
+      // Try to get real balance first (requires unsealing and initialized cofhejs)
+      if (isInitialized && !isFallbackMode) {
+        try {
+          const { getRealBalance } = await import("../lib/fhenixContracts");
+          const realBal = await getRealBalance(account, signer);
+          if (realBal !== null && realBal > 0) {
+            // FHPAY has 6 decimals
+            const formatted = (Number(realBal) / 1_000_000).toFixed(6);
+            setBalance(formatted);
+            return;
+          }
+        } catch (unsealError) {
+          console.warn("Failed to unseal real balance, using indicated balance:", unsealError);
+        }
+      }
+      
+      // Fallback to indicated balance (just a counter, not real balance)
+      // This is just an indicator (0.0000-0.9999) that increments/decrements by 0.0001
       const bal = await getBalance(account);
-      // FHPAY has 6 decimals
-      const formatted = (Number(bal) / 1_000_000).toFixed(6);
+      const contract = new (await import("ethers")).Contract(
+        FHENIX_CONFIG.arbitrumSepolia.fhpayContractAddress,
+        (await import("../abi/FHPAY.json")).default.abi,
+        provider
+      );
+      const indicatorTick = await contract.indicatorTick();
+      const indicatedValue = Number(bal) / Number(indicatorTick);
+      const formatted = indicatedValue.toFixed(4);
       setBalance(formatted);
     } catch (err) {
       console.error("Failed to load balance:", err);
@@ -193,21 +224,26 @@ export default function FhenixPayments() {
         return;
       }
 
-      toast.loading("Requesting test tokens...", { id: "request" });
+      toast.loading("Minting test tokens...", { id: "request" });
       const result = await requestTestTokens(walletAccount, amount);
       
-      if (result.success) {
-        toast.success(`Successfully minted ${amount} ${tokenInfo.symbol || "FHPAY"} to your address!`, { id: "request" });
-        if (result.txHash) {
-          toast.success(`Transaction: ${result.txHash.substring(0, 10)}...`, { duration: 5000 });
-        }
+      if (result.success && result.txHash) {
+        setLastMintTxHash(result.txHash);
+        toast.success(`Successfully minted ${amount} ${tokenInfo.symbol || "FHPAY"}!`, { id: "request" });
         
-        // Reload balance after a delay
+        // Reload balance multiple times to ensure it's updated
+        // Blockchain might take a few seconds to update
         setTimeout(() => {
           loadBalance();
         }, 3000);
+        setTimeout(() => {
+          loadBalance();
+        }, 6000);
+        setTimeout(() => {
+          loadBalance();
+        }, 10000);
       } else {
-        toast.error(result.message || "Failed to request test tokens", { id: "request" });
+        toast.error(result.message || "Failed to mint test tokens", { id: "request" });
       }
     } catch (err) {
       console.error("Request tokens error:", err);
@@ -220,17 +256,22 @@ export default function FhenixPayments() {
 
   const handleTransfer = async () => {
     if (!isInitialized) {
-      toast.error("Fhenix FHE client başlatılmadı. Lütfen cüzdanınızı bağlayın.");
+      toast.error("Fhenix FHE client not initialized. Please connect your wallet and refresh the page.");
+      return;
+    }
+
+    if (isFallbackMode) {
+      toast.error("CoFHE mode is not active. CoFHE is required for confidential transfers. Please connect your wallet and refresh the page.");
       return;
     }
 
     if (!amount || parseFloat(amount) <= 0) {
-      toast.error("Geçerli bir miktar girin.");
+      toast.error("Please enter a valid amount.");
       return;
     }
 
     if (!recipient || !recipient.startsWith("0x") || recipient.length !== 42) {
-      toast.error("Geçerli bir Ethereum adresi girin (0x ile başlamalı).");
+      toast.error("Please enter a valid Ethereum address (must start with 0x).");
       return;
     }
 
@@ -240,24 +281,24 @@ export default function FhenixPayments() {
 
     try {
       // Step 1: Encrypt amount
-      toast.loading("Miktar şifreleniyor...", { id: "encrypt" });
+      toast.loading("Encrypting amount...", { id: "encrypt" });
       setEncryptionState("Pack");
       
       const encryptedAmount = await encrypt(parseFloat(amount));
       
       if (!encryptedAmount) {
-        throw new Error("Şifreleme başarısız oldu.");
+        throw new Error("Encryption failed. CoFHE may not be working properly.");
       }
 
       setEncryptionState("Prove");
-      toast.loading("İşlem hazırlanıyor...", { id: "tx" });
+      toast.loading("Preparing transaction...", { id: "tx" });
 
       // Step 2: Send confidential transfer
       const hash = await confidentialTransfer(recipient, encryptedAmount);
       
       setTxHash(hash);
       setEncryptionState("Done");
-      toast.success("Gizli transfer başarılı!", { id: "tx" });
+      toast.success("Confidential transfer successful!", { id: "tx" });
       toast.success(`Transaction: ${hash.substring(0, 10)}...`, { duration: 5000 });
 
       // Reset form
@@ -272,8 +313,8 @@ export default function FhenixPayments() {
     } catch (err) {
       console.error("Transfer error:", err);
       setEncryptionState(null);
-      toast.error(err.message || "Transfer başarısız oldu.", { id: "tx" });
-      toast.error(err.message || "Transfer başarısız oldu.", { id: "encrypt" });
+      toast.error(err.message || "Transfer failed.", { id: "tx" });
+      toast.error(err.message || "Transfer failed.", { id: "encrypt" });
     } finally {
       setLoading(false);
       setTimeout(() => setEncryptionState(null), 3000);
@@ -283,12 +324,12 @@ export default function FhenixPayments() {
   const getEncryptionStateLabel = (state) => {
     if (!state) return "";
     const labels = {
-      Extract: "Veri hazırlanıyor...",
-      Pack: "Şifreleme yapılıyor...",
-      Prove: "İşlem doğrulanıyor...",
-      Verify: "Doğrulama kontrol ediliyor...",
-      Replace: "Sonuç hazırlanıyor...",
-      Done: "Tamamlandı!",
+      Extract: "Preparing data...",
+      Pack: "Encrypting...",
+      Prove: "Verifying transaction...",
+      Verify: "Checking verification...",
+      Replace: "Preparing result...",
+      Done: "Completed!",
     };
     return labels[state] || state;
   };
@@ -361,9 +402,63 @@ export default function FhenixPayments() {
                     <p className="text-sm font-semibold text-blue-900">
                       Wrong Network
                     </p>
-                    <p className="text-xs text-blue-700">
+                    <p className="text-xs text-blue-700 mb-2">
                       Please switch to Arbitrum Sepolia (Chain ID: 421614) in MetaMask
                     </p>
+                    <Button
+                      size="sm"
+                      className="bg-blue-600 text-white"
+                      onClick={async () => {
+                        try {
+                          if (typeof window !== "undefined" && window.ethereum) {
+                            await window.ethereum.request({
+                              method: "wallet_switchEthereumChain",
+                              params: [{ chainId: "0x66eee" }], // 421614 in hex
+                            });
+                            // Recheck after switch
+                            setTimeout(async () => {
+                              const status = await checkWalletConnection();
+                              setIsCorrectNetwork(status.isCorrectNetwork);
+                            }, 1000);
+                          }
+                        } catch (switchError) {
+                          // This error code indicates that the chain has not been added to MetaMask
+                          if (switchError.code === 4902) {
+                            try {
+                              await window.ethereum.request({
+                                method: "wallet_addEthereumChain",
+                                params: [
+                                  {
+                                    chainId: "0x66eee",
+                                    chainName: "Arbitrum Sepolia",
+                                    nativeCurrency: {
+                                      name: "ETH",
+                                      symbol: "ETH",
+                                      decimals: 18,
+                                    },
+                                    rpcUrls: ["https://sepolia-rollup.arbitrum.io/rpc"],
+                                    blockExplorerUrls: ["https://sepolia.arbiscan.io"],
+                                  },
+                                ],
+                              });
+                              // Recheck after add
+                              setTimeout(async () => {
+                                const status = await checkWalletConnection();
+                                setIsCorrectNetwork(status.isCorrectNetwork);
+                              }, 1000);
+                            } catch (addError) {
+                              console.error("Failed to add network:", addError);
+                              toast.error("Failed to add Arbitrum Sepolia network");
+                            }
+                          } else {
+                            console.error("Failed to switch network:", switchError);
+                            toast.error("Failed to switch network");
+                          }
+                        }
+                      }}
+                    >
+                      Switch to Arbitrum Sepolia
+                    </Button>
                   </div>
                 </div>
               </CardBody>
@@ -441,6 +536,13 @@ export default function FhenixPayments() {
                     {balanceHidden ? "***" : balance}{" "}
                     <span className="text-sm text-blue-500">{tokenInfo.symbol || "FHPAY"}</span>
                   </div>
+                  {!balanceHidden && (!isInitialized || isFallbackMode || parseFloat(balance) < 1) && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      {!isInitialized || isFallbackMode 
+                        ? "Real balance requires CoFHE initialization" 
+                        : "Note: Real balance is encrypted. Showing indicator if unseal fails."}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-col gap-1 bg-white/70 p-4 rounded-xl border border-blue-200">
                   <label className="text-xs text-blue-700 font-semibold flex items-center gap-1">
@@ -481,7 +583,7 @@ export default function FhenixPayments() {
                         Request Test Tokens
                       </p>
                       <p className="text-xs text-blue-700">
-                        Request test tokens. Owner wallet will mint and send tokens to your address.
+                        Mint test tokens directly to your wallet address.
                       </p>
                     </div>
                   </div>
@@ -505,9 +607,33 @@ export default function FhenixPayments() {
                       isLoading={isRequestingTokens}
                       disabled={!isCorrectNetwork || !walletAccount}
                     >
-                      Request
+                      Mint
                     </Button>
                   </div>
+                  
+                  {/* Show last mint transaction */}
+                  {lastMintTxHash && (
+                    <Card className="bg-white border border-blue-200 mt-3">
+                      <CardBody className="p-3">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="size-4 text-blue-600" />
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-blue-900 mb-1">
+                              Last Mint Transaction
+                            </p>
+                            <a
+                              href={`${FHENIX_CONFIG.arbitrumSepolia.blockExplorerUrl}/tx/${lastMintTxHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 underline font-mono hover:text-blue-800"
+                            >
+                              {lastMintTxHash.substring(0, 10)}...{lastMintTxHash.substring(lastMintTxHash.length - 8)}
+                            </a>
+                          </div>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  )}
                 </CardBody>
               </Card>
 
