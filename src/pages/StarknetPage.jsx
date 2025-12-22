@@ -181,8 +181,8 @@ export default function StarknetPage() {
             <Card className="bg-gradient-to-br from-purple-500/10 via-indigo-500/10 to-blue-500/10 border-2 border-purple-300/50 shadow-xl backdrop-blur-sm max-w-md w-full">
               <CardBody className="p-6">
                 <div className="flex flex-col items-center gap-4 text-center">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-xl">
-                    <Shield className="w-8 h-8 text-white" />
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-xl p-3">
+                    <img src="/assets/starknet-logo.png" alt="Starknet" className="w-full h-full rounded-full" />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-gray-900 mb-1">
@@ -303,7 +303,8 @@ export default function StarknetPage() {
 
                 <div className="grid grid-cols-3 gap-4">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-purple-700 font-semibold">
+                    <label className="text-xs text-purple-700 font-semibold flex items-center gap-1">
+                      <img src="/assets/eth-logo.png" alt="ETH" className="w-4 h-4 rounded-full" />
                       ETH Balance
                     </label>
                     <div className="text-xl font-bold text-gray-800">
@@ -312,7 +313,8 @@ export default function StarknetPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-purple-700 font-semibold">
+                    <label className="text-xs text-purple-700 font-semibold flex items-center gap-1">
+                      <img src="/assets/starknet-logo.png" alt="STRK" className="w-4 h-4 rounded-full" />
                       STRK Balance
                     </label>
                     <div className="text-xl font-bold text-gray-800">
@@ -321,7 +323,8 @@ export default function StarknetPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-green-700 font-semibold">
+                    <label className="text-xs text-green-700 font-semibold flex items-center gap-1">
+                      <img src="/assets/zcash_logo.png" alt="sZEC" className="w-4 h-4 rounded-full" />
                       sZEC Balance
                     </label>
                     <div className="text-xl font-bold text-gray-800">
@@ -374,22 +377,32 @@ export default function StarknetPage() {
                     }
                   >
                     <div className="p-6 flex flex-col gap-4 bg-gradient-to-br from-white to-purple-50/30">
-                      <div>
-                        <h3 className="text-base font-bold text-gray-900 mb-1">
-                          Stealth Address Setup
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          Generate a meta address to receive private payments. Your stealth
-                          addresses are derived from this meta address.
-                        </p>
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg flex-shrink-0">
+                          <Shield className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-gray-900 mb-1">
+                            Stealth Address Setup
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            Generate a meta address to receive private payments. Your stealth
+                            addresses are derived from this meta address.
+                          </p>
+                        </div>
                       </div>
 
                       {!metaAddress ? (
                         <Button
-                          className="w-full h-12 font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xl hover:scale-[1.01] transition-all"
+                          className="w-full h-14 font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xl hover:scale-[1.01] transition-all"
                           onClick={handleGenerateMetaAddress}
                           isLoading={isGenerating}
-                          startContent={<Shield className="w-5 h-5" />}
+                          startContent={!isGenerating && (
+                            <div className="flex items-center gap-1">
+                              <Shield className="w-5 h-5" />
+                              <img src="/assets/starknet-logo.png" alt="Starknet" className="w-5 h-5 rounded-full" />
+                            </div>
+                          )}
                         >
                           {isGenerating
                             ? "Generating..."
@@ -397,11 +410,16 @@ export default function StarknetPage() {
                         </Button>
                       ) : (
                         <div className="flex flex-col gap-3">
-                          <Card className="bg-purple-50/80 border-2 border-purple-200 shadow-sm">
+                          <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 shadow-md">
                             <CardBody className="p-4">
-                              <label className="text-xs text-purple-700 font-bold mb-2 block">
-                                Spend Public Key
-                              </label>
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-6 h-6 rounded-lg bg-purple-600 flex items-center justify-center">
+                                  <Shield className="w-4 h-4 text-white" />
+                                </div>
+                                <label className="text-xs text-purple-700 font-bold">
+                                  Spend Public Key
+                                </label>
+                              </div>
                               <div className="flex items-center gap-2">
                                 <code className="text-xs truncate flex-1 text-gray-700 bg-white/70 p-2 rounded font-mono">
                                   {metaAddress.spend.publicKey}
@@ -420,11 +438,16 @@ export default function StarknetPage() {
                               </div>
                             </CardBody>
                           </Card>
-                          <Card className="bg-purple-50/80 border-2 border-purple-200 shadow-sm">
+                          <Card className="bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-indigo-200 shadow-md">
                             <CardBody className="p-4">
-                              <label className="text-xs text-purple-700 font-bold mb-2 block">
-                                Viewing Public Key
-                              </label>
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-6 h-6 rounded-lg bg-indigo-600 flex items-center justify-center">
+                                  <Eye className="w-4 h-4 text-white" />
+                                </div>
+                                <label className="text-xs text-indigo-700 font-bold">
+                                  Viewing Public Key
+                                </label>
+                              </div>
                               <div className="flex items-center gap-2">
                                 <code className="text-xs truncate flex-1 text-gray-700 bg-white/70 p-2 rounded font-mono">
                                   {metaAddress.viewing.publicKey}
@@ -436,9 +459,9 @@ export default function StarknetPage() {
                                       "Viewing Key"
                                     )
                                   }
-                                  className="p-1.5 hover:bg-purple-100 rounded transition-colors"
+                                  className="p-1.5 hover:bg-indigo-100 rounded transition-colors"
                                 >
-                                  <Copy size={14} className="text-purple-600" />
+                                  <Copy size={14} className="text-indigo-600" />
                                 </button>
                               </div>
                             </CardBody>
@@ -496,18 +519,24 @@ export default function StarknetPage() {
                     }
                   >
                     <div className="p-6 flex flex-col gap-4 bg-gradient-to-br from-white to-indigo-50/30">
-                      <div>
-                        <h3 className="text-base font-bold text-gray-900 mb-1">
-                          Send Private Payment
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          Send sZEC or STRK to a stealth address. The recipient
-                          can claim funds privately.
-                        </p>
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg flex-shrink-0">
+                          <Send className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-gray-900 mb-1">
+                            Send Private Payment
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            Send sZEC or STRK to a stealth address. The recipient
+                            can claim funds privately.
+                          </p>
+                        </div>
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-800">
+                        <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                          <img src="/assets/starknet-logo.png" alt="Starknet" className="w-5 h-5 rounded-full" />
                           Recipient Meta Address
                         </label>
                         <Input
