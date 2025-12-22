@@ -69,10 +69,10 @@ export async function fetchSolanaTransactions(publicKeyString, network = 'devnet
  */
 export async function fetchEthereumTransactions(address, network = 'sepolia', limit = 10) {
     try {
-        // RPC endpoints
+        // RPC endpoints (CORS-friendly)
         const endpoints = {
             mainnet: 'https://eth.llamarpc.com',
-            sepolia: 'https://rpc.sepolia.org',
+            sepolia: 'https://rpc2.sepolia.org',
         };
 
         const endpoint = endpoints[network] || endpoints.sepolia;

@@ -1,6 +1,6 @@
 import { Button, Modal, ModalContent, Select, SelectItem } from "@nextui-org/react";
 import { QRCode } from "react-qrcode-logo";
-import { Download, Copy, X } from "lucide-react";
+import { Download, Copy } from "lucide-react";
 import { useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -58,14 +58,7 @@ export default function ReceiveModal({ isOpen, onClose, wallet }) {
     return (
         <Modal isOpen={isOpen} onClose={onClose} size="md" placement="center">
             <ModalContent className="p-6">
-                <button
-                    onClick={onClose}
-                    className="absolute right-6 top-6 bg-gray-100 rounded-full p-2 hover:bg-gray-200"
-                >
-                    <X className="w-5 h-5 text-gray-600" />
-                </button>
-
-                <div className="flex flex-col items-center gap-4 mt-4">
+                <div className="flex flex-col items-center gap-4 mt-2">
                     <h2 className="text-2xl font-bold" style={{ color: '#0d08e3' }}>
                         Receive Crypto
                     </h2>
