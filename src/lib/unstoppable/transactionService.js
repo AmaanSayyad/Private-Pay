@@ -124,6 +124,7 @@ export async function fetchEthereumTransactions(address, network = 'sepolia', li
 
 /**
  * Fetch Zcash transaction history for an address
+ * Uses multiple APIs with fallbacks
  * @param {string} address - Zcash address
  * @param {string} network - Network: 'mainnet' or 'testnet'
  * @param {number} limit - Max number of transactions to fetch
@@ -131,24 +132,55 @@ export async function fetchEthereumTransactions(address, network = 'sepolia', li
  */
 export async function fetchZcashTransactions(address, network = 'testnet', limit = 10) {
     try {
-        // Note: blockexplorer.one doesn't have public API, keeping chain.so for now
-        const apiUrl = `https://chain.so/api/v2/get_tx_received/ZECTEST/${address}`;
-
-        const response = await fetch(apiUrl);
-        const data = await response.json();
-
-        if (data.status === 'success' && data.data.txs) {
-            return data.data.txs.slice(0, limit).map(tx => ({
-                hash: tx.txid,
-                timestamp: new Date(tx.time * 1000).toISOString(),
-                status: tx.confirmations > 0 ? 'confirmed' : 'pending',
-                chain: 'Zcash',
-                value: tx.value,
-                confirmations: tx.confirmations,
-                explorerUrl: `https://blockexplorer.one/zcash/testnet/tx/${tx.txid}`,
-            }));
+        // For mainnet, use Blockchair API
+        if (network === 'mainnet') {
+            try {
+                const response = await fetch(
+                    `https://api.blockchair.com/zcash/dashboards/address/${address}?transaction_details=true&limit=${limit}`
+                );
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.data && data.data[address] && data.data[address].transactions) {
+                        return data.data[address].transactions.slice(0, limit).map(txid => ({
+                            hash: txid,
+                            timestamp: null, // Blockchair doesn't return timestamp in this endpoint
+                            status: 'confirmed',
+                            chain: 'Zcash',
+                            explorerUrl: `https://blockchair.com/zcash/transaction/${txid}`,
+                        }));
+                    }
+                }
+            } catch (e) {
+                console.warn('Blockchair API failed:', e);
+            }
         }
 
+        // For testnet, try chain.so API
+        if (network === 'testnet') {
+            try {
+                const apiUrl = `https://chain.so/api/v2/get_tx_received/ZECTEST/${address}`;
+                const response = await fetch(apiUrl);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'success' && data.data && data.data.txs) {
+                        return data.data.txs.slice(0, limit).map(tx => ({
+                            hash: tx.txid,
+                            timestamp: tx.time ? new Date(tx.time * 1000).toISOString() : null,
+                            status: tx.confirmations > 0 ? 'confirmed' : 'pending',
+                            chain: 'Zcash',
+                            value: tx.value,
+                            confirmations: tx.confirmations,
+                            explorerUrl: `https://blockexplorer.one/zcash/testnet/tx/${tx.txid}`,
+                        }));
+                    }
+                }
+            } catch (e) {
+                console.warn('Chain.so API failed:', e);
+            }
+        }
+
+        console.log('Zcash transaction APIs unavailable');
         return [];
     } catch (error) {
         console.error('Failed to fetch Zcash transactions:', error);
@@ -159,26 +191,27 @@ export async function fetchZcashTransactions(address, network = 'testnet', limit
 /**
  * Fetch all transactions for the wallet
  * @param {Object} wallet - Wallet object with addresses
+ * @param {number} limit - Max transactions per chain (default: 10)
  * @returns {Promise<Array>} Combined transaction history
  */
-export async function fetchAllTransactions(wallet) {
+export async function fetchAllTransactions(wallet, limit = 10) {
     const allTransactions = [];
 
     // Fetch Solana transactions
     if (wallet.solanaPublicKey) {
-        const solTxs = await fetchSolanaTransactions(wallet.solanaPublicKey, 'devnet', 5);
+        const solTxs = await fetchSolanaTransactions(wallet.solanaPublicKey, 'devnet', limit);
         allTransactions.push(...solTxs);
     }
 
     // Fetch Ethereum transactions
     if (wallet.ethereumAddress) {
-        const ethTxs = await fetchEthereumTransactions(wallet.ethereumAddress, 'sepolia', 5);
+        const ethTxs = await fetchEthereumTransactions(wallet.ethereumAddress, 'sepolia', limit);
         allTransactions.push(...ethTxs);
     }
 
     // Fetch Zcash transactions
     if (wallet.zcashAddress) {
-        const zecTxs = await fetchZcashTransactions(wallet.zcashAddress, 'testnet', 5);
+        const zecTxs = await fetchZcashTransactions(wallet.zcashAddress, 'testnet', limit);
         allTransactions.push(...zecTxs);
     }
 

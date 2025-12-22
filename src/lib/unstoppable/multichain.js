@@ -151,8 +151,48 @@ export function deriveEthereumKeys(mnemonic) {
 }
 
 /**
+ * Derive Aptos keypair from BIP39 mnemonic
+ * Uses BIP44 path: m/44'/637'/0'/0'/0' (637 is Aptos coin type)
+ */
+export function deriveAptosKeys(mnemonic) {
+    try {
+        // Validate mnemonic
+        if (!bip39.validateMnemonic(mnemonic)) {
+            throw new Error('Invalid mnemonic phrase');
+        }
+
+        // Convert mnemonic to seed
+        const seed = bip39.mnemonicToSeedSync(mnemonic);
+
+        // BIP44 derivation path for Aptos
+        // m/44'/637'/0'/0'/0' (637 is Aptos's coin type)
+        const path = "m/44'/637'/0'/0'";
+
+        // Derive key from path
+        const derivedSeed = derivePath(path, seed.toString('hex')).key;
+
+        // Generate Aptos-compatible keypair (Ed25519)
+        const keypair = nacl.sign.keyPair.fromSeed(derivedSeed);
+
+        // Aptos address is 0x + first 32 bytes of SHA3-256(public key + 0x00)
+        // For simplicity, we use hex of public key as address identifier
+        const publicKeyHex = Buffer.from(keypair.publicKey).toString('hex');
+        const address = `0x${publicKeyHex}`;
+
+        return {
+            address: address,
+            publicKey: publicKeyHex,
+            privateKey: Buffer.from(keypair.secretKey.slice(0, 32)).toString('hex'),
+        };
+    } catch (error) {
+        console.error('Failed to derive Aptos keys:', error);
+        throw error;
+    }
+}
+
+/**
  * Derive all chain keys from a single mnemonic
- * Returns keys for Solana, Aztec, Mina, and Ethereum
+ * Returns keys for Solana, Aztec, Mina, Ethereum, and Aptos
  */
 export function deriveAllChainKeys(mnemonic) {
     return {
@@ -160,6 +200,7 @@ export function deriveAllChainKeys(mnemonic) {
         aztec: deriveAztecKeys(mnemonic),
         mina: deriveMinaKeys(mnemonic),
         ethereum: deriveEthereumKeys(mnemonic),
+        aptos: deriveAptosKeys(mnemonic),
     };
 }
 

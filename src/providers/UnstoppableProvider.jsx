@@ -269,6 +269,10 @@ const generateMasterKeys = (mnemonic) => {
       ethereumAddress: multiChainKeys?.ethereum?.address || null,
       ethereumPublicKey: multiChainKeys?.ethereum?.publicKey || null,
       ethereumPrivateKey: multiChainKeys?.ethereum?.privateKey || null,
+      // Aptos
+      aptosAddress: multiChainKeys?.aptos?.address || null,
+      aptosPublicKey: multiChainKeys?.aptos?.publicKey || null,
+      aptosPrivateKey: multiChainKeys?.aptos?.privateKey || null,
     };
   } catch (error) {
     console.error("Error generating master keys:", error);
@@ -349,11 +353,11 @@ export default function UnstoppableProvider({ children }) {
   useEffect(() => {
     if (!isConnected || !wallet) return;
 
-    const loadTransactions = async () => {
+    const loadTransactions = async (limit = 10) => {
       try {
         console.log('🔄 Fetching transaction history from blockchain...');
 
-        const transactions = await fetchAllTransactions(wallet);
+        const transactions = await fetchAllTransactions(wallet, limit);
         console.log('✅ Transactions fetched:', transactions.length);
 
         setTxHistory(transactions);
@@ -365,7 +369,7 @@ export default function UnstoppableProvider({ children }) {
     loadTransactions();
 
     // Refresh transactions every 60 seconds
-    const interval = setInterval(loadTransactions, 60000);
+    const interval = setInterval(() => loadTransactions(), 60000);
     return () => clearInterval(interval);
   }, [isConnected, wallet]);
 
@@ -805,6 +809,23 @@ export default function UnstoppableProvider({ children }) {
           'sepolia'
         );
         toast.success(`Transaction sent! Hash: ${txHash.substring(0, 10)}...`);
+      } else if (chain === 'Zcash') {
+        // Import Zcash send function dynamically
+        const { sendZcashTransaction } = await import('../lib/unstoppable/sendService');
+
+        // Use wallet's Zcash address as source
+        if (!wallet.zcashAddress) {
+          throw new Error("No Zcash address in wallet");
+        }
+
+        const operationId = await sendZcashTransaction(
+          wallet.zcashAddress,
+          toAddress,
+          amount,
+          'testnet'
+        );
+        toast.success(`Zcash transaction initiated! Op: ${operationId.substring(0, 12)}...`);
+        return operationId;
       } else {
         throw new Error(`Sending not supported for ${chain}`);
       }
