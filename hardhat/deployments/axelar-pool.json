@@ -1,0 +1,16 @@
+{
+  "base-sepolia": {
+    "network": "base-sepolia",
+    "chainId": 84532,
+    "pool": "0xc303c1329AF68C2cED80464AE9f84BB4D8B8a93d",
+    "hasher": "0x5E3b1Ae2C3ec081759A4A335870030eBB0C16003",
+    "verifier": "0xf88a43A873Bd9e56CC25Fc960464bBc2321f3e7a",
+    "bridge": "0x955a7a85B346b0d49E3BC451774DdcDb11805788",
+    "mode": "ITS",
+    "denomination": "10000000",
+    "token": "0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B",
+    "itsTokenId": "0x8bb61f14973ff494dda544391a758a6edf44a9ef16e2dfcd9d6dc9ade3da12bf",
+    "gmpSymbol": "",
+    "timestamp": "2025-12-19T09:44:00.966Z"
+  }
+}

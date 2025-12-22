@@ -1,20 +1,32 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, CardBody, Input, Select, SelectItem, Spinner, Chip, Tabs, Tab } from "@nextui-org/react";
+import { Button, Card, CardBody, Input, Select, SelectItem, Spinner, Chip, Tabs, Tab, Accordion, AccordionItem, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure } from "@nextui-org/react";
+import { ethers } from "ethers";
 import toast from "react-hot-toast";
 import { useAxelarPayment, TX_STATUS } from "../hooks/useAxelarPayment.js";
 import { scanStealthPayments, deriveStealthPrivateKey, ERC20_ABI, GATEWAY_ABI } from "../lib/axelar/crossChainPayment.js";
-import { AXELAR_CHAINS, getSupportedChains, getAxelarscanUrl, getAvailableTokens } from "../lib/axelar/index.js";
+import { AXELAR_CHAINS, getSupportedChains, getAxelarscanUrl, getAvailableTokens, getItsTokenId } from "../lib/axelar/index.js";
 import { deriveKeysFromSignature } from "../lib/aptos/stealthAddress.js";
 import { ArrowLeftRight, Shield, Send, Eye, CheckCircle2, AlertCircle, Zap, ExternalLink, ArrowDown, ArrowUp, Coins } from "lucide-react";
+import { AxelarPrivacyPoolPanel } from "../components/axelar/AxelarPrivacyPoolPanel.jsx";
 
 // Bridge contract address (same on all chains)
-const BRIDGE_ADDRESS = import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS || "0x1764681c26D04f0E9EBb305368cfda808A9F6f8f";
+const DEFAULT_BRIDGE_ADDRESS = import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS || "0x1764681c26D04f0E9EBb305368cfda808A9F6f8f";
+
+// Optional per-chain overrides (recommended for testnets where you deploy distinct bridge addresses)
+const BRIDGE_ADDRESS_OVERRIDES = {
+  base: import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS_BASE_SEPOLIA,
+  polygon: import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS_POLYGON_SEPOLIA,
+};
 
 // Bridge ABI for meta address lookup and registration
 const BRIDGE_ABI = [
   "function getMetaAddress(address user) external view returns (bytes spendPubKey, bytes viewingPubKey)",
   "function registerMetaAddress(bytes spendPubKey, bytes viewingPubKey) external",
+];
+
+const ITS_READ_ABI = [
+  "function interchainTokenAddress(bytes32 tokenId) external view returns (address)",
 ];
 
 // Network detection
@@ -24,6 +36,15 @@ const isMainnet = import.meta.env.VITE_NETWORK === "mainnet";
 const FALLBACK_TOKENS = isMainnet
   ? [{ symbol: "axlUSDC", name: "Axelar USDC", decimals: 6 }]
   : [{ symbol: "TUSDC", name: "Test USDC", decimals: 6 }]; // Our deployed test token at 0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B
+
+// Privacy-pool on Base→Polygon is fixed-denomination and currently uses TUSDC (ITS token).
+const POOL_FIXED_TOKEN = { symbol: "TUSDC", name: "Test USDC", decimals: 6 };
+
+function resolveBridgeAddressForChainKey(chainKey) {
+  const chainConfig = AXELAR_CHAINS?.[chainKey];
+  const envOverride = chainKey ? BRIDGE_ADDRESS_OVERRIDES[chainKey] : undefined;
+  return envOverride || chainConfig?.stealthBridge || DEFAULT_BRIDGE_ADDRESS;
+}
 
 export default function CrossChainPaymentPage() {
   const navigate = useNavigate();
@@ -47,14 +68,34 @@ export default function CrossChainPaymentPage() {
   const [evmConnecting, setEvmConnecting] = useState(false);
   const [chainId, setChainId] = useState(null);
 
+  // Prefer per-chain configured bridge address when available.
+  // Note: many chains do not have `stealthBridge` populated in AXELAR_CHAINS yet,
+  // so we fall back to `VITE_AXELAR_BRIDGE_ADDRESS`.
+  const connectedBridgeAddress = useMemo(() => {
+    if (!chainId) return DEFAULT_BRIDGE_ADDRESS;
+    const entry = Object.entries(AXELAR_CHAINS).find(([, chain]) => chain.chainId === chainId);
+    const chainKey = entry?.[0];
+    return resolveBridgeAddressForChainKey(chainKey);
+  }, [chainId]);
+
   const [sourceChain, setSourceChain] = useState("");
   const [destinationChain, setDestinationChain] = useState("");
+  const isPrivacyRoute = sourceChain === "base" && destinationChain === "polygon";
+  const [transferMode, setTransferMode] = useState("direct");
+  const [modeManuallySelected, setModeManuallySelected] = useState(false);
   const [recipientAddress, setRecipientAddress] = useState("");
   const [amount, setAmount] = useState("");
   const [selectedToken, setSelectedToken] = useState("");
   const [availableTokens, setAvailableTokens] = useState(FALLBACK_TOKENS);
   const [loadingTokens, setLoadingTokens] = useState(false);
   const [estimatingGas, setEstimatingGas] = useState(false);
+
+  // Bridge address to use for *source-chain* reads (meta address lookup, etc).
+  // This is intentionally keyed off the selected source chain, not the currently-connected wallet chain.
+  const sourceBridgeAddress = useMemo(() => {
+    if (!sourceChain) return DEFAULT_BRIDGE_ADDRESS;
+    return resolveBridgeAddressForChainKey(sourceChain);
+  }, [sourceChain]);
 
   // Stealth mode state
   const [stealthMode, setStealthMode] = useState(null); // null = checking, true = stealth, false = direct
@@ -63,8 +104,10 @@ export default function CrossChainPaymentPage() {
 
   // Scanning State
   const [scanning, setScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(null); // { scannedBlocks, totalBlocks, startBlock, endBlock, chunkSize }
   const [scannedPayments, setScannedPayments] = useState([]);
   const [withdrawing, setWithdrawing] = useState(null); // ID of payment being withdrawn
+  const [scanChain, setScanChain] = useState("polygon"); // Default to Polygon since that's where cross-chain payments arrive
 
   // Registration state
   const [isRegistered, setIsRegistered] = useState(false);
@@ -83,7 +126,7 @@ export default function CrossChainPaymentPage() {
       try {
         const { ethers } = await import("ethers");
         const provider = new ethers.BrowserProvider(window.ethereum);
-        const bridgeContract = new ethers.Contract(BRIDGE_ADDRESS, BRIDGE_ABI, provider);
+        const bridgeContract = new ethers.Contract(connectedBridgeAddress, BRIDGE_ABI, provider);
 
         const [spendPubKey, viewingPubKey] = await bridgeContract.getMetaAddress(evmAddress);
         const spendPubKeyHex = ethers.hexlify(spendPubKey);
@@ -104,7 +147,7 @@ export default function CrossChainPaymentPage() {
     }
 
     checkUserRegistration();
-  }, [evmAddress]);
+  }, [evmAddress, connectedBridgeAddress]);
 
   // Register with signature (Deterministic)
   const handleRegisterWithSignature = async () => {
@@ -129,7 +172,7 @@ export default function CrossChainPaymentPage() {
       const keys = deriveKeysFromSignature(signatureHash);
 
       // 3. Register on-chain
-      const bridgeContract = new ethers.Contract(BRIDGE_ADDRESS, BRIDGE_ABI, signer);
+      const bridgeContract = new ethers.Contract(connectedBridgeAddress, BRIDGE_ABI, signer);
       const spendPubKey = `0x${keys.spend.publicKey}`;
       const viewingPubKey = `0x${keys.viewing.publicKey}`;
 
@@ -155,17 +198,23 @@ export default function CrossChainPaymentPage() {
     }
   };
 
-  // Scan for payments
+  // Scan for payments - scans on the SELECTED chain (not necessarily the connected chain)
+  // This is critical for cross-chain payments where funds arrive on destination chain
   const handleScanPayments = async () => {
     if (!evmAddress) return;
+    if (!scanChain) {
+      toast.error("Please select a chain to scan");
+      return;
+    }
 
     setScanning(true);
+    setScanProgress(null);
     setScannedPayments([]);
 
     try {
       const { ethers } = await import("ethers");
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
+      const walletProvider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await walletProvider.getSigner();
 
       // 1. Get keys (either from session or ask to sign)
       let signatureHash = sessionStorage.getItem(`stealth_sig_${evmAddress}`);
@@ -179,40 +228,102 @@ export default function CrossChainPaymentPage() {
 
       const keys = deriveKeysFromSignature(signatureHash);
 
-      // 2. Scan
-      console.log("Scanning for payments...");
+      // 2. Scan on the SELECTED chain (not the connected chain)
+      // This is important for cross-chain payments where you send from Base but receive on Polygon
+      const scanChainConfig = AXELAR_CHAINS[scanChain];
+      if (!scanChainConfig) {
+        throw new Error(`Chain ${scanChain} not configured`);
+      }
+
+      console.log(`Scanning for payments on ${scanChainConfig.name}...`);
+      
+      // Use the selected chain's RPC (not the wallet's connected chain)
+      const scanProvider = new ethers.JsonRpcProvider(scanChainConfig.rpcUrl);
+      const scanBridgeAddress = resolveBridgeAddressForChainKey(scanChain);
+
+      console.log(`Bridge address on ${scanChain}: ${scanBridgeAddress}`);
+
       const payments = await scanStealthPayments({
-        provider,
-        bridgeAddress: BRIDGE_ADDRESS,
+        provider: scanProvider,
+        bridgeAddress: scanBridgeAddress,
         viewingPrivateKey: keys.viewing.privateKey,
         spendPublicKey: keys.spend.publicKey,
-        fromBlock: 0, // In prod, optimize this
+        chainId: scanChainConfig.chainId,
+        onProgress: (scannedBlocks, totalBlocks, meta) => {
+          setScanProgress({
+            scannedBlocks,
+            totalBlocks,
+            startBlock: meta?.startBlock,
+            endBlock: meta?.endBlock,
+            chunkSize: meta?.chunkSize,
+          });
+        },
       });
 
       console.log("Found payments:", payments);
       setScannedPayments(payments);
 
       if (payments.length === 0) {
-        toast("No stealth payments found", { icon: "🔍" });
+        toast(`No stealth payments found on ${scanChainConfig.name}`, { icon: "🔍" });
       } else {
-        toast.success(`Found ${payments.length} payments!`);
+        toast.success(`Found ${payments.length} payments on ${scanChainConfig.name}!`);
       }
 
     } catch (error) {
       console.error("Scanning error:", error);
-      toast.error("Failed to scan payments");
+      toast.error(error?.shortMessage || error?.message || "Failed to scan payments");
     } finally {
       setScanning(false);
     }
   };
 
-  // Withdraw funds
+  // Withdraw funds - IMPORTANT: Must switch wallet to the scan chain first
+  // Because withdrawal requires sending a transaction from the stealth wallet on that chain
   const handleWithdraw = async (payment) => {
     setWithdrawing(payment.txHash);
     const toastId = toast.loading("Initializing withdrawal...");
 
     try {
       const { ethers } = await import("ethers");
+      
+      // Get the chain config for the scan chain (where the payment was found)
+      const withdrawChainConfig = AXELAR_CHAINS[scanChain];
+      if (!withdrawChainConfig) {
+        throw new Error(`Chain ${scanChain} not configured`);
+      }
+
+      // Check if wallet is on the correct chain
+      const currentChainIdHex = await window.ethereum.request({ method: "eth_chainId" });
+      const currentChainId = parseInt(currentChainIdHex, 16);
+      
+      if (currentChainId !== withdrawChainConfig.chainId) {
+        toast.loading(`Switching to ${withdrawChainConfig.name}...`, { id: toastId });
+        
+        // Try to switch chain
+        try {
+          await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x" + withdrawChainConfig.chainId.toString(16) }],
+          });
+        } catch (switchError) {
+          // Chain not added, try to add it
+          if (switchError.code === 4902) {
+            await window.ethereum.request({
+              method: "wallet_addEthereumChain",
+              params: [{
+                chainId: "0x" + withdrawChainConfig.chainId.toString(16),
+                chainName: withdrawChainConfig.name,
+                rpcUrls: [withdrawChainConfig.rpcUrl],
+                nativeCurrency: { name: withdrawChainConfig.gasToken, symbol: withdrawChainConfig.gasToken, decimals: 18 },
+                blockExplorerUrls: [withdrawChainConfig.explorer],
+              }],
+            });
+          } else {
+            throw new Error(`Please switch your wallet to ${withdrawChainConfig.name} to withdraw`);
+          }
+        }
+      }
+
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
 
@@ -233,41 +344,45 @@ export default function CrossChainPaymentPage() {
       // 3. Create stealth wallet connected to provider
       const stealthWallet = new ethers.Wallet(stealthPrivateKey, provider);
 
-      // 4. Resolve Token Address
-      // We need the Axelar Gateway to find the token address for the symbol
-      const bridgeContract = new ethers.Contract(BRIDGE_ADDRESS, BRIDGE_ABI, provider);
-      // Note: BRIDGE_ABI in this file is minimal, we need to ensure it has 'gateway()'
-      // The ABI defined at the top of this file is missing 'gateway()'. 
-      // Let's use the full ABI from the hook if possible, or just add it dynamically.
-      // Actually, we imported GATEWAY_ABI, but we need to call bridge.gateway() first.
-
-      // Let's use a direct call for gateway address since we know the bridge ABI has it
-      // (It was added in the previous steps to the contract)
+      // 4. Resolve Token Address using the SCAN chain's bridge (not connected chain)
+      const withdrawBridgeAddress = resolveBridgeAddressForChainKey(scanChain);
+      
       const bridgeGatewayABI = ["function gateway() external view returns (address)"];
-      const bridgeForGateway = new ethers.Contract(BRIDGE_ADDRESS, bridgeGatewayABI, provider);
+      const bridgeForGateway = new ethers.Contract(withdrawBridgeAddress, bridgeGatewayABI, provider);
       const gatewayAddress = await bridgeForGateway.gateway();
 
-      const gatewayContract = new ethers.Contract(gatewayAddress, GATEWAY_ABI, provider);
-      const tokenAddress = await gatewayContract.tokenAddresses(payment.symbol);
+      let tokenAddress = ethers.ZeroAddress;
+      if (payment.symbol === "ITS_TOKEN") {
+        const itsAddress = withdrawChainConfig.its;
+        const tokenId = getItsTokenId("TUSDC");
 
-      if (tokenAddress === ethers.ZeroAddress) {
-        throw new Error(`Token ${payment.symbol} not found on this chain`);
+        if (!itsAddress || !tokenId) {
+          throw new Error("Missing ITS config to resolve TUSDC address");
+        }
+
+        const its = new ethers.Contract(itsAddress, ITS_READ_ABI, provider);
+        tokenAddress = await its.interchainTokenAddress(tokenId);
+      } else {
+        const gatewayContract = new ethers.Contract(gatewayAddress, GATEWAY_ABI, provider);
+        tokenAddress = await gatewayContract.tokenAddresses(payment.symbol);
       }
 
-      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, stealthWallet); // Connected to stealth wallet
+      if (tokenAddress === ethers.ZeroAddress) {
+        throw new Error(`Token ${payment.symbol} not found on ${withdrawChainConfig.name}`);
+      }
 
-      // 5. Check Stealth Wallet ETH Balance for Gas
+      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, stealthWallet);
+
+      // 5. Check Stealth Wallet native token balance for Gas
       const gasPrice = (await provider.getFeeData()).gasPrice;
-      const gasLimit = 100000n; // Standard ERC20 transfer is ~65k, buffer to 100k
+      const gasLimit = 100000n;
       const gasCost = gasPrice * gasLimit;
 
       const stealthBalance = await provider.getBalance(stealthWallet.address);
 
       if (stealthBalance < gasCost) {
-        toast.loading(`Stealth wallet needs gas. Sending ETH...`, { id: toastId });
+        toast.loading(`Stealth wallet needs gas. Sending ${withdrawChainConfig.gasToken}...`, { id: toastId });
 
-        // Send ETH from Main Wallet -> Stealth Wallet
-        // Add a buffer to gas cost (e.g. 2x) to be safe
         const topUpAmount = gasCost * 2n;
 
         const tx = await signer.sendTransaction({
@@ -282,7 +397,6 @@ export default function CrossChainPaymentPage() {
       // 6. Execute Withdrawal (Stealth -> Main)
       toast.loading("Withdrawing funds...", { id: toastId });
 
-      // Get full token balance to sweep
       const tokenBalance = await tokenContract.balanceOf(stealthWallet.address);
 
       if (tokenBalance === 0n) {
@@ -292,9 +406,8 @@ export default function CrossChainPaymentPage() {
       const withdrawTx = await tokenContract.transfer(evmAddress, tokenBalance);
       await withdrawTx.wait();
 
-      toast.success("Withdrawal complete! Funds sent to your wallet.", { id: toastId });
+      toast.success(`Withdrawal complete on ${withdrawChainConfig.name}!`, { id: toastId });
 
-      // Remove from list or mark as withdrawn
       setScannedPayments(prev => prev.filter(p => p.txHash !== payment.txHash));
 
     } catch (error) {
@@ -317,8 +430,16 @@ export default function CrossChainPaymentPage() {
       setCheckingStealthKeys(true);
       try {
         const { ethers } = await import("ethers");
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const bridgeContract = new ethers.Contract(BRIDGE_ADDRESS, BRIDGE_ABI, provider);
+
+        // Prefer RPC provider for the selected source chain so we can read even if the wallet
+        // is currently on a different network.
+        const srcCfg = AXELAR_CHAINS[sourceChain];
+        const provider =
+          srcCfg?.rpcUrl
+            ? new ethers.JsonRpcProvider(srcCfg.rpcUrl)
+            : new ethers.BrowserProvider(window.ethereum);
+
+        const bridgeContract = new ethers.Contract(sourceBridgeAddress, BRIDGE_ABI, provider);
 
         const [spendPubKey, viewingPubKey] = await bridgeContract.getMetaAddress(recipientAddress);
 
@@ -350,11 +471,18 @@ export default function CrossChainPaymentPage() {
     // Debounce the check
     const timer = setTimeout(checkStealthKeys, 500);
     return () => clearTimeout(timer);
-  }, [recipientAddress]);
+  }, [recipientAddress, sourceBridgeAddress, sourceChain]);
 
   // Fetch available tokens when chains change
   useEffect(() => {
     async function fetchTokens() {
+      // In Privacy Pool mode, token choice is fixed and does not depend on Axelar gateway assets.
+      if (isPrivacyRoute && transferMode === "pool") {
+        setAvailableTokens([POOL_FIXED_TOKEN]);
+        setSelectedToken(POOL_FIXED_TOKEN.symbol);
+        return;
+      }
+
       if (!sourceChain || !destinationChain) {
         setAvailableTokens(FALLBACK_TOKENS);
         return;
@@ -382,7 +510,20 @@ export default function CrossChainPaymentPage() {
     }
 
     fetchTokens();
-  }, [sourceChain, destinationChain]);
+  }, [sourceChain, destinationChain, isPrivacyRoute, transferMode]);
+
+  const tokenOptions = availableTokens;
+
+  useEffect(() => {
+    if (!isPrivacyRoute) {
+      setTransferMode("direct");
+      setModeManuallySelected(false);
+      return;
+    }
+    if (!modeManuallySelected) {
+      setTransferMode("pool");
+    }
+  }, [isPrivacyRoute, modeManuallySelected]);
 
   // Check if MetaMask is connected on mount
   useEffect(() => {
@@ -450,11 +591,14 @@ export default function CrossChainPaymentPage() {
     }
   };
 
-  const switchToSepolia = async () => {
+  const switchToChain = async (targetChainKey) => {
+    const cfg = AXELAR_CHAINS[targetChainKey];
+    if (!cfg) throw new Error("Unknown chain");
+    const chainIdHex = "0x" + cfg.chainId.toString(16);
     try {
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
-        params: [{ chainId: "0xaa36a7" }], // Sepolia chainId
+        params: [{ chainId: chainIdHex }],
       });
     } catch (err) {
       // Chain not added, add it
@@ -462,18 +606,24 @@ export default function CrossChainPaymentPage() {
         await window.ethereum.request({
           method: "wallet_addEthereumChain",
           params: [{
-            chainId: "0xaa36a7",
-            chainName: "Sepolia Testnet",
-            rpcUrls: ["https://ethereum-sepolia-rpc.publicnode.com"],
-            nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-            blockExplorerUrls: ["https://sepolia.etherscan.io"],
+            chainId: chainIdHex,
+            chainName: cfg.name,
+            rpcUrls: [cfg.rpcUrl],
+            nativeCurrency: { name: cfg.gasToken, symbol: cfg.gasToken, decimals: 18 },
+            blockExplorerUrls: [cfg.explorer],
           }],
         });
       }
     }
   };
 
-  const isOnSepolia = chainId === 11155111;
+  const requiredSourceChainId = sourceChain ? AXELAR_CHAINS[sourceChain]?.chainId : null;
+  const isOnSourceChain = requiredSourceChainId ? chainId === requiredSourceChainId : false;
+
+  const handleTransferModeChange = (mode) => {
+    setTransferMode(mode);
+    setModeManuallySelected(true);
+  };
 
   // Get all available chains
   const availableChains = useMemo(() => {
@@ -487,8 +637,21 @@ export default function CrossChainPaymentPage() {
 
   // Handle gas estimation
   const handleEstimateGas = async () => {
+    // Validation
     if (!sourceChain || !destinationChain) {
       toast.error("Select source and destination chains");
+      return;
+    }
+    if (!selectedToken) {
+      toast.error("Please select a token first");
+      return;
+    }
+    if (!amount || parseFloat(amount) <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+    if (!recipientAddress) {
+      toast.error("Please enter recipient address");
       return;
     }
 
@@ -497,7 +660,13 @@ export default function CrossChainPaymentPage() {
       const estimate = await estimateGas({ sourceChain, destinationChain });
       toast.success(`Gas estimated: ${(Number(estimate) / 1e18).toFixed(6)} ETH`);
     } catch (err) {
-      toast.error("Failed to estimate gas");
+      console.error("Gas estimation error:", err);
+      const errorMsg = err?.message || "Failed to estimate gas";
+      if (errorMsg.includes("OVERFLOW")) {
+        toast.error("Amount too large or calculation overflow. Try a smaller amount.");
+      } else {
+        toast.error(errorMsg);
+      }
     } finally {
       setEstimatingGas(false);
     }
@@ -509,8 +678,8 @@ export default function CrossChainPaymentPage() {
       toast.error("Please connect your MetaMask wallet first");
       return;
     }
-    if (!isOnSepolia) {
-      toast.error("Please switch to Sepolia network");
+    if (!isOnSourceChain) {
+      toast.error("Please switch wallet to the selected source chain");
       return;
     }
     if (!sourceChain || !destinationChain) {
@@ -523,6 +692,11 @@ export default function CrossChainPaymentPage() {
     }
     if (!amount || parseFloat(amount) <= 0) {
       toast.error("Enter a valid amount");
+      return;
+    }
+
+    if (isPrivacyRoute && transferMode === "pool") {
+      toast("Use the privacy pool controls below to deposit & bridge", { icon: "🔒" });
       return;
     }
 
@@ -578,6 +752,12 @@ export default function CrossChainPaymentPage() {
 
   // Tabs state
   const [activeTab, setActiveTab] = useState("send");
+
+  // Default route for your current testing goal: Base Sepolia -> Polygon Sepolia.
+  useEffect(() => {
+    if (!sourceChain) setSourceChain("base");
+    if (!destinationChain) setDestinationChain("polygon");
+  }, [sourceChain, destinationChain]);
 
   return (
     <div className="flex flex-col items-center w-full min-h-screen bg-white py-6 px-4 pb-24">
@@ -655,7 +835,7 @@ export default function CrossChainPaymentPage() {
                       </CardBody>
                     </Card>
             ) : (
-                    <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 shadow-lg">
+            <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-indigo-200 shadow-lg">
                       <CardBody className="p-4">
                 <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -669,16 +849,20 @@ export default function CrossChainPaymentPage() {
                     </p>
                   </div>
                           </div>
-                    {!isOnSepolia && (
+                  <div className="flex items-center gap-2">
+                    {!isOnSourceChain && sourceChain && (
                       <Button
                         size="sm"
-                              className="bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-md"
-                        onClick={switchToSepolia}
+                        color="warning"
+                        variant="flat"
+                        onClick={() => switchToChain(sourceChain)}
+                        className="rounded-lg"
                       >
-                        Switch to Sepolia
+                        Switch Wallet
                       </Button>
                     )}
                   </div>
+                </div>
                       </CardBody>
                     </Card>
             )}
@@ -711,8 +895,11 @@ export default function CrossChainPaymentPage() {
                                   )}
                   <Select
                                     placeholder="Select source chain"
-                    selectedKeys={sourceChain ? [sourceChain] : []}
-                    onSelectionChange={(keys) => setSourceChain(Array.from(keys)[0])}
+                    selectedKeys={sourceChain ? new Set([sourceChain]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === "all") return;
+                      setSourceChain(Array.from(keys)[0]);
+                    }}
                     variant="bordered"
                     classNames={{
                                       trigger: "h-12 rounded-xl bg-white/90 border-2 border-gray-200 flex-1",
@@ -757,8 +944,11 @@ export default function CrossChainPaymentPage() {
                                   )}
                   <Select
                                     placeholder="Select destination chain"
-                    selectedKeys={destinationChain ? [destinationChain] : []}
-                    onSelectionChange={(keys) => setDestinationChain(Array.from(keys)[0])}
+                    selectedKeys={destinationChain ? new Set([destinationChain]) : new Set()}
+                    onSelectionChange={(keys) => {
+                      if (keys === "all") return;
+                      setDestinationChain(Array.from(keys)[0]);
+                    }}
                     variant="bordered"
                     isDisabled={!sourceChain}
                     classNames={{
@@ -810,17 +1000,20 @@ export default function CrossChainPaymentPage() {
                               )}
                 <Select
                   placeholder={loadingTokens ? "Loading tokens..." : "Select token"}
-                  selectedKeys={selectedToken ? [selectedToken] : []}
-                  onSelectionChange={(keys) => setSelectedToken(Array.from(keys)[0])}
+                  selectedKeys={selectedToken ? new Set([selectedToken]) : new Set()}
+                  onSelectionChange={(keys) => {
+                    if (keys === "all") return;
+                    setSelectedToken(Array.from(keys)[0]);
+                  }}
                   variant="bordered"
                   classNames={{
                                   trigger: "h-12 rounded-xl bg-white/90 border-2 border-gray-200 flex-1",
                                   value: "text-foreground flex items-center font-semibold text-sm",
                   }}
                   disallowEmptySelection
-                  isDisabled={loadingTokens}
+                  isDisabled={loadingTokens || (isPrivacyRoute && transferMode === "pool")}
                 >
-                  {availableTokens.map((token) => (
+                  {tokenOptions.map((token) => (
                     <SelectItem key={token.symbol} textValue={token.symbol}>
                       <div className="flex items-center gap-2">
                                       <img src="/assets/usdc.png" alt={token.symbol} className="w-5 h-5 rounded-full" />
@@ -892,6 +1085,64 @@ export default function CrossChainPaymentPage() {
                           </Card>
                   )}
                 </div>
+
+                {isPrivacyRoute && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[0.65rem] uppercase tracking-[0.3em] text-gray-500 font-semibold">
+                      Transfer Mode
+                    </p>
+                    <div className="flex bg-gray-100 rounded-xl p-1 text-sm">
+                      <button
+                        type="button"
+                        onClick={() => handleTransferModeChange("pool")}
+                        className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${transferMode === "pool" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        Privacy Pool
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleTransferModeChange("direct")}
+                        className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${transferMode === "direct" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        Direct Bridge
+                      </button>
+                    </div>
+                    <div className="text-xs text-gray-600 space-y-1 leading-snug">
+                      <p><strong className="font-semibold">Privacy Pool:</strong> spend from the shared Base pool; the bridge originates from the contract, not your wallet.</p>
+                      <p><strong className="font-semibold">Direct Bridge:</strong> standard Axelar send; quicker, but the source wallet is public.</p>
+                    </div>
+                  </div>
+                )}
+
+                {isPrivacyRoute && transferMode === "pool" && (
+                  <div className="rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/70 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-indigo-900">🔒 Privacy Pool Controls</p>
+                        <p className="text-xs text-indigo-800">Deposit fixed 10&nbsp;TUSDC notes and withdraw when you’re ready.</p>
+                      </div>
+                      <Chip color="primary" variant="flat" size="sm">Base → Polygon</Chip>
+                    </div>
+                    <div className="text-xs text-indigo-900 leading-relaxed space-y-1">
+                      <p><strong className="font-semibold">How it works:</strong></p>
+                      <ol className="list-decimal list-inside space-y-1 ml-3">
+                        <li>Deposit to join the anonymity set.</li>
+                        <li>Wait for more deposits (optional but improves privacy).</li>
+                        <li>Withdraw with a ZK proof; Axelar bridge call originates from the pool.</li>
+                      </ol>
+                      <p><strong className="font-semibold">Tip:</strong> Waiting &gt;= 24h and/or multiple deposits increases privacy.</p>
+                    </div>
+                    <AxelarPrivacyPoolPanel
+                      evmAddress={evmAddress}
+                      chainId={chainId}
+                      sourceChainKey={sourceChain}
+                      destinationChainKey={destinationChain}
+                      recipientAddress={recipientAddress}
+                      recipientMetaAddress={recipientMetaAddress}
+                      connectedBridgeAddress={sourceBridgeAddress}
+                    />
+                  </div>
+                )}
 
                 {/* Amount */}
                       <div className="space-y-2">
@@ -1022,7 +1273,7 @@ export default function CrossChainPaymentPage() {
                 <Button
                   onClick={handleSendPayment}
                   isLoading={loading}
-                  isDisabled={!evmAddress || !isOnSepolia || !sourceChain || !destinationChain || !recipientAddress || !amount || isProcessing}
+                  isDisabled={!evmAddress || !isOnSourceChain || !sourceChain || !destinationChain || !recipientAddress || !amount || isProcessing}
                           className="w-full h-14 font-bold text-white shadow-xl hover:scale-[1.01] transition-all"
                           style={{ backgroundColor: '#0d08e3' }}
                   size="lg"
@@ -1117,6 +1368,57 @@ export default function CrossChainPaymentPage() {
                     </Card>
                 )}
 
+                {/* Chain Selection for Scanning */}
+                {evmAddress && (
+                  <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 shadow-lg">
+                    <CardBody className="p-4">
+                      <div className="flex items-start gap-3 mb-3">
+                        <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-bold text-amber-900">Important: Select Destination Chain</p>
+                          <p className="text-xs text-amber-700 mt-1">
+                            Cross-chain payments arrive on the <strong>destination chain</strong>. 
+                            If you sent from Base → Polygon, scan on <strong>Polygon</strong>.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <Select
+                            label="Scan on chain"
+                            placeholder="Select chain to scan"
+                            selectedKeys={scanChain ? new Set([scanChain]) : new Set()}
+                            onSelectionChange={(keys) => {
+                              if (keys === "all") return;
+                              setScanChain(Array.from(keys)[0]);
+                            }}
+                            variant="bordered"
+                            size="sm"
+                            classNames={{
+                              trigger: "h-12 rounded-xl bg-white border-2 border-amber-300",
+                              value: "font-semibold",
+                            }}
+                          >
+                            {availableChains.map((chain) => (
+                              <SelectItem key={chain.key} textValue={chain.name}>
+                                <div className="flex items-center gap-2">
+                                  {chain.image && (
+                                    <img src={chain.image} alt={chain.name} className="w-5 h-5 rounded-full" />
+                                  )}
+                                  <span>{chain.name}</span>
+                                  {chain.key === "polygon" && (
+                                    <Chip size="sm" color="success" variant="flat" className="ml-auto">Recommended</Chip>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </Select>
+                        </div>
+                      </div>
+                    </CardBody>
+                  </Card>
+                )}
+
                 {/* Scan Button */}
                   {evmAddress && (
                 <Button
@@ -1134,9 +1436,19 @@ export default function CrossChainPaymentPage() {
                       onMouseEnter={(e) => !scanning && (e.currentTarget.style.backgroundColor = '#0a06b8')}
                       onMouseLeave={(e) => !scanning && (e.currentTarget.style.backgroundColor = '#0d08e3')}
                 >
-                  {scanning ? "Scanning Blockchain..." : "Scan for Payments"}
+                  {scanning ? `Scanning ${AXELAR_CHAINS[scanChain]?.name || 'Blockchain'}...` : `Scan on ${AXELAR_CHAINS[scanChain]?.name || 'Selected Chain'}`}
                 </Button>
                   )}
+                  {scanning && scanProgress?.totalBlocks ? (
+                    <div className="text-center text-xs text-gray-600 -mt-2">
+                      Scanning {AXELAR_CHAINS[scanChain]?.name} blocks{" "}
+                      <span className="font-mono">
+                        {scanProgress.startBlock ?? "?"}-{scanProgress.endBlock ?? "?"}
+                      </span>{" "}
+                      ({scanProgress.scannedBlocks}/{scanProgress.totalBlocks}
+                      {scanProgress.chunkSize ? `, chunk ${scanProgress.chunkSize}` : ""})
+                    </div>
+                  ) : null}
 
                 {/* Results List */}
                 {scannedPayments.length > 0 && (
@@ -1158,7 +1470,7 @@ export default function CrossChainPaymentPage() {
                                 </div>
                                 <div>
                                   <span className="font-extrabold text-3xl text-gray-900 block mb-2">
-                                    {(Number(payment.amount) / 1e6).toFixed(6)} {payment.symbol}
+                                    {(Number(payment.amount) / 1e6).toFixed(6)} {payment.symbol === "ITS_TOKEN" ? "TUSDC" : payment.symbol}
                             </span>
                                   <div className="flex items-center gap-3">
                                     <Chip size="md" color="success" variant="flat" className="h-auto py-1.5">
