@@ -1,0 +1,18 @@
+[package]
+name = "addchain-arcium-fork"
+description = "Generate addition chains (Arcium fork)"
+version = "0.2.1"
+edition = "2018"
+license = "MIT OR Apache-2.0"
+homepage = "https://www.arcium.com"
+readme = "README.md"
+repository = "https://github.com/arcium-hq/addchain"
+categories = ["algorithms", "cryptography"]
+
+[badges]
+maintenance = { status = "experimental" }
+
+[dependencies]
+num-bigint = "0.3"
+num-integer = "0.1"
+num-traits = "0.2"

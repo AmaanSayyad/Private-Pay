@@ -1,0 +1,92 @@
+name: 'Setup Arcium'
+description: 'Install Arcium, Anchor, Solana CLI tools, Node.js, and Docker.'
+branding:
+  icon: play
+  color: purple
+inputs:
+  node-version:
+    description: 'Version of node.js to use'
+    required: false
+    default: '20.18.0'
+  solana-cli-version:
+    description: 'Version of Solana CLI to use. Must be greater than 2.0'
+    required: false
+    default: '2.3.0'
+  anchor-version:
+    description: 'Version of Anchor to use'
+    required: false
+    default: '0.32.1'
+  arcium-version:
+    description: 'Version of Arcium to use'
+    required: false
+    default: '0.5.1'
+  runner-arch-os:
+    description: 'Architecture and operating system of the runner. Options: x86_64_linux, aarch64_macos'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+    - name: Cache Solana CLI tools
+      uses: actions/cache@v4
+      id: cache-solana-cli-tools
+      with:
+        path: |
+          ~/.cache/solana/
+          ~/.local/share/solana/
+        key: solana-cli-${{ runner.os }}-build-${{ inputs.solana-cli-version }}
+    - name: Install Solana CLI tools
+      run: |
+        if [[ "${{ inputs.solana-cli-version }}" == 1* ]]; then
+          echo "solana-cli-version < 2.0 is not supported by this action." >&2
+          exit 1
+        else
+          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ inputs.solana-cli-version }}/install)"
+        fi
+      shell: bash
+      if: steps.cache-solana-cli-tools.outputs.cache-hit != 'true'
+    - name: Set Solana CLI tools path
+      run: |
+        echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+      shell: bash
+    - name: Generate Solana keypair in default loc
+      run: solana-keygen new -s --no-bip39-passphrase --force
+      shell: bash
+    - uses: actions/cache/restore@v4
+      name: Restore Anchor CLI cache
+      id: cache-anchor-cli
+      with:
+        path: |
+          ~/.cargo/bin/anchor
+        key: anchor-cli-${{ runner.os }}-build-${{ inputs.anchor-version }}
+    - name: Install Linux build dependencies
+      if: runner.os == 'Linux' && steps.cache-anchor-cli.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential pkg-config libudev-dev libssl-dev
+      shell: bash
+    - name: Install Anchor CLI
+      run: cargo install --git https://github.com/solana-foundation/anchor --tag v${{ inputs.anchor-version }} anchor-cli --locked --force
+      shell: bash
+      if: steps.cache-anchor-cli.outputs.cache-hit != 'true'
+    - uses: actions/cache/save@v4
+      name: Save Anchor CLI cache
+      if: steps.cache-anchor-cli.outputs.cache-hit != 'true'
+      with:
+        path: |
+          ~/.cargo/bin/anchor
+        key: anchor-cli-${{ runner.os }}-build-${{ inputs.anchor-version }}
+    - name: Install yarn
+      run: npm i -g yarn
+      shell: bash
+    - name: Install Arcup
+      run: |
+        curl "https://bin.arcium.com/download/arcup_${{ inputs.runner-arch-os }}_${{ inputs.arcium-version }}" -o ~/.cargo/bin/arcup 
+        chmod +x ~/.cargo/bin/arcup
+      shell: bash
+    - name: Install Arcium
+      run: |
+        arcup install ${{ inputs.arcium-version }}
+      shell: bash
