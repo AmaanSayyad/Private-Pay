@@ -14,6 +14,7 @@ import * as bip39 from 'bip39';
 import { derivePath } from 'ed25519-hd-key';
 import nacl from 'tweetnacl';
 import { Keypair } from '@solana/web3.js';
+import { ethers } from 'ethers';
 
 /**
  * Derive Solana keypair from BIP39 mnemonic
@@ -65,8 +66,9 @@ export function deriveAztecKeys(mnemonic) {
         const seed = bip39.mnemonicToSeedSync(mnemonic);
 
         // Aztec uses a custom derivation path
-        // For now, using a similar BIP44 structure
-        const path = "m/44'/60'/0'/0/0"; // Using Ethereum's coin type as placeholder
+        // For now, using a similar BIP44 structure  
+        // NOTE: ed25519-hd-key requires ALL segments to be hardened
+        const path = "m/44'/60'/0'/0'"; // Using Ethereum's coin type as placeholder
 
         // Derive key from path
         const derivedSeed = derivePath(path, seed.toString('hex')).key;
@@ -120,14 +122,44 @@ export function deriveMinaKeys(mnemonic) {
 }
 
 /**
+ * Derive Ethereum keypair from BIP39 mnemonic
+ * Uses BIP44 path: m/44'/60'/0'/0/0
+ */
+export function deriveEthereumKeys(mnemonic) {
+    try {
+        // Validate mnemonic
+        if (!bip39.validateMnemonic(mnemonic)) {
+            throw new Error('Invalid mnemonic phrase');
+        }
+
+        // BIP44 derivation path for Ethereum
+        // m/44'/60'/0'/0/0 (60 is Ethereum's coin type)
+        const path = "m/44'/60'/0'/0/0";
+
+        // Create HD wallet from mnemonic with path directly
+        const wallet = ethers.HDNodeWallet.fromPhrase(mnemonic, undefined, path);
+
+        return {
+            address: wallet.address,
+            publicKey: wallet.publicKey,
+            privateKey: wallet.privateKey,
+        };
+    } catch (error) {
+        console.error('Failed to derive Ethereum keys:', error);
+        throw error;
+    }
+}
+
+/**
  * Derive all chain keys from a single mnemonic
- * Returns keys for Solana, Aztec, and Mina
+ * Returns keys for Solana, Aztec, Mina, and Ethereum
  */
 export function deriveAllChainKeys(mnemonic) {
     return {
         solana: deriveSolanaKeypair(mnemonic),
         aztec: deriveAztecKeys(mnemonic),
         mina: deriveMinaKeys(mnemonic),
+        ethereum: deriveEthereumKeys(mnemonic),
     };
 }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import ReceiveModal from "../components/unstoppable/ReceiveModal";
 import {
   Button,
   Card,
@@ -42,6 +43,8 @@ import {
   Settings,
   Sparkles,
   Zap,
+  ExternalLink,
+  Send,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -77,6 +80,11 @@ export default function UnstoppableDashboard() {
     solanaPublicKey,
     aztecAddress,
     minaPublicKey,
+    ethereumAddress,
+    // Transaction history
+    txHistory,
+    // Send transaction
+    sendTransaction,
   } = useUnstoppable();
 
   // Modals
@@ -84,6 +92,8 @@ export default function UnstoppableDashboard() {
   const { isOpen: isImportOpen, onOpen: onImportOpen, onClose: onImportClose } = useDisclosure();
   const { isOpen: isBackupOpen, onOpen: onBackupOpen, onClose: onBackupClose } = useDisclosure();
   const { isOpen: isUnlockOpen, onOpen: onUnlockOpen, onClose: onUnlockClose } = useDisclosure();
+  const { isOpen: isSendOpen, onOpen: onSendOpen, onClose: onSendClose } = useDisclosure();
+  const { isOpen: isReceiveOpen, onOpen: onReceiveOpen, onClose: onReceiveClose } = useDisclosure();
 
   // Form state
   const [password, setPassword] = useState("");
@@ -92,6 +102,12 @@ export default function UnstoppableDashboard() {
   const [newMnemonic, setNewMnemonic] = useState("");
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
+
+  // Send transaction form state
+  const [sendChain, setSendChain] = useState("Solana");
+  const [sendRecipient, setSendRecipient] = useState("");
+  const [sendAmount, setSendAmount] = useState("");
+  const [isSending, setIsSending] = useState(false);
 
   // Check password strength
   useEffect(() => {
@@ -165,6 +181,33 @@ export default function UnstoppableDashboard() {
     toast.success(`${label} copied!`);
   };
 
+  // Handle send transaction
+  const handleSend = async () => {
+    if (!sendRecipient.trim()) {
+      toast.error("Please enter recipient address");
+      return;
+    }
+    if (!sendAmount || parseFloat(sendAmount) <= 0) {
+      toast.error("Please enter valid amount");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      await sendTransaction(sendChain, sendRecipient, parseFloat(sendAmount));
+
+      // Reset form
+      setSendRecipient("");
+      setSendAmount("");
+      onSendClose();
+    } catch (error) {
+      console.error("Send failed:", error);
+      // Error toast is already shown by sendTransaction function
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   // Get privacy score color
   const getScoreColor = (score) => {
     if (score >= 75) return "success";
@@ -209,6 +252,24 @@ export default function UnstoppableDashboard() {
                     <span className="font-bold" style={{ color: '#0d08e3' }}>{privacyScore}%</span>
                   </div>
                 </Tooltip>
+                <Button
+                  variant="bordered"
+                  className="font-semibold border-2"
+                  style={{ borderColor: '#0d08e3', color: '#0d08e3' }}
+                  onClick={onReceiveOpen}
+                >
+                  <Download className="w-4 h-4" />
+                  Receive
+                </Button>
+                <Button
+                  variant="solid"
+                  className="font-semibold text-white"
+                  style={{ backgroundColor: '#0d08e3' }}
+                  onClick={onSendOpen}
+                >
+                  <Send className="w-4 h-4" />
+                  Send
+                </Button>
                 <Button
                   isIconOnly
                   variant="bordered"
@@ -550,6 +611,92 @@ export default function UnstoppableDashboard() {
               </CardBody>
             </Card>
 
+            {/* Transaction History */}
+            <Card className="bg-white border border-gray-200 shadow-sm mb-8">
+              <CardBody className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-gray-900 font-bold text-lg flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5" />
+                    Transaction History
+                    <Chip size="sm" color="primary" variant="flat">
+                      {txHistory?.length || 0}
+                    </Chip>
+                  </h3>
+                </div>
+
+                {txHistory && txHistory.length > 0 ? (
+                  <div className="space-y-3">
+                    {txHistory.map((tx, index) => (
+                      <div
+                        key={tx.hash || index}
+                        className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-primary-300 transition-all"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`px-2 py-1 rounded text-xs font-medium ${tx.chain === 'Solana' ? 'bg-purple-100 text-purple-700' :
+                              tx.chain === 'Ethereum' ? 'bg-indigo-100 text-indigo-700' :
+                                'bg-yellow-100 text-yellow-700'
+                              }`}>
+                              {tx.chain}
+                            </div>
+                            <div className={`px-2 py-1 rounded text-xs font-medium ${tx.status === 'success' || tx.status === 'confirmed'
+                              ? 'bg-green-100 text-green-700'
+                              : tx.status === 'failed'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                              }`}>
+                              {tx.status}
+                            </div>
+                          </div>
+                          {tx.timestamp && (
+                            <p className="text-xs text-gray-500">
+                              {new Date(tx.timestamp).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="text-gray-900 font-mono text-xs truncate flex-1">
+                            {tx.hash}
+                          </p>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            onClick={() => window.open(tx.explorerUrl, '_blank')}
+                          >
+                            <ExternalLink className="w-3 h-3 text-gray-500" />
+                          </Button>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            onClick={() => copyToClipboard(tx.hash, "Transaction Hash")}
+                          >
+                            <Copy className="w-3 h-3 text-gray-500" />
+                          </Button>
+                        </div>
+
+                        {tx.value && (
+                          <p className="text-xs text-gray-600">
+                            Amount: {tx.value} {tx.chain === 'Ethereum' ? 'ETH' : tx.chain === 'Solana' ? 'SOL' : 'ZEC'}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <TrendingUp className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm">No transactions yet</p>
+                    <p className="text-gray-400 text-xs mt-1">
+                      Your transaction history will appear here
+                    </p>
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+
             {/* Privacy Technology Section */}
             <Card className="bg-white border border-gray-200 shadow-sm">
               <CardBody className="p-6">
@@ -625,6 +772,14 @@ export default function UnstoppableDashboard() {
                         isIconOnly
                         size="sm"
                         variant="light"
+                        onClick={() => window.open(`https://blockexplorer.one/zcash/testnet/address/${zcashAddress}`, '_blank')}
+                      >
+                        <ExternalLink className="w-4 h-4 text-gray-500" />
+                      </Button>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="light"
                         onClick={() => copyToClipboard(zcashAddress, "Zcash Address")}
                       >
                         <Copy className="w-4 h-4 text-gray-500" />
@@ -657,7 +812,15 @@ export default function UnstoppableDashboard() {
                             isIconOnly
                             size="sm"
                             variant="light"
-                            onClick={() => copyToClipboard(solanaPublicKey, "Solana Address")}
+                            onClick={() => window.open(`https://solscan.io/account/${solanaPublicKey}?cluster=devnet`, '_blank')}
+                          >
+                            <ExternalLink className="w-3 h-3 text-gray-500" />
+                          </Button>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            onClick={() => copyToClipboard(solanaPublicKey, "Solana Public Key")}
                           >
                             <Copy className="w-3 h-3 text-gray-500" />
                           </Button>
@@ -712,13 +875,50 @@ export default function UnstoppableDashboard() {
                         </div>
                       </div>
                     )}
+
+                    {ethereumAddress && (
+                      <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-6 h-6 rounded bg-indigo-100 flex items-center justify-center">
+                            <span className="text-xs font-bold text-indigo-600">ETH</span>
+                          </div>
+                          <p className="text-indigo-800 text-xs font-medium">Ethereum</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-gray-900 font-mono text-xs truncate flex-1">
+                            {ethereumAddress}
+                          </p>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            onClick={() => window.open(`https://sepolia.etherscan.io/address/${ethereumAddress}`, '_blank')}
+                          >
+                            <ExternalLink className="w-3 h-3 text-gray-500" />
+                          </Button>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            onClick={() => copyToClipboard(ethereumAddress, "Ethereum Address")}
+                          >
+                            <Copy className="w-3 h-3 text-gray-500" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* Shielded Notes */}
                 {shieldedNotes && shieldedNotes.length > 0 && (
                   <div className="mt-4">
-                    <p className="text-gray-500 text-xs mb-2">Shielded Notes ({shieldedNotes.length})</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-gray-500 text-xs">Shielded Notes ({shieldedNotes.length})</p>
+                      <Chip size="sm" className="bg-purple-100 text-purple-700 text-xs">
+                        zk-SNARK
+                      </Chip>
+                    </div>
                     <div className="space-y-2 max-h-32 overflow-y-auto">
                       {shieldedNotes.map((note) => (
                         <div key={note.id} className="flex items-center justify-between p-2 bg-emerald-50 rounded-lg border border-emerald-100">
@@ -767,7 +967,7 @@ export default function UnstoppableDashboard() {
                   </div>
                 </CardBody>
               </Card>
-              
+
               <div>
                 <Input
                   type="password"
@@ -790,8 +990,8 @@ export default function UnstoppableDashboard() {
                     className="h-2"
                   />
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium" style={{ 
-                      color: passwordStrength >= 75 ? '#10b981' : passwordStrength >= 50 ? '#f59e0b' : '#ef4444' 
+                    <p className="text-sm font-medium" style={{
+                      color: passwordStrength >= 75 ? '#10b981' : passwordStrength >= 50 ? '#f59e0b' : '#ef4444'
                     }}>
                       {passwordStrength < 50 ? "🔴 Weak password" : passwordStrength < 75 ? "🟡 Medium password" : "🟢 Strong password"}
                     </p>
@@ -801,7 +1001,7 @@ export default function UnstoppableDashboard() {
                   </div>
                 </div>
               </div>
-              
+
               <Input
                 type="password"
                 label="Confirm Password"
@@ -818,8 +1018,8 @@ export default function UnstoppableDashboard() {
             </div>
           </ModalBody>
           <ModalFooter className="pt-4">
-            <Button 
-              variant="bordered" 
+            <Button
+              variant="bordered"
               className="border-2 font-semibold"
               style={{ borderColor: '#0d08e3', color: '#0d08e3' }}
               onClick={onCreateClose}
@@ -866,7 +1066,7 @@ export default function UnstoppableDashboard() {
                   </div>
                 </CardBody>
               </Card>
-              
+
               <div>
                 <Textarea
                   label="Recovery Phrase"
@@ -888,7 +1088,7 @@ export default function UnstoppableDashboard() {
                   </p>
                 )}
               </div>
-              
+
               <div className="pt-2">
                 <p className="text-sm font-semibold text-gray-700 mb-3">Set a password to encrypt your wallet:</p>
                 <div className="space-y-4">
@@ -923,8 +1123,8 @@ export default function UnstoppableDashboard() {
             </div>
           </ModalBody>
           <ModalFooter className="pt-4">
-            <Button 
-              variant="bordered" 
+            <Button
+              variant="bordered"
               className="border-2 font-semibold"
               style={{ borderColor: '#0d08e3', color: '#0d08e3' }}
               onClick={onImportClose}
@@ -976,13 +1176,12 @@ export default function UnstoppableDashboard() {
               {/* Compact Recovery Phrase Grid */}
               <div className="relative">
                 <div
-                  className={`p-4 bg-white rounded-xl font-mono grid grid-cols-4 gap-2 border-2 shadow-lg transition-all ${
-                    !showMnemonic ? "blur-md select-none border-gray-300" : "border-indigo-300"
-                  }`}
+                  className={`p-4 bg-white rounded-xl font-mono grid grid-cols-4 gap-2 border-2 shadow-lg transition-all ${!showMnemonic ? "blur-md select-none border-gray-300" : "border-indigo-300"
+                    }`}
                 >
                   {(newMnemonic || wallet?.mnemonic || "").split(" ").map((word, i) => (
-                    <div 
-                      key={i} 
+                    <div
+                      key={i}
                       className="flex items-center gap-1.5 p-2 bg-indigo-50 rounded-lg border border-indigo-200"
                     >
                       <span className="text-indigo-400 text-xs font-bold">{i + 1}.</span>
@@ -1075,7 +1274,7 @@ export default function UnstoppableDashboard() {
                   </div>
                 </CardBody>
               </Card>
-              
+
               <Input
                 type="password"
                 label="Password"
@@ -1095,8 +1294,8 @@ export default function UnstoppableDashboard() {
             </div>
           </ModalBody>
           <ModalFooter className="pt-4">
-            <Button 
-              variant="bordered" 
+            <Button
+              variant="bordered"
               className="border-2 font-semibold border-amber-500 text-amber-700"
               onClick={onUnlockClose}
             >
@@ -1113,6 +1312,142 @@ export default function UnstoppableDashboard() {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Send Transaction Modal */}
+      <Modal isOpen={isSendOpen} onClose={onSendClose} size="lg">
+        <ModalContent className="bg-gradient-to-br from-white to-indigo-50">
+          <ModalHeader className="flex flex-col gap-1 pb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md" style={{ backgroundColor: '#0d08e3' }}>
+                <Send className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold" style={{ color: '#0d08e3' }}>Send Transaction</h3>
+                <p className="text-xs text-gray-600 font-normal">Transfer funds to another address</p>
+              </div>
+            </div>
+          </ModalHeader>
+          <ModalBody className="pt-2">
+            <div className="space-y-4">
+              {/* Chain Selector */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-2 block">Select Chain</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    className={`p-4 rounded-xl border-2 transition-all ${sendChain === 'Solana'
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-200 bg-white hover:border-purple-300'
+                      }`}
+                    onClick={() => setSendChain('Solana')}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                        <span className="text-xs font-bold text-purple-600">SOL</span>
+                      </div>
+                      <span className="font-semibold text-gray-900">Solana</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 text-left">Fast & low cost</p>
+                  </button>
+
+                  <button
+                    className={`p-4 rounded-xl border-2 transition-all ${sendChain === 'Ethereum'
+                      ? 'border-indigo-500 bg-indigo-50'
+                      : 'border-gray-200 bg-white hover:border-indigo-300'
+                      }`}
+                    onClick={() => setSendChain('Ethereum')}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                        <span className="text-xs font-bold text-indigo-600">ETH</span>
+                      </div>
+                      <span className="font-semibold text-gray-900">Ethereum</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 text-left">Sepolia testnet</p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Recipient Address */}
+              <Input
+                type="text"
+                label="Recipient Address"
+                placeholder={sendChain === 'Solana' ? 'Enter Solana address...' : 'Enter Ethereum address (0x...)'}
+                value={sendRecipient}
+                onValueChange={setSendRecipient}
+                variant="bordered"
+                size="lg"
+                classNames={{
+                  label: "font-semibold text-gray-700",
+                  input: "font-mono text-sm",
+                }}
+                description={`Enter the ${sendChain} address of the recipient`}
+              />
+
+              {/* Amount */}
+              <Input
+                type="number"
+                label="Amount"
+                placeholder="0.00"
+                value={sendAmount}
+                onValueChange={setSendAmount}
+                variant="bordered"
+                size="lg"
+                classNames={{
+                  label: "font-semibold text-gray-700",
+                  input: "text-lg",
+                }}
+                endContent={
+                  <div className="flex items-center">
+                    <span className="text-default-400 text-sm">
+                      {sendChain === 'Solana' ? 'SOL' : 'ETH'}
+                    </span>
+                  </div>
+                }
+                description="Amount to send (excluding fees)"
+              />
+
+              {/* Info Card */}
+              <Card className="bg-blue-50 border border-blue-200">
+                <CardBody className="p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-blue-600 mt-0.5" />
+                    <div className="text-xs text-blue-800">
+                      <p className="font-semibold mb-1">Transaction Info</p>
+                      <p>• {sendChain === 'Solana' ? 'Network fee: ~0.0001 SOL' : 'Network fee: ~0.001 ETH'}</p>
+                      <p>• {sendChain === 'Solana' ? 'Network: Devnet' : 'Network: Sepolia Testnet'}</p>
+                      <p>• Transaction will be signed with your wallet keys</p>
+                    </div>
+                  </div>
+                </CardBody>
+              </Card>
+            </div>
+          </ModalBody>
+          <ModalFooter className="pt-4">
+            <Button
+              variant="bordered"
+              className="border-2 font-semibold"
+              style={{ borderColor: '#0d08e3', color: '#0d08e3' }}
+              onClick={onSendClose}
+              isDisabled={isSending}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="font-bold text-white shadow-lg"
+              style={{ backgroundColor: '#0d08e3' }}
+              onClick={handleSend}
+              isLoading={isSending}
+              isDisabled={!sendRecipient || !sendAmount || parseFloat(sendAmount) <= 0}
+            >
+              <Send className="w-4 h-4" />
+              Send {sendChain === 'Solana' ? 'SOL' : 'ETH'}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Receive Modal */}
+      <ReceiveModal isOpen={isReceiveOpen} onClose={onReceiveClose} wallet={wallet} />
     </div>
   );
 }

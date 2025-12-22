@@ -18,6 +18,15 @@ import {
 // Import multi-chain key derivation
 import { deriveAllChainKeys } from "../lib/unstoppable/multichain";
 
+// Import balance fetching service
+import { fetchAllBalances, updateAssetsWithBalances } from "../lib/unstoppable/balanceService";
+
+// Import transaction history service
+import { fetchAllTransactions } from "../lib/unstoppable/transactionService";
+
+// Import send transaction service
+import { sendSolanaTransaction, sendEthereumTransaction, validateAddress } from "../lib/unstoppable/sendService";
+
 // Utility functions
 const hexToBytes = (hex) => {
   if (!hex || typeof hex !== 'string') {
@@ -256,6 +265,10 @@ const generateMasterKeys = (mnemonic) => {
       aztecPrivateKey: multiChainKeys?.aztec?.privateKey || null,
       minaPublicKey: multiChainKeys?.mina?.publicKey || null,
       minaPrivateKey: multiChainKeys?.mina?.privateKey || null,
+      // Ethereum
+      ethereumAddress: multiChainKeys?.ethereum?.address || null,
+      ethereumPublicKey: multiChainKeys?.ethereum?.publicKey || null,
+      ethereumPrivateKey: multiChainKeys?.ethereum?.privateKey || null,
     };
   } catch (error) {
     console.error("Error generating master keys:", error);
@@ -297,6 +310,65 @@ export default function UnstoppableProvider({ children }) {
   const [privacyScore, setPrivacyScore] = useState(0);
   const [txHistory, setTxHistory] = useState([]);
 
+  // Balance fetching state
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false);
+
+  // Fetch real balances when wallet is connected
+  useEffect(() => {
+    if (!isConnected || !wallet || isLoadingBalances) return;
+
+    const loadBalances = async () => {
+      try {
+        setIsLoadingBalances(true);
+        console.log('🔄 Fetching real balances from blockchain...');
+        console.log('Wallet has:', {
+          solana: !!wallet.solanaPublicKey,
+          ethereum: !!wallet.ethereumAddress,
+          zcash: !!wallet.zcashAddress,
+        });
+
+        const balances = await fetchAllBalances(wallet);
+        console.log('✅ Balances fetched:', balances);
+
+        setAssets(currentAssets => updateAssetsWithBalances(currentAssets, balances));
+      } catch (error) {
+        console.error('Failed to fetch balances:', error);
+      } finally {
+        setIsLoadingBalances(false);
+      }
+    };
+
+    loadBalances();
+
+    // Refresh balances every 30 seconds
+    const interval = setInterval(loadBalances, 30000);
+    return () => clearInterval(interval);
+  }, [isConnected, wallet, isLoadingBalances]);
+
+  // Fetch real transaction history when wallet is connected
+  useEffect(() => {
+    if (!isConnected || !wallet) return;
+
+    const loadTransactions = async () => {
+      try {
+        console.log('🔄 Fetching transaction history from blockchain...');
+
+        const transactions = await fetchAllTransactions(wallet);
+        console.log('✅ Transactions fetched:', transactions.length);
+
+        setTxHistory(transactions);
+      } catch (error) {
+        console.error('Failed to fetch transactions:', error);
+      }
+    };
+
+    loadTransactions();
+
+    // Refresh transactions every 60 seconds
+    const interval = setInterval(loadTransactions, 60000);
+    return () => clearInterval(interval);
+  }, [isConnected, wallet]);
+
   // Load wallet from encrypted storage
   useEffect(() => {
     const loadWallet = async () => {
@@ -328,6 +400,15 @@ export default function UnstoppableProvider({ children }) {
         createdAt: Date.now(),
         version: 1,
       };
+
+      // Debug: Log what keys were generated
+      console.log('🔑 Wallet keys generated:', {
+        hasZcash: !!keys.zcashAddress,
+        hasSolana: !!keys.solanaPublicKey,
+        hasEthereum: !!keys.ethereumAddress,
+        hasMina: !!keys.minaPublicKey,
+        hasAztec: !!keys.aztecAddress,
+      });
 
       // Encrypt and store
       const encrypted = await encryptData(walletData, userPassword);
@@ -691,6 +772,51 @@ export default function UnstoppableProvider({ children }) {
     }
   }, [shieldedNotes]);
 
+  // Send transaction function
+  const sendTransaction = useCallback(async (chain, toAddress, amount) => {
+    try {
+      if (!wallet) throw new Error("No wallet connected");
+
+      // Validate address
+      if (!validateAddress(toAddress, chain)) {
+        throw new Error(`Invalid ${chain} address`);
+      }
+
+      // Validate amount
+      if (!amount || amount <= 0) {
+        throw new Error("Invalid amount");
+      }
+
+      let txHash;
+
+      if (chain === 'Solana') {
+        txHash = await sendSolanaTransaction(
+          wallet.solanaSecretKey,
+          toAddress,
+          amount,
+          'devnet'
+        );
+        toast.success(`Transaction sent! Hash: ${txHash.substring(0, 8)}...`);
+      } else if (chain === 'Ethereum') {
+        txHash = await sendEthereumTransaction(
+          wallet.ethereumPrivateKey,
+          toAddress,
+          amount,
+          'sepolia'
+        );
+        toast.success(`Transaction sent! Hash: ${txHash.substring(0, 10)}...`);
+      } else {
+        throw new Error(`Sending not supported for ${chain}`);
+      }
+
+      return txHash;
+    } catch (error) {
+      console.error("Failed to send transaction:", error);
+      toast.error(`Failed to send: ${error.message}`);
+      throw error;
+    }
+  }, [wallet]);
+
   const value = useMemo(() => ({
     // Wallet state
     wallet: isLocked ? null : wallet,
@@ -740,11 +866,16 @@ export default function UnstoppableProvider({ children }) {
     isValidZcashAddress,
     createShieldedProof,
 
-    // Multi-chain addresses (Solana, Aztec, Mina)
+    // Multi-chain addresses (Solana, Aztec, Mina, Ethereum)
     solanaPublicKey: wallet?.solanaPublicKey || null,
     solanaSecretKey: wallet?.solanaSecretKey || null,
     aztecAddress: wallet?.aztecAddress || null,
     minaPublicKey: wallet?.minaPublicKey || null,
+    ethereumAddress: wallet?.ethereumAddress || null,
+    ethereumPublicKey: wallet?.ethereumPublicKey || null,
+
+    // Send transaction
+    sendTransaction,
   }), [
     wallet,
     isConnected,
