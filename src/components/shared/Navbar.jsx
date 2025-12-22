@@ -136,6 +136,17 @@ export default function Navbar() {
           <span>Mina</span>
         </Link>
 
+        <Link
+          to={"/fhenix"}
+          className={cnm(
+            "px-2.5 py-2 rounded-full flex items-center gap-1.5 transition-all duration-300 whitespace-nowrap",
+            `${location.pathname.startsWith("/fhenix") ? "bg-primary text-white" : ""}`
+          )}
+        >
+          <Lock className="size-3.5" />
+          <span>Fhenix</span>
+        </Link>
+
         <div className="w-px h-6 bg-black/10 mx-0.5" />
 
         {/* Starknet Group with Dropdown */}

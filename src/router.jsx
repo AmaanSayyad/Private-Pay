@@ -37,6 +37,8 @@ const OsmosisPage = lazy(() => import("./pages/OsmosisPage.jsx"));
 const UnstoppableDashboard = lazy(() => import("./pages/UnstoppableDashboard.jsx"));
 // Solana-Zcash Bridge (Helius-powered)
 const SolanaZcashBridgePage = lazy(() => import("./pages/SolanaZcashBridgePage.jsx"));
+// Fhenix Confidential Payments
+const FhenixPaymentsPage = lazy(() => import("./pages/FhenixPayments.jsx"));
 
 // Loading component
 const PageLoader = () => (
@@ -231,6 +233,11 @@ export const router = createBrowserRouter([
       {
         path: "/solana-zcash-bridge",
         element: <LazyRoute Component={SolanaZcashBridgePage} routeName="Sol-ZEC Bridge" />,
+      },
+      // Fhenix Confidential Payments
+      {
+        path: "/fhenix",
+        element: <LazyRoute Component={FhenixPaymentsPage} routeName="Fhenix Payments" />,
       },
     ],
   },

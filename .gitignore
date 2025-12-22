@@ -48,3 +48,28 @@ hardhat/tools/*.zip
 public/zk/**/*.zkey
 public/zk/**/*.ptau
 # Keep WASM files - they're small enough (~100-200KB)
+
+# Cloned repositories
+zec2eth/
+librustzcash/
+
+# Rust build artifacts
+target/
+Cargo.lock
+**/*.rs.bk
+
+# Additional privacy-focused development
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+private/
+
+# Fhenix FHE artifacts
+fhenix/artifacts/
+fhenix/cache/
+fhenix/typechain-types/
+fhenix/node_modules/
+fhenix/.env
+fhenix/.env.local

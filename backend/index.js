@@ -1,9 +1,11 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { ethers } from 'ethers';
 import { createBridgeOperator } from './services/bridgeOperator.js';
 import { createZECOracle } from './services/oracle.js';
 import { createWebhookRouter, HeliusWebhookHandler } from './services/heliusWebhook.js';
+import { initializeFhenixMint, mintToUser, getContractInfo } from './services/fhenixMint.js';
 
 // Configuration
 const config = {
@@ -76,6 +78,81 @@ async function main() {
       
       app.use('/api', webhookRouter);
       console.log('✅ Helius webhook handler initialized');
+    }
+
+    // Initialize Fhenix Mint Service
+    let fhenixMintService = null;
+    try {
+      fhenixMintService = await initializeFhenixMint();
+      console.log('✅ Fhenix Mint Service initialized');
+    } catch (error) {
+      console.warn('⚠️  Fhenix Mint Service not initialized:', error.message);
+      console.warn('   Set ARBITRUM_TREASURY_PRIVATE_KEY in .env to enable');
+    }
+
+    // Fhenix API routes
+    if (fhenixMintService) {
+      // Mint endpoint
+      app.post('/api/fhenix/mint', async (req, res) => {
+        try {
+          const { address, amount = 100 } = req.body;
+
+          if (!address) {
+            return res.status(400).json({
+              success: false,
+              message: 'Address is required',
+            });
+          }
+
+          if (!ethers.isAddress(address)) {
+            return res.status(400).json({
+              success: false,
+              message: 'Invalid address format',
+            });
+          }
+
+          const result = await mintToUser(address, amount);
+
+          if (result.success) {
+            return res.json({
+              success: true,
+              txHash: result.txHash,
+              message: result.message,
+              blockNumber: result.blockNumber,
+            });
+          } else {
+            return res.status(500).json({
+              success: false,
+              message: result.message,
+            });
+          }
+        } catch (error) {
+          console.error('Mint endpoint error:', error);
+          return res.status(500).json({
+            success: false,
+            message: error.message || 'Internal server error',
+          });
+        }
+      });
+
+      // Contract info endpoint
+      app.get('/api/fhenix/info', async (req, res) => {
+        try {
+          const info = await getContractInfo();
+          return res.json({
+            success: true,
+            ...info,
+          });
+        } catch (error) {
+          console.error('Info endpoint error:', error);
+          return res.status(500).json({
+            success: false,
+            message: error.message || 'Internal server error',
+          });
+        }
+      });
+
+      console.log('✅ Fhenix API routes registered');
     }
 
     // Health check endpoint

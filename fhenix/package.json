@@ -1,0 +1,36 @@
+{
+  "name": "private-pay-fhenix",
+  "version": "0.1.0",
+  "description": "Fhenix CoFHE Hardhat setup for Private-Pay (based on zec2eth/cofhe-hardhat-starter)",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "REPORT_GAS=true hardhat test",
+    "deploy:arb-sepolia": "hardhat deploy --network arb-sepolia --tags FHPAY"
+  },
+  "devDependencies": {
+    "@fhenixprotocol/cofhe-contracts": "^0.0.13",
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.1.1",
+    "@openzeppelin/contracts": "^5.0.0",
+    "@typechain/ethers-v6": "^0.5.0",
+    "@typechain/hardhat": "^9.0.0",
+    "@types/chai": "^4.2.0",
+    "@types/mocha": ">=9.1.0",
+    "@types/node": ">=18.0.0",
+    "chai": "^4.2.0",
+    "cofhe-hardhat-plugin": "^0.3.0",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.4.0",
+    "hardhat": "^2.26.0",
+    "hardhat-deploy": "^1.0.4",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.0",
+    "ts-node": ">=8.0.0",
+    "typechain": "^8.3.0",
+    "typescript": ">=4.5.0"
+  }
+}
+
+

@@ -165,6 +165,16 @@ export const customEvmNetworks =
     ? TESTNET_CHAINS
     : MAINNET_CHAINS;
 
+// Fhenix FHPAY Contract Configuration
+export const FHENIX_CONFIG = {
+  arbitrumSepolia: {
+    chainId: 421614,
+    rpcUrl: import.meta.env.VITE_ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc",
+    blockExplorerUrl: "https://sepolia.arbiscan.io",
+    fhpayContractAddress: "0xf7554dBFdf4633bB4b2c1E708945bB83c9071C12",
+  },
+};
+
 export const CHAINS = [
   // Mainnet Chains
   {
