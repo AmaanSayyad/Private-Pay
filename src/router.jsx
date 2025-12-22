@@ -1,8 +1,9 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
-import { lazy, Suspense } from "react";
+import { createBrowserRouter, Navigate, useLocation } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
 import AuthLayout from "./layouts/AuthLayout.jsx";
 import ErrorPage from "./pages/ErrorPage.jsx";
 import PlainLayout from "./layouts/PlainLayout.jsx";
+import activityLogger from "./lib/activityLogger.js";
 
 // Lazy load pages for code-splitting
 const IndexPage = lazy(() => import("./pages/IndexPage.jsx"));
@@ -44,12 +45,31 @@ const PageLoader = () => (
   </div>
 );
 
-// Wrapper component for lazy-loaded routes
-const LazyRoute = ({ Component }) => (
-  <Suspense fallback={<PageLoader />}>
-    <Component />
-  </Suspense>
-);
+// Wrapper component for lazy-loaded routes with navigation logging
+const LazyRoute = ({ Component, routeName }) => {
+  const location = useLocation();
+  
+  useEffect(() => {
+    // Log route navigation
+    activityLogger.logNavigation(
+      document.referrer || 'unknown',
+      location.pathname,
+      'ReactRouter'
+    );
+    activityLogger.info('RouteLoad', `Loading route: ${routeName || location.pathname}`, {
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+      routeName,
+    });
+  }, [location.pathname, routeName]);
+  
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Component />
+    </Suspense>
+  );
+};
 
 const EXCLUDED_SUBDOMAINS = [
   "www",
@@ -91,7 +111,7 @@ export const router = createBrowserRouter([
     children: [
       {
         path: "/",
-        element: <LazyRoute Component={IndexPage} />,
+        element: <LazyRoute Component={IndexPage} routeName="Dashboard" />,
       },
       {
         path: "/:alias/detail/:parent",
@@ -115,11 +135,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "/payment-links",
-        element: <LazyRoute Component={PaymentLinksPage} />,
+        element: <LazyRoute Component={PaymentLinksPage} routeName="Payment Links" />,
       },
       {
         path: "/transactions",
-        element: <LazyRoute Component={TransactionsPage} />,
+        element: <LazyRoute Component={TransactionsPage} routeName="Transactions" />,
       },
       {
         path: "/main-details",
@@ -140,19 +160,19 @@ export const router = createBrowserRouter([
       // Arcium Private DeFi Routes
       {
         path: "/arcium",
-        element: <LazyRoute Component={ArciumDashboard} />,
+        element: <LazyRoute Component={ArciumDashboard} routeName="Arcium" />,
       },
       {
         path: "/arcium/swap",
-        element: <LazyRoute Component={PrivateSwapPage} />,
+        element: <LazyRoute Component={PrivateSwapPage} routeName="Arcium Swap" />,
       },
       {
         path: "/arcium/darkpool",
-        element: <LazyRoute Component={DarkPoolPage} />,
+        element: <LazyRoute Component={DarkPoolPage} routeName="Arcium DarkPool" />,
       },
       {
         path: "/arcium/payments",
-        element: <LazyRoute Component={PrivatePaymentsPage} />,
+        element: <LazyRoute Component={PrivatePaymentsPage} routeName="Arcium Payments" />,
       },
       // Zcash-Aztec Integration Routes
       {
@@ -161,56 +181,56 @@ export const router = createBrowserRouter([
       },
       {
         path: "/bridge",
-        element: <LazyRoute Component={BridgePage} />,
+        element: <LazyRoute Component={BridgePage} routeName="Bridge" />,
       },
       {
         path: "/mina",
-        element: <LazyRoute Component={MinaPage} />,
+        element: <LazyRoute Component={MinaPage} routeName="Mina" />,
       },
       {
         path: "/zcash",
-        element: <LazyRoute Component={ZcashPage} />,
+        element: <LazyRoute Component={ZcashPage} routeName="Zcash" />,
       },
       {
         path: "/zcash-mina-bridge",
-        element: <LazyRoute Component={ZcashMinaBridgePage} />,
+        element: <LazyRoute Component={ZcashMinaBridgePage} routeName="ZEC-Mina Bridge" />,
       },
       // Starknet Integration Routes
       {
         path: "/starknet",
-        element: <LazyRoute Component={StarknetPage} />,
+        element: <LazyRoute Component={StarknetPage} routeName="Starknet" />,
       },
       {
         path: "/zcash-starknet-bridge",
-        element: <LazyRoute Component={ZcashStarknetBridgePage} />,
+        element: <LazyRoute Component={ZcashStarknetBridgePage} routeName="Zcash-Starknet Bridge" />,
       },
       {
         path: "/ztarknet-lending",
-        element: <LazyRoute Component={ZtarknetLendingPage} />,
+        element: <LazyRoute Component={ZtarknetLendingPage} routeName="Ztarknet Lending" />,
       },
       {
         path: "/ztarknet-swap",
-        element: <LazyRoute Component={ZtarknetSwapPage} />,
+        element: <LazyRoute Component={ZtarknetSwapPage} routeName="Ztarknet Swap" />,
       },
       // Axelar Cross-Chain Payment
       {
         path: "/cross-chain",
-        element: <LazyRoute Component={CrossChainPaymentPage} />,
+        element: <LazyRoute Component={CrossChainPaymentPage} routeName="Axelar" />,
       },
       // Cosmos / Osmosis Integration
       {
         path: "/osmosis",
-        element: <LazyRoute Component={OsmosisPage} />,
+        element: <LazyRoute Component={OsmosisPage} routeName="Osmosis" />,
       },
       // Unstoppable Wallet - Zcash Self-Custody
       {
         path: "/unstoppable",
-        element: <LazyRoute Component={UnstoppableDashboard} />,
+        element: <LazyRoute Component={UnstoppableDashboard} routeName="Unstoppable" />,
       },
       // Solana-Zcash Bridge (Helius-powered)
       {
         path: "/solana-zcash-bridge",
-        element: <LazyRoute Component={SolanaZcashBridgePage} />,
+        element: <LazyRoute Component={SolanaZcashBridgePage} routeName="Sol-ZEC Bridge" />,
       },
     ],
   },
