@@ -4,7 +4,8 @@ pragma solidity ^0.8.0;
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
 
-import { Host, Result } from "@oasisprotocol/sapphire-contracts/contracts/OPL.sol";
+import {Host} from "@oasisprotocol/sapphire-contracts/contracts/OPL.sol";
+import {Result} from "@oasisprotocol/sapphire-contracts/contracts/opl/Endpoint.sol";
 
 import { EthereumUtils } from "@oasisprotocol/sapphire-contracts/contracts/EthereumUtils.sol";
 import { Secp256k1 } from "./Secp256k1.sol";

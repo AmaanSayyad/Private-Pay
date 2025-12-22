@@ -10,7 +10,8 @@ import {Secp256k1} from "./Secp256k1.sol";
 import {EIP155Signer} from "@oasisprotocol/sapphire-contracts/contracts/EIP155Signer.sol";
 import {Subcall} from "@oasisprotocol/sapphire-contracts/contracts/Subcall.sol";
 
-import {Enclave, autoswitch, Result} from "@oasisprotocol/sapphire-contracts/contracts/OPL.sol";
+import {Enclave, autoswitch} from "@oasisprotocol/sapphire-contracts/contracts/OPL.sol";
+import {Result} from "@oasisprotocol/sapphire-contracts/contracts/opl/Endpoint.sol";
 
 interface RemoteContract {
     function example(uint256 test) external;

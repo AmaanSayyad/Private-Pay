@@ -26,7 +26,7 @@ const ITS_TOKENS = {
     decimals: 6,
     address: "0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B",
     tokenManagerAddress: "0x1e2f2E68ea65212Ec6F3D91f39E6B644fE41e29B",
-    deployedChains: ["ethereum-sepolia", "base-sepolia"],
+    deployedChains: ["ethereum-sepolia", "base-sepolia", "polygon-sepolia", "polygon-amoy"],
   },
 };
 
@@ -43,6 +43,18 @@ const ITS_ABI = [
 const TOKEN_MANAGER_ABI = [
   "function interchainTokenId() external view returns (bytes32)",
 ];
+
+function getBridgeAddressForChainKey(chainKey, chainConfig) {
+  const overrides = {
+    base: import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS_BASE_SEPOLIA,
+    polygon: import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS_POLYGON_SEPOLIA,
+  };
+  return (
+    overrides[chainKey] ||
+    chainConfig?.stealthBridge ||
+    import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS
+  );
+}
 
 /**
  * Check if token is a custom ITS token
@@ -186,12 +198,21 @@ export function useAxelarPayment() {
    * Estimate gas for a cross-chain payment
    */
   const estimateGas = useCallback(
-    async ({ sourceChain, destinationChain }) => {
+    async ({ sourceChain, destinationChain, tokenSymbol = null }) => {
       try {
+        const baseMultiplier =
+          Number(import.meta.env.VITE_AXELAR_GAS_MULTIPLIER) ||
+          (import.meta.env.VITE_NETWORK === "mainnet" ? 1.1 : 1.8);
+        const itsMultiplier =
+          Number(import.meta.env.VITE_AXELAR_ITS_GAS_MULTIPLIER) ||
+          (import.meta.env.VITE_NETWORK === "mainnet" ? 1.2 : 3.0);
+        const gasMultiplier = isITSToken(tokenSymbol) ? itsMultiplier : baseMultiplier;
+
         const estimate = await estimateCrossChainGas({
           sourceChain,
           destinationChain,
           gasLimit: 350000, // Higher limit for stealth payment execution
+          gasMultiplier,
         });
 
         setGasEstimate(estimate);
@@ -277,16 +298,45 @@ export function useAxelarPayment() {
         setTxStatus(TX_STATUS.ESTIMATING_GAS);
         console.log("Estimating cross-chain gas...");
 
-        const gasFee = await estimateCrossChainGas({
+        const baseMultiplier =
+          Number(import.meta.env.VITE_AXELAR_GAS_MULTIPLIER) ||
+          (import.meta.env.VITE_NETWORK === "mainnet" ? 1.1 : 1.8);
+        const itsMultiplier =
+          Number(import.meta.env.VITE_AXELAR_ITS_GAS_MULTIPLIER) ||
+          (import.meta.env.VITE_NETWORK === "mainnet" ? 1.2 : 3.0);
+        const gasMultiplier = isITSToken(tokenSymbol) ? itsMultiplier : baseMultiplier;
+
+        const minGasFeeWei = (() => {
+          const raw = isITSToken(tokenSymbol)
+            ? import.meta.env.VITE_AXELAR_MIN_GAS_FEE_WEI_ITS
+            : import.meta.env.VITE_AXELAR_MIN_GAS_FEE_WEI;
+          if (!raw) return 0n;
+          try {
+            return BigInt(String(raw));
+          } catch {
+            return 0n;
+          }
+        })();
+
+        const estimatedGasFeeWei = await estimateCrossChainGas({
           sourceChain,
           destinationChain,
           gasLimit: 350000,
+          gasMultiplier,
         });
+        const gasFeeWei = (() => {
+          try {
+            const n = BigInt(String(estimatedGasFeeWei));
+            return n > minGasFeeWei ? n : minGasFeeWei;
+          } catch {
+            return minGasFeeWei || BigInt(estimatedGasFeeWei);
+          }
+        })();
 
-        console.log("Gas fee estimated:", ethers.formatEther(gasFee), "ETH");
+        console.log("Gas fee estimated:", ethers.formatEther(gasFeeWei), "ETH");
 
         // Step 3: Get contract instances
-        const bridgeAddress = srcChainConfig.stealthBridge || import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS;
+        const bridgeAddress = getBridgeAddressForChainKey(sourceChain, srcChainConfig);
         if (!bridgeAddress) {
           throw new Error(`Axelar bridge address not configured for ${srcChainConfig.name}`);
         }
@@ -394,7 +444,7 @@ export function useAxelarPayment() {
             k,
             tokenId,
             amountInWei,
-            { value: gasFee }
+            { value: gasFeeWei }
           );
 
         } else {
@@ -424,7 +474,7 @@ export function useAxelarPayment() {
             k,
             tokenSymbol,
             amountInWei,
-            { value: gasFee }
+            { value: gasFeeWei }
           );
         }
 

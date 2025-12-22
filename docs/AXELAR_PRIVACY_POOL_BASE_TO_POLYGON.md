@@ -1,0 +1,127 @@
+# Axelar Privacy Pool (Fixed Denomination) — Base Sepolia → Polygon Sepolia
+
+This repo now includes an **Axelar-only “fixed denomination privacy pool”** for stealth payments.
+
+High-level idea:
+- Users **deposit** a fixed amount into `AxelarPrivacyPool` (ERC20).
+- Later, a **relayer** submits a ZK proof to withdraw a note and trigger the Axelar bridge call.
+- The **Axelar send originates from the pool contract**, not the depositor EOA, so the source becomes “one of the pool depositors” (unlinkability within the anonymity set).
+
+This document is a runbook for **Base Sepolia → Polygon Sepolia**.
+
+## Prereqs
+
+- Fund your deployer EOA on **Base Sepolia** and **Polygon Sepolia**.
+- Ensure you have ZK artifacts available locally:
+  - `hardhat/circuits/axelar-pool/build/WithdrawAndBridge_js/WithdrawAndBridge.wasm`
+  - `hardhat/circuits/axelar-pool/build/WithdrawAndBridge_final.zkey`
+
+To make the UI able to prove in-browser, copy those artifacts into `public/`:
+```bash
+bun run sync:axelar-zk
+```
+
+If those files are missing, rebuild them (fast “standard” flow using a ptau):
+```bash
+cd hardhat/circuits/axelar-pool
+../../tools/circom WithdrawAndBridge.circom --r1cs --wasm --sym -o build -l ../../node_modules
+
+cd ../../..
+node node_modules/snarkjs/build/cli.cjs groth16 setup \
+  hardhat/circuits/axelar-pool/build/WithdrawAndBridge.r1cs \
+  hardhat/circuits/axelar-pool/build/powersOfTau28_hez_final_15.ptau \
+  hardhat/circuits/axelar-pool/build/WithdrawAndBridge_0000.zkey
+
+node node_modules/snarkjs/build/cli.cjs zkey contribute \
+  hardhat/circuits/axelar-pool/build/WithdrawAndBridge_0000.zkey \
+  hardhat/circuits/axelar-pool/build/WithdrawAndBridge_final.zkey \
+  --name="local" -v -e="random"
+```
+
+## 1) Configure RPC + deploy key
+
+Set these env vars (example names match `hardhat/hardhat.config.ts`):
+```bash
+export PRIVATE_KEY="0x..."
+export BASE_SEPOLIA_RPC_URL="https://..."
+export POLYGON_AMOY_RPC_URL="https://..."   # used for both polygon-amoy and polygon-sepolia (chainId 80002)
+```
+
+Note: the Hardhat network `polygon-sepolia` is an alias for `polygon-amoy` (same chainId `80002`).
+
+## 2) Deploy AxelarStealthBridge on both chains
+
+```bash
+cd hardhat
+
+bunx hardhat run scripts/deployAxelarBridge.ts --network base-sepolia
+bunx hardhat run scripts/deployAxelarBridge.ts --network polygon-sepolia
+```
+
+This writes `hardhat/deployments/axelar-bridge.json`.
+
+## 3) Set trusted remotes
+
+Run on **each** chain (it reads `axelar-bridge.json` and sets all other deployed chains):
+```bash
+bunx hardhat run scripts/setTrustedRemotes.ts --network base-sepolia
+bunx hardhat run scripts/setTrustedRemotes.ts --network polygon-sepolia
+```
+
+## 4) Deploy the privacy pool on Base Sepolia
+
+### Recommended mode for Base → Polygon testnets: **GMP + aUSDC**
+
+This avoids requiring a custom ITS token deployment on Polygon.
+
+```bash
+export AXELAR_POOL_MODE="GMP"
+export AXELAR_GMP_SYMBOL="aUSDC"
+export AXELAR_POOL_DENOMINATION="10"   # human units; uses token decimals on-chain
+
+bunx hardhat run scripts/axelar-pool/deployAxelarPrivacyPool.ts --network base-sepolia
+```
+
+This writes `hardhat/deployments/axelar-pool.json`.
+
+For the UI, set:
+```bash
+export VITE_AXELAR_PRIVACY_POOL_BASE_SEPOLIA="<deployed pool address>"
+export VITE_AXELAR_BRIDGE_ADDRESS_BASE_SEPOLIA="<base-sepolia bridge address>"
+export VITE_AXELAR_BRIDGE_ADDRESS_POLYGON_SEPOLIA="<polygon-sepolia bridge address>"
+```
+
+## 5) Deposit (creates a note file)
+
+```bash
+export AXELAR_NOTE_OUT="axelar-note-base.json"
+bunx hardhat run scripts/axelar-pool/poolDeposit.ts --network base-sepolia
+```
+
+Keep the note file secret. Anyone with it can withdraw.
+
+## 6) Withdraw + bridge (relayer tx on Base Sepolia)
+
+You need destination stealth parameters (stealth address + ephemeral pubkey/view hint).
+
+```bash
+export AXELAR_NOTE_PATH="axelar-note-base.json"
+export AXELAR_DESTINATION_CHAIN="polygon-sepolia"
+export AXELAR_STEALTH_ADDRESS="0x..."
+export AXELAR_EPHEMERAL_PUBKEY="0x..."    # 33-byte compressed pubkey
+export AXELAR_VIEW_HINT="0x.."            # bytes1
+export AXELAR_K="0"
+export AXELAR_RELAYER_FEE="0.5"           # human units
+export AXELAR_GAS_VALUE_WEI="1000000000000000"  # msg.value passed to Axelar gas service
+
+bunx hardhat run scripts/axelar-pool/poolWithdrawAndBridge.ts --network base-sepolia
+```
+
+You can then track the bridge tx on Axelarscan and verify delivery on Polygon Sepolia.
+
+## Notes / Production considerations
+
+- **Privacy model:** the “source” becomes *the pool contract*. Linkability reduces to “which depositor note was spent”, which the ZK proof hides (within the deposit set).
+- **Relayers:** for real privacy, withdrawals should be submitted by a relayer (not the depositor EOA).
+- **Fixed denomination:** avoid amount correlation by keeping denomination constant per pool.
+- **Licensing:** `hardhat/contracts/axelar-pool/Groth16Verifier.sol` is generated by snarkjs and marked `GPL-3.0`. If this repo needs permissive licensing, you’ll want to swap verifier tooling/templates before shipping.

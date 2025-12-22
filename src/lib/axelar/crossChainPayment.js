@@ -14,6 +14,7 @@ import {
 import {
   AXELAR_CHAINS,
   estimateCrossChainGas,
+  getItsTokenId,
   getSupportedTokens,
   trackTransaction,
 } from "./index";
@@ -22,6 +23,7 @@ import {
 // Full ABI available at: src/abi/AxelarStealthBridge.json
 export const AXELAR_STEALTH_BRIDGE_ABI = [
   "function sendCrossChainStealthPayment(string destinationChain, address stealthAddress, bytes ephemeralPubKey, bytes1 viewHint, uint32 k, string symbol, uint256 amount) external payable",
+  "function sendCrossChainStealthPaymentITS(string destinationChain, address stealthAddress, bytes ephemeralPubKey, bytes1 viewHint, uint32 k, bytes32 tokenId, uint256 amount) external payable",
   "function registerMetaAddress(bytes spendPubKey, bytes viewingPubKey) external",
   "function syncMetaAddress(string destinationChain) external payable",
   "function getMetaAddress(address user) external view returns (bytes spendPubKey, bytes viewingPubKey)",
@@ -35,6 +37,7 @@ export const AXELAR_STEALTH_BRIDGE_ABI = [
 ];
 
 export const ERC20_ABI = [
+  "function transfer(address to, uint256 amount) external returns (bool)",
   "function approve(address spender, uint256 amount) external returns (bool)",
   "function allowance(address owner, address spender) external view returns (uint256)",
   "function balanceOf(address account) external view returns (uint256)",
@@ -44,6 +47,10 @@ export const ERC20_ABI = [
 
 export const GATEWAY_ABI = [
   "function tokenAddresses(string symbol) external view returns (address)",
+];
+
+const ITS_ABI = [
+  "function interchainTokenAddress(bytes32 tokenId) external view returns (address)",
 ];
 
 /**
@@ -100,7 +107,6 @@ export async function prepareCrossChainPayment({
     sourceChain,
     destinationChain,
     gasLimit: 350000,
-    gasLimit: 350000,
     express: true, // Enable GMP Express for faster execution (< 1 min)
   });
 
@@ -131,6 +137,7 @@ export async function executeCrossChainPayment({
     viewHint,
     k,
     gasEstimate,
+    sourceChain,
     destinationChain,
     tokenSymbol,
     amount,
@@ -143,22 +150,44 @@ export async function executeCrossChainPayment({
     signer
   );
 
-  // Get gateway and token addresses
-  const gatewayAddress = await bridgeContract.gateway();
-  const gatewayContract = new ethers.Contract(gatewayAddress, GATEWAY_ABI, signer);
-  const tokenAddress = await gatewayContract.tokenAddresses(tokenSymbol);
+  const signerAddress = await signer.getAddress();
+  const isItsToken = tokenSymbol === "TUSDC" && Boolean(getItsTokenId("TUSDC"));
+  const amountStr = amount?.toString?.() ?? String(amount);
 
-  if (tokenAddress === ethers.ZeroAddress) {
-    throw new Error(`Token ${tokenSymbol} not available on gateway`);
+  let tokenAddress = ethers.ZeroAddress;
+  let decimals = 18;
+  if (isItsToken) {
+    const srcCfg = sourceChain || null;
+    const itsAddress = srcCfg?.its;
+    if (!itsAddress) {
+      throw new Error("Missing InterchainTokenService address for source chain");
+    }
+    const itsContract = new ethers.Contract(itsAddress, ITS_ABI, signer);
+    tokenAddress = await itsContract.interchainTokenAddress(getItsTokenId("TUSDC"));
+    if (tokenAddress === ethers.ZeroAddress) {
+      throw new Error("ITS token address not found for tokenId");
+    }
+    const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+    decimals = await tokenContract.decimals();
+  } else {
+    // Get gateway and token addresses (Gateway tokens)
+    const gatewayAddress = await bridgeContract.gateway();
+    const gatewayContract = new ethers.Contract(gatewayAddress, GATEWAY_ABI, signer);
+    tokenAddress = await gatewayContract.tokenAddresses(tokenSymbol);
+
+    if (tokenAddress === ethers.ZeroAddress) {
+      throw new Error(`Token ${tokenSymbol} not available on gateway`);
+    }
+
+    const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+    decimals = await tokenContract.decimals();
   }
 
   // Get token contract
   const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
-  const decimals = await tokenContract.decimals();
-  const amountInWei = ethers.parseUnits(amount.toString(), decimals);
+  const amountInWei = ethers.parseUnits(amountStr, decimals);
 
   // Check balance
-  const signerAddress = await signer.getAddress();
   const balance = await tokenContract.balanceOf(signerAddress);
 
   if (balance < amountInWei) {
@@ -193,17 +222,28 @@ export async function executeCrossChainPayment({
   const viewHintHex = viewHint.startsWith("0x") ? viewHint : "0x" + viewHint;
   const viewHintByte = viewHintHex.slice(0, 4); // bytes1 = 0x + 2 hex chars
 
-  // Send payment
-  const tx = await bridgeContract.sendCrossChainStealthPayment(
-    destinationChain.axelarName,
-    stealthAddress,
-    ephemeralPubKeyBytes,
-    viewHintByte,
-    k,
-    tokenSymbol,
-    amountInWei,
-    { value: gasEstimate }
-  );
+  // Send payment (Gateway vs ITS)
+  const tx = isItsToken
+    ? await bridgeContract.sendCrossChainStealthPaymentITS(
+        destinationChain.axelarName,
+        stealthAddress,
+        ephemeralPubKeyBytes,
+        viewHintByte,
+        k,
+        getItsTokenId("TUSDC"),
+        amountInWei,
+        { value: gasEstimate }
+      )
+    : await bridgeContract.sendCrossChainStealthPayment(
+        destinationChain.axelarName,
+        stealthAddress,
+        ephemeralPubKeyBytes,
+        viewHintByte,
+        k,
+        tokenSymbol,
+        amountInWei,
+        { value: gasEstimate }
+      );
 
   const receipt = await tx.wait();
 
@@ -311,6 +351,68 @@ function checkViewHintMatch(ephemeralPubKeyHex, viewingPrivateKeyHex, eventViewH
 }
 
 /**
+ * Fully verify a stealth payment by re-deriving the expected stealth address
+ * from (spendPubKey, viewingPrivKey, ephemeralPubKey, k) and comparing.
+ *
+ * This avoids false positives from the 1-byte viewHint filter.
+ */
+function deriveExpectedEvmStealthAddress({
+  spendPublicKeyHex,
+  viewingPrivateKeyHex,
+  ephemeralPubKeyHex,
+  k = 0,
+}) {
+  // Normalize hex inputs
+  const spendPubKey = spendPublicKeyHex?.startsWith("0x")
+    ? spendPublicKeyHex.slice(2)
+    : spendPublicKeyHex;
+  const viewingPrivKey = viewingPrivateKeyHex?.startsWith("0x")
+    ? viewingPrivateKeyHex.slice(2)
+    : viewingPrivateKeyHex;
+  const ephemeralPubKey = ephemeralPubKeyHex?.startsWith("0x")
+    ? ephemeralPubKeyHex.slice(2)
+    : ephemeralPubKeyHex;
+
+  if (!spendPubKey || !viewingPrivKey || !ephemeralPubKey) {
+    throw new Error("Missing keys for stealth address verification");
+  }
+
+  // Compute shared secret (compressed point, 33 bytes)
+  const sharedSecret = secp256k1.getSharedSecret(
+    viewingPrivKey,
+    ephemeralPubKey,
+    true
+  );
+
+  // tweak = sha256(sharedSecret || k) where k is 4 bytes big-endian
+  const kBytes = new Uint8Array(4);
+  const kView = new DataView(kBytes.buffer);
+  kView.setUint32(0, k, false); // big-endian
+
+  const tweakInput = new Uint8Array(sharedSecret.length + 4);
+  tweakInput.set(sharedSecret, 0);
+  tweakInput.set(kBytes, sharedSecret.length);
+  const tweakBytes = sha256(tweakInput);
+
+  // Convert tweak to bigint
+  let tweakBigInt = 0n;
+  for (let i = 0; i < tweakBytes.length; i++) {
+    tweakBigInt = tweakBigInt * 256n + BigInt(tweakBytes[i]);
+  }
+
+  // stealthPubPoint = spendPubPoint + tweak * G
+  const spendPoint = secp256k1.Point.fromHex(spendPubKey);
+  const tweakPoint = secp256k1.Point.BASE.multiply(tweakBigInt);
+  const stealthPubPoint = spendPoint.add(tweakPoint);
+
+  // EVM address = last 20 bytes of keccak256(uncompressed_pubkey[1:])
+  const stealthUncompressed = stealthPubPoint.toRawBytes(false); // 65 bytes (0x04 + x + y)
+  const pubKeyNoPrefix = stealthUncompressed.slice(1);
+  const hashHex = ethers.keccak256(pubKeyNoPrefix); // 0x...
+  return ethers.getAddress("0x" + hashHex.slice(-40));
+}
+
+/**
  * Derive the stealth private key for a matched payment
  * MUST match stealthAddress.js algorithm:
  *   tweak = sha256(sharedSecret || k)
@@ -371,6 +473,161 @@ export function deriveStealthPrivateKey(ephemeralPubKeyHex, viewingPrivateKeyHex
 // Maximum blocks to scan per query to prevent timeout
 const MAX_BLOCK_RANGE = 10000;
 
+const DEFAULT_STEALTH_SCAN_LOOKBACK_BLOCKS = Number(import.meta.env?.VITE_AXELAR_STEALTH_SCAN_LOOKBACK_BLOCKS ?? 90000);
+const DEFAULT_STEALTH_SCAN_REORG_SAFETY_BLOCKS = Number(import.meta.env?.VITE_AXELAR_STEALTH_SCAN_REORG_SAFETY_BLOCKS ?? 20);
+const MIN_SCAN_CHUNK_SIZE = 1000;
+
+function getSafeLocalStorage() {
+  try {
+    if (typeof window === "undefined") return null;
+    return window.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function fingerprintKeyHex(hex) {
+  try {
+    const normalized = hex?.startsWith("0x") ? hex : `0x${hex}`;
+    return ethers.keccak256(normalized).slice(2, 10);
+  } catch {
+    return "unknown";
+  }
+}
+
+function makeStealthScanCheckpointKey({ chainId, bridgeAddress, viewingPrivateKey }) {
+  const addr = (bridgeAddress || "").toLowerCase();
+  const viewerFp = fingerprintKeyHex(viewingPrivateKey);
+  const cid = chainId != null ? String(chainId) : "unknown";
+  return `pp_axelar_stealth_scan_ckpt_v1:${cid}:${addr}:${viewerFp}`;
+}
+
+function readScanCheckpoint(key) {
+  const ls = getSafeLocalStorage();
+  if (!ls) return null;
+  try {
+    const raw = ls.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.lastScannedBlock !== "number") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeScanCheckpoint(key, checkpoint) {
+  const ls = getSafeLocalStorage();
+  if (!ls) return;
+  try {
+    ls.setItem(key, JSON.stringify(checkpoint));
+  } catch {
+    // ignore
+  }
+}
+
+function makeDeployBlockCacheKey({ chainId, address }) {
+  const cid = chainId != null ? String(chainId) : "unknown";
+  return `pp_contract_deploy_block_v1:${cid}:${(address || "").toLowerCase()}`;
+}
+
+function readCachedDeployBlock(key) {
+  const ls = getSafeLocalStorage();
+  if (!ls) return null;
+  try {
+    const raw = ls.getItem(key);
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedDeployBlock(key, blockNumber) {
+  const ls = getSafeLocalStorage();
+  if (!ls) return;
+  try {
+    ls.setItem(key, String(blockNumber));
+  } catch {
+    // ignore
+  }
+}
+
+async function getChainIdSafe(provider) {
+  try {
+    const net = await provider.getNetwork();
+    return Number(net.chainId);
+  } catch {
+    return null;
+  }
+}
+
+function looksLikeBlockRangeError(err) {
+  const msg = (err?.shortMessage || err?.reason || err?.message || "").toLowerCase();
+  if (msg.includes("query exceeds max block range")) return true;
+  if (msg.includes("max block range")) return true;
+  if (msg.includes("block range") && msg.includes("exceed")) return true;
+  const nestedMsg =
+    err?.error?.data?.message ||
+    err?.error?.message ||
+    err?.data?.message ||
+    err?.info?.error?.data?.message ||
+    "";
+  if (String(nestedMsg).toLowerCase().includes("query exceeds max block range")) return true;
+  return false;
+}
+
+async function findContractDeployBlock(provider, address, latestBlock, { maxProbeSteps = 26 } = {}) {
+  // Best-effort: some RPC endpoints do not support historical `eth_getCode` (non-archive),
+  // so this may fail; callers should fall back to a lookback window.
+  const codeAtLatest = await provider.getCode(address, latestBlock);
+  if (!codeAtLatest || codeAtLatest === "0x") return null;
+
+  let high = latestBlock;
+  let low = 0;
+  let steps = 0;
+
+  // Quick narrowing: probe backwards with exponential steps to reduce binary-search calls.
+  let step = 1_000;
+  while (steps < maxProbeSteps) {
+    steps += 1;
+    const probe = Math.max(0, high - step);
+    let code;
+    try {
+      code = await provider.getCode(address, probe);
+    } catch {
+      return null;
+    }
+    if (code && code !== "0x") {
+      high = probe;
+      step *= 2;
+      continue;
+    }
+    low = probe;
+    break;
+  }
+
+  // Binary search between low (no code) and high (code) for first code block.
+  while (low + 1 < high && steps < maxProbeSteps * 3) {
+    steps += 1;
+    const mid = Math.floor((low + high) / 2);
+    let code;
+    try {
+      code = await provider.getCode(address, mid);
+    } catch {
+      return null;
+    }
+    if (code && code !== "0x") {
+      high = mid;
+    } else {
+      low = mid;
+    }
+  }
+
+  return high;
+}
+
 /**
  * Scan for stealth payments that belong to a user
  * Uses view hint for fast filtering, then verifies with full ECDH
@@ -381,9 +638,14 @@ const MAX_BLOCK_RANGE = 10000;
  * @param {string} params.bridgeAddress - Bridge contract address
  * @param {string} params.viewingPrivateKey - User's viewing private key (hex)
  * @param {string} params.spendPublicKey - User's spend public key (hex)
- * @param {number} params.fromBlock - Start block (default: 0)
+ * @param {number} params.fromBlock - Start block (optional; default uses checkpoint/deploy/lookback)
  * @param {string|number} params.toBlock - End block (default: "latest")
  * @param {function} params.onProgress - Optional progress callback (scannedBlocks, totalBlocks)
+ * @param {number} params.chainId - Optional chainId (enables stable per-chain checkpoints)
+ * @param {boolean} params.useCheckpoint - Whether to resume scanning from checkpoint (default: true)
+ * @param {number} params.lookbackBlocks - Fallback lookback window if no checkpoint is available
+ * @param {number} params.reorgSafetyBlocks - Reorg safety margin when resuming (default: 20)
+ * @param {number} params.chunkSize - Initial scan chunk size (auto-reduced on RPC limits)
  * @returns {Promise<Array>} - Array of matching payments
  */
 export async function scanStealthPayments({
@@ -391,9 +653,14 @@ export async function scanStealthPayments({
   bridgeAddress,
   viewingPrivateKey,
   spendPublicKey,
-  fromBlock = 0,
+  fromBlock,
   toBlock = "latest",
   onProgress = null,
+  chainId = null,
+  useCheckpoint = true,
+  lookbackBlocks = DEFAULT_STEALTH_SCAN_LOOKBACK_BLOCKS,
+  reorgSafetyBlocks = DEFAULT_STEALTH_SCAN_REORG_SAFETY_BLOCKS,
+  chunkSize = MAX_BLOCK_RANGE,
 }) {
   if (!viewingPrivateKey) {
     throw new Error("viewingPrivateKey is required for scanning");
@@ -411,20 +678,94 @@ export async function scanStealthPayments({
     endBlock = await provider.getBlockNumber();
   }
 
-  const totalBlocks = endBlock - fromBlock;
+  const resolvedChainId = chainId ?? (await getChainIdSafe(provider));
+
+  let startBlock = null;
+  if (fromBlock != null) {
+    startBlock = Number(fromBlock);
+  }
+
+  // 1) Resume from checkpoint if available (fastest and best UX)
+  if (startBlock == null && useCheckpoint && resolvedChainId != null) {
+    const ckKey = makeStealthScanCheckpointKey({
+      chainId: resolvedChainId,
+      bridgeAddress,
+      viewingPrivateKey,
+    });
+    const ck = readScanCheckpoint(ckKey);
+    if (ck?.lastScannedBlock != null) {
+      startBlock = Math.max(0, ck.lastScannedBlock - reorgSafetyBlocks);
+    }
+  }
+
+  // 2) Try to find deployment block and cache it (best-effort; may fail on non-archive RPCs)
+  if (startBlock == null && resolvedChainId != null) {
+    const deployKey = makeDeployBlockCacheKey({ chainId: resolvedChainId, address: bridgeAddress });
+    const cachedDeploy = readCachedDeployBlock(deployKey);
+    if (cachedDeploy != null) {
+      startBlock = cachedDeploy;
+    } else {
+      try {
+        const deployBlock = await findContractDeployBlock(provider, bridgeAddress, endBlock);
+        if (deployBlock != null) {
+          startBlock = deployBlock;
+          writeCachedDeployBlock(deployKey, deployBlock);
+        }
+      } catch {
+        // ignore; fall back to lookback window
+      }
+    }
+  }
+
+  // 3) Final fallback: bounded lookback to avoid RPC max-range failures
+  if (startBlock == null) {
+    const lookback = Number.isFinite(Number(lookbackBlocks))
+      ? Number(lookbackBlocks)
+      : DEFAULT_STEALTH_SCAN_LOOKBACK_BLOCKS;
+    startBlock = Math.max(0, endBlock - Math.max(1, lookback));
+  }
+
+  if (startBlock > endBlock) return [];
+
+  const totalBlocks = endBlock - startBlock + 1;
   let allEvents = [];
 
+  const ckKey =
+    useCheckpoint && resolvedChainId != null
+      ? makeStealthScanCheckpointKey({ chainId: resolvedChainId, bridgeAddress, viewingPrivateKey })
+      : null;
+
   // Chunk scanning for scalability (prevents RPC timeout on large ranges)
-  for (let start = fromBlock; start <= endBlock; start += MAX_BLOCK_RANGE) {
-    const end = Math.min(start + MAX_BLOCK_RANGE - 1, endBlock);
+  let currentChunkSize = Math.max(MIN_SCAN_CHUNK_SIZE, Number(chunkSize) || MAX_BLOCK_RANGE);
+  const filter = bridgeContract.filters.StealthPaymentReceived();
 
-    const filter = bridgeContract.filters.StealthPaymentReceived();
-    const events = await bridgeContract.queryFilter(filter, start, end);
-    allEvents = allEvents.concat(events);
+  for (let start = startBlock; start <= endBlock; ) {
+    const end = Math.min(start + currentChunkSize - 1, endBlock);
+    try {
+      const events = await bridgeContract.queryFilter(filter, start, end);
+      allEvents = allEvents.concat(events);
 
-    // Report progress if callback provided
-    if (onProgress) {
-      onProgress(end - fromBlock, totalBlocks);
+      if (ckKey) {
+        writeScanCheckpoint(ckKey, {
+          lastScannedBlock: end,
+          updatedAt: Date.now(),
+        });
+      }
+
+      // Report progress if callback provided
+      if (onProgress) {
+        const scanned = end - startBlock + 1;
+        onProgress(scanned, totalBlocks, { startBlock, endBlock, chunkSize: currentChunkSize });
+      }
+
+      start = end + 1;
+    } catch (err) {
+      // Some RPCs enforce a max range; adaptively reduce chunk size and retry.
+      if (looksLikeBlockRangeError(err) && currentChunkSize > MIN_SCAN_CHUNK_SIZE) {
+        currentChunkSize = Math.max(MIN_SCAN_CHUNK_SIZE, Math.floor(currentChunkSize / 2));
+        continue;
+      }
+      throw err;
     }
   }
 
@@ -448,6 +789,19 @@ export async function scanStealthPayments({
       );
 
       if (isMatch) {
+        // Full verification: re-derive expected stealth address and compare
+        const expectedStealthAddress = deriveExpectedEvmStealthAddress({
+          spendPublicKeyHex: spendPublicKey,
+          viewingPrivateKeyHex: viewingPrivateKey,
+          ephemeralPubKeyHex: ephemeralPubKeyHex,
+          k: Number(k),
+        });
+
+        if (expectedStealthAddress.toLowerCase() !== stealthAddress.toLowerCase()) {
+          // False positive from 1-byte view hint (expected occasionally)
+          continue;
+        }
+
         matchingPayments.push({
           stealthAddress,
           amount: amount.toString(),

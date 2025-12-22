@@ -1,0 +1,97 @@
+{
+  "version": "0.1.0",
+  "name": "private_pay",
+  "instructions": [
+    {
+      "name": "init_balance_comp_def",
+      "accounts": [
+        { "name": "payer", "isMut": true, "isSigner": true },
+        { "name": "mxe_account", "isMut": true, "isSigner": false },
+        { "name": "comp_def_account", "isMut": true, "isSigner": false },
+        { "name": "arcium_program", "isMut": false, "isSigner": false },
+        { "name": "system_program", "isMut": false, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_deposit_comp_def",
+      "accounts": [
+        { "name": "payer", "isMut": true, "isSigner": true },
+        { "name": "mxe_account", "isMut": true, "isSigner": false },
+        { "name": "comp_def_account", "isMut": true, "isSigner": false },
+        { "name": "arcium_program", "isMut": false, "isSigner": false },
+        { "name": "system_program", "isMut": false, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_balance_account",
+      "accounts": [
+        { "name": "payer", "isMut": true, "isSigner": true },
+        { "name": "sign_pda_account", "isMut": true, "isSigner": false },
+        { "name": "mxe_account", "isMut": false, "isSigner": false },
+        { "name": "mempool_account", "isMut": true, "isSigner": false },
+        { "name": "executing_pool", "isMut": true, "isSigner": false },
+        { "name": "computation_account", "isMut": true, "isSigner": false },
+        { "name": "comp_def_account", "isMut": false, "isSigner": false },
+        { "name": "cluster_account", "isMut": true, "isSigner": false },
+        { "name": "pool_account", "isMut": true, "isSigner": false },
+        { "name": "clock_account", "isMut": false, "isSigner": false },
+        { "name": "system_program", "isMut": false, "isSigner": false },
+        { "name": "arcium_program", "isMut": false, "isSigner": false },
+        { "name": "balance_account", "isMut": true, "isSigner": false }
+      ],
+      "args": [
+        { "name": "computation_offset", "type": "u64" },
+        { "name": "nonce", "type": "u128" }
+      ]
+    },
+    {
+      "name": "deposit_funds",
+      "accounts": [
+        { "name": "payer", "isMut": true, "isSigner": true },
+        { "name": "sign_pda_account", "isMut": true, "isSigner": false },
+        { "name": "mxe_account", "isMut": false, "isSigner": false },
+        { "name": "mempool_account", "isMut": true, "isSigner": false },
+        { "name": "executing_pool", "isMut": true, "isSigner": false },
+        { "name": "computation_account", "isMut": true, "isSigner": false },
+        { "name": "comp_def_account", "isMut": false, "isSigner": false },
+        { "name": "cluster_account", "isMut": true, "isSigner": false },
+        { "name": "pool_account", "isMut": true, "isSigner": false },
+        { "name": "clock_account", "isMut": false, "isSigner": false },
+        { "name": "system_program", "isMut": false, "isSigner": false },
+        { "name": "arcium_program", "isMut": false, "isSigner": false },
+        { "name": "balance_account", "isMut": true, "isSigner": false },
+        { "name": "owner", "isMut": false, "isSigner": true }
+      ],
+      "args": [
+        { "name": "computation_offset", "type": "u64" },
+        { "name": "amount", "type": "u64" }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "PrivateBalanceAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "owner", "type": "publicKey" },
+          { "name": "bump", "type": "u8" },
+          { "name": "balance_state", "type": { "array": ["u8", 64] } },
+          { "name": "nonce", "type": "u128" }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    { "code": 6000, "name": "InvalidAuthority", "msg": "Invalid authority" },
+    { "code": 6001, "name": "AbortedComputation", "msg": "The computation was aborted" },
+    { "code": 6002, "name": "ClusterNotSet", "msg": "Cluster not set" },
+    { "code": 6003, "name": "InsufficientBalance", "msg": "Insufficient balance" }
+  ]
+}
+
+
+
+

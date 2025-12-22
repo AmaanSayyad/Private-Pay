@@ -1,0 +1,68 @@
+{
+  "version": "0.1.0",
+  "name": "private_swap",
+  "instructions": [
+    {
+      "name": "init_swap_comp_def",
+      "accounts": [
+        { "name": "payer", "isMut": true, "isSigner": true },
+        { "name": "mxe_account", "isMut": true, "isSigner": false },
+        { "name": "comp_def_account", "isMut": true, "isSigner": false },
+        { "name": "arcium_program", "isMut": false, "isSigner": false },
+        { "name": "system_program", "isMut": false, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "execute_private_swap",
+      "accounts": [
+        { "name": "payer", "isMut": true, "isSigner": true },
+        { "name": "sign_pda_account", "isMut": true, "isSigner": false },
+        { "name": "mxe_account", "isMut": false, "isSigner": false },
+        { "name": "mempool_account", "isMut": true, "isSigner": false },
+        { "name": "executing_pool", "isMut": true, "isSigner": false },
+        { "name": "computation_account", "isMut": true, "isSigner": false },
+        { "name": "comp_def_account", "isMut": false, "isSigner": false },
+        { "name": "cluster_account", "isMut": true, "isSigner": false },
+        { "name": "pool_account", "isMut": true, "isSigner": false },
+        { "name": "clock_account", "isMut": false, "isSigner": false },
+        { "name": "system_program", "isMut": false, "isSigner": false },
+        { "name": "arcium_program", "isMut": false, "isSigner": false },
+        { "name": "user_token_account_in", "isMut": true, "isSigner": false },
+        { "name": "user_token_account_out", "isMut": true, "isSigner": false },
+        { "name": "pool_token_account_in", "isMut": true, "isSigner": false },
+        { "name": "pool_token_account_out", "isMut": true, "isSigner": false },
+        { "name": "token_program", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "computation_offset", "type": "u64" },
+        { "name": "encrypted_amount_in", "type": { "array": ["u8", 64] } },
+        { "name": "min_amount_out", "type": "u64" },
+        { "name": "nonce", "type": "u128" }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "SwapPool",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "authority", "type": "publicKey" },
+          { "name": "token_mint_a", "type": "publicKey" },
+          { "name": "token_mint_b", "type": "publicKey" },
+          { "name": "reserve_a", "type": "u64" },
+          { "name": "reserve_b", "type": "u64" },
+          { "name": "fee_rate", "type": "u16" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    { "code": 6000, "name": "InvalidAuthority", "msg": "Invalid authority" },
+    { "code": 6001, "name": "SlippageExceeded", "msg": "Slippage tolerance exceeded" },
+    { "code": 6002, "name": "InsufficientLiquidity", "msg": "Insufficient liquidity" }
+  ],
+  "metadata": { "address": "SwapProgramNotDeployedYet11111111111111111" }
+}
