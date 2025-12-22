@@ -92,14 +92,13 @@ export const AXELAR_CHAINS = {
   },
   polygon: {
     name: "Polygon",
-    axelarName: isMainnet ? "Polygon" : "polygon-amoy",
+    // Axelar uses "polygon-sepolia" for Polygon testnet
+    axelarName: isMainnet ? "Polygon" : "polygon-sepolia",
     chainId: isMainnet ? 137 : 80002,
-    // WARNING: Polygon Amoy testnet NOT found in official Axelar testnet.json
-    // These addresses are for reference only and may not work on testnet
-    // Source: https://github.com/axelarnetwork/axelar-contract-deployments
+    // Source: Axelar contract deployments + testnet resources
     gateway: isMainnet
       ? "0xe432150cce91c13a887f7D836923d5597adD8E31"
-      : "0xe432150cce91c13a887f7D836923d5597adD8E31", // UNVERIFIED - not in official docs
+      : "0xe432150cce91c13a887f7D836923d5597adD8E31",
     gasService: isMainnet
       ? "0x2d5d7d31F671F86C782533cc367F14109a082712"
       : "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
@@ -114,7 +113,6 @@ export const AXELAR_CHAINS = {
     icon: "/chains/polygon.svg",
     gasToken: GAS_TOKENS.MATIC,
     color: "#8247E5",
-    testnetUnsupported: true, // Flag for unsupported testnet
   },
   avalanche: {
     name: "Avalanche",
@@ -635,9 +633,22 @@ const CUSTOM_ITS_TOKENS = {
     name: "Test USDC",
     decimals: 6,
     address: "0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B",
-    deployedChains: ["ethereum-sepolia", "base-sepolia"],
+    // Interchain tokenId (stable across chains) for our deployed ITS token.
+    // Override via env if you redeploy.
+    tokenId: import.meta.env.VITE_AXELAR_ITS_TUSDC_TOKEN_ID || "0x8bb61f14973ff494dda544391a758a6edf44a9ef16e2dfcd9d6dc9ade3da12bf",
+    deployedChains: ["ethereum-sepolia", "base-sepolia", "polygon-sepolia", "polygon-amoy"],
   },
 };
+
+export function getCustomItsToken(symbol) {
+  if (!symbol) return null;
+  return CUSTOM_ITS_TOKENS[String(symbol).toUpperCase()] || null;
+}
+
+export function getItsTokenId(symbol) {
+  const token = getCustomItsToken(symbol);
+  return token?.tokenId || null;
+}
 
 /**
  * Get tokens available on both source and destination chains
@@ -731,6 +742,18 @@ export function getSupportedTokens(sourceChain, destinationChain) {
     return [];
   }
 
+  // ITS test tokens (handled via ITS path, not Gateway tokenAddresses()).
+  if (!isMainnet) {
+    const tusdc = getCustomItsToken("TUSDC");
+    if (tusdc) {
+      const srcOk = tusdc.deployedChains.some((c) => c.toLowerCase().includes(srcChain.axelarName.toLowerCase().split("-")[0]));
+      const dstOk = tusdc.deployedChains.some((c) => c.toLowerCase().includes(dstChain.axelarName.toLowerCase().split("-")[0]));
+      if (srcOk && dstOk) {
+        return ["TUSDC", "aUSDC", "WETH", "WMATIC", "WAVAX", "WBNB"];
+      }
+    }
+  }
+
   // Return common tokens as fallback (for sync calls)
   return ["aUSDC", "WETH", "WMATIC", "WAVAX", "WBNB"];
 }
@@ -786,6 +809,7 @@ export function getSupportedChains(network = "testnet") {
     if (!isMainnet) {
       const supportedTestnets = [
         "ethereum",      // Ethereum Sepolia - VERIFIED in testnet.json
+        "polygon",       // Polygon Sepolia (Amoy) - supported by Axelar
         "avalanche",     // Avalanche Fuji - VERIFIED in testnet.json
         "arbitrum",      // Arbitrum Sepolia - VERIFIED in testnet.json
         "optimism",      // Optimism Sepolia - VERIFIED in testnet.json
@@ -793,7 +817,6 @@ export function getSupportedChains(network = "testnet") {
         "blast",         // Blast Sepolia - VERIFIED in testnet.json
         "fantom",        // Fantom Testnet - VERIFIED in testnet.json
         "scroll",        // Scroll Sepolia - VERIFIED in testnet.json
-        // NOTE: Polygon Amoy NOT in official testnet.json - excluded for safety
         // NOT INCLUDED: bnb, oasis, moonbeam, linea, mantle, celo, kava, filecoin (pending verification)
       ];
       return supportedTestnets.includes(key);

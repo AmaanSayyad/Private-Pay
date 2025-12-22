@@ -15,6 +15,10 @@ const AXELAR_CONTRACTS: Record<string, { gateway: string; gasService: string }> 
     gateway: "0xe432150cce91c13a887f7D836923d5597adD8E31",
     gasService: "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
   },
+  "polygon-sepolia": {
+    gateway: "0xe432150cce91c13a887f7D836923d5597adD8E31",
+    gasService: "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
+  },
   "avalanche-fuji": {
     gateway: "0xC249632c2D40b9001FE907806902f63038B737Ab",
     gasService: "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
@@ -51,6 +55,7 @@ const AXELAR_CONTRACTS: Record<string, { gateway: string; gasService: string }> 
 const AXELAR_CHAIN_NAMES: Record<string, string> = {
   "ethereum-sepolia": "ethereum-sepolia",
   "polygon-amoy": "polygon-sepolia", // Axelar uses "polygon-sepolia" not "polygon-amoy"
+  "polygon-sepolia": "polygon-sepolia",
   "avalanche-fuji": "Avalanche", // Capitalized per Axelar config
   "arbitrum-sepolia": "arbitrum-sepolia",
   "optimism-sepolia": "optimism-sepolia",

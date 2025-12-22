@@ -13,10 +13,13 @@
     "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
     "@types/bun": "latest",
+    "circomlib": "^2.0.5",
+    "circomlibjs": "^0.1.7",
     "elliptic-curve-solidity": "https://github.com/witnet/elliptic-curve-solidity#master",
     "ethers": "^6.13.2",
     "hardhat": "^2.22.11",
     "hardhat-tracer": "^3.1.0",
+    "poseidon-solidity": "^0.0.5",
     "typechain": "^8.3.2"
   },
   "peerDependencies": {
