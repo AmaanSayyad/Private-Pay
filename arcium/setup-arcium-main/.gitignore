@@ -1,0 +1,11 @@
+test_project/.anchor
+test_project/.DS_Store
+test_project/target
+test_project/**/*.rs.bk
+test_project/node_modules
+test_project/test-ledger
+test_project/.yarn
+test_project/encrypted-ixs/arcis_temp_target
+test_project/build
+test_project/encrypted-ixs/src/main.rs
+test_project/artifacts/

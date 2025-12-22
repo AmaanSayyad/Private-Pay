@@ -429,7 +429,10 @@ export default function UnstoppableDashboard() {
                   </div>
                 </CardBody>
               </Card>
+            </div>
 
+            {/* Quick Access & Private Assets Side by Side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
               {/* Quick Access to Privacy Features */}
               <Card className="bg-white border border-gray-200 shadow-sm">
                 <CardBody className="p-6">
@@ -444,8 +447,8 @@ export default function UnstoppableDashboard() {
                       onClick={() => navigate("/arcium/swap")}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                          <Shield className="w-6 h-6 text-purple-600" />
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 p-1.5 bg-white shadow-sm">
+                          <img src="/assets/arcium.png" alt="Arcium" className="w-full h-full object-contain" />
                         </div>
                         <div className="text-left">
                           <p className="font-semibold text-gray-900">Arcium Private Swaps</p>
@@ -461,8 +464,8 @@ export default function UnstoppableDashboard() {
                       onClick={() => navigate("/zcash")}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg bg-yellow-100 flex items-center justify-center flex-shrink-0">
-                          <Shield className="w-6 h-6 text-yellow-600" />
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 p-1.5 bg-white shadow-sm">
+                          <img src="/assets/zcash_logo.png" alt="Zcash" className="w-full h-full object-contain" />
                         </div>
                         <div className="text-left">
                           <p className="font-semibold text-gray-900">Zcash Privacy</p>
@@ -478,8 +481,8 @@ export default function UnstoppableDashboard() {
                       onClick={() => navigate("/aztec")}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                          <Lock className="w-6 h-6 text-blue-600" />
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 p-1.5 bg-white shadow-sm">
+                          <img src="/assets/aztec.png" alt="Aztec" className="w-full h-full object-contain" />
                         </div>
                         <div className="text-left">
                           <p className="font-semibold text-gray-900">Aztec Network</p>
@@ -492,11 +495,11 @@ export default function UnstoppableDashboard() {
                     <Button
                       className="w-full justify-between h-auto p-4"
                       variant="flat"
-                      onClick={() => navigate("/mina-protocol")}
+                      onClick={() => navigate("/mina")}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                          <Sparkles className="w-6 h-6 text-emerald-600" />
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 p-1.5 bg-white shadow-sm">
+                          <img src="/assets/mina_logo.png" alt="Mina" className="w-full h-full object-contain" />
                         </div>
                         <div className="text-left">
                           <p className="font-semibold text-gray-900">Mina Protocol</p>
@@ -508,60 +511,78 @@ export default function UnstoppableDashboard() {
                   </div>
                 </CardBody>
               </Card>
-            </div>
 
-            {/* Asset Balances */}
-            <Card className="bg-white border border-gray-200 shadow-sm mb-8">
-              <CardBody className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-gray-900 font-bold text-lg flex items-center gap-2">
-                    <Wallet className="w-5 h-5" />
-                    Private Assets
-                    {decoyMode && (
-                      <Chip size="sm" color="warning" variant="flat">
-                        🎭 Decoy Mode
-                      </Chip>
-                    )}
-                  </h3>
-                  <Button
-                    size="sm"
-                    variant="light"
-                    className="text-gray-600"
-                    onClick={toggleBalanceVisibility}
-                  >
-                    {isBalanceHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {getVisibleBalances.map((asset) => (
-                    <div
-                      key={asset.id}
-                      className={`p-4 rounded-xl border transition-all cursor-pointer hover:border-primary/50 ${asset.hidden
-                        ? "bg-gray-50 border-gray-100"
-                        : "bg-white border-gray-200"
-                        }`}
-                      onClick={() => toggleAssetVisibility(asset.id)}
+              {/* Private Assets */}
+              <Card className="bg-white border border-gray-200 shadow-sm">
+                <CardBody className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-gray-900 font-bold text-lg flex items-center gap-2">
+                      <Wallet className="w-5 h-5" />
+                      Private Assets
+                      {decoyMode && (
+                        <Chip size="sm" color="warning" variant="flat">
+                          🎭 Decoy Mode
+                        </Chip>
+                      )}
+                    </h3>
+                    <Button
+                      size="sm"
+                      variant="light"
+                      className="text-gray-600"
+                      onClick={toggleBalanceVisibility}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-gray-900 font-medium">{asset.symbol}</span>
-                        {asset.shielded && (
-                          <Shield className="w-3 h-3 text-emerald-500" />
-                        )}
-                      </div>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {typeof asset.balance === "number"
-                          ? asset.balance.toFixed(4)
-                          : asset.balance}
-                      </p>
-                      <p className="text-gray-500 text-xs mt-1">
-                        {asset.hidden ? "Hidden" : asset.name}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardBody>
-            </Card>
+                      {isBalanceHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {getVisibleBalances.map((asset) => {
+                      const assetLogos = {
+                        'ZEC': '/assets/zcash_logo.png',
+                        'SOL': '/assets/solana_logo.png',
+                        'APT': '/assets/aptos-logo.png',
+                        'ETH': '/assets/eth-logo.png'
+                      };
+                      
+                      return (
+                        <div
+                          key={asset.id}
+                          className={`p-4 rounded-xl border transition-all cursor-pointer hover:border-primary/50 hover:shadow-md ${asset.hidden
+                            ? "bg-gray-50 border-gray-100"
+                            : "bg-white border-gray-200"
+                            }`}
+                          onClick={() => toggleAssetVisibility(asset.id)}
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              {assetLogos[asset.symbol] && (
+                                <img 
+                                  src={assetLogos[asset.symbol]} 
+                                  alt={asset.symbol} 
+                                  className="w-6 h-6 object-contain"
+                                />
+                              )}
+                              <span className="text-gray-900 font-bold">{asset.symbol}</span>
+                            </div>
+                            {asset.shielded && (
+                              <Shield className="w-4 h-4 text-emerald-500" />
+                            )}
+                          </div>
+                          <p className="text-2xl font-bold text-gray-900 mb-1">
+                            {typeof asset.balance === "number"
+                              ? asset.balance.toFixed(4)
+                              : asset.balance}
+                          </p>
+                          <p className="text-gray-500 text-xs">
+                            {asset.hidden ? "Hidden" : asset.name}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardBody>
+              </Card>
+            </div>
 
             {/* Stealth Addresses */}
             <Card className="bg-white border border-gray-200 shadow-sm mb-8">
@@ -802,8 +823,8 @@ export default function UnstoppableDashboard() {
                 {zcashAddress && (
                   <div className="mt-4 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
                     <div className="flex items-center gap-2 mb-2">
-                      <Shield className="w-4 h-4 text-yellow-600" />
-                      <p className="text-yellow-800 text-xs font-medium">Zcash Privacy Technology</p>
+                      <img src="/assets/zcash_logo.png" alt="Zcash" className="w-5 h-5 object-contain" />
+                      <p className="text-yellow-800 text-xs font-bold">Zcash Privacy Technology</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <p className="text-gray-900 font-mono text-sm truncate flex-1">
@@ -840,10 +861,9 @@ export default function UnstoppableDashboard() {
                     {solanaPublicKey && (
                       <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className="w-6 h-6 rounded bg-purple-100 flex items-center justify-center">
-                            <span className="text-xs font-bold text-purple-600">SOL</span>
-                          </div>
-                          <p className="text-purple-800 text-xs font-medium">Solana</p>
+                          <img src="/assets/solana_logo.png" alt="Solana" className="w-6 h-6 object-contain" />
+                          <p className="text-purple-800 text-xs font-bold">SOL</p>
+                          <p className="text-purple-600 text-xs">Solana</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <p className="text-gray-900 font-mono text-xs truncate flex-1">
@@ -872,10 +892,9 @@ export default function UnstoppableDashboard() {
                     {aztecAddress && (
                       <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className="w-6 h-6 rounded bg-blue-100 flex items-center justify-center">
-                            <span className="text-xs font-bold text-blue-600">AZ</span>
-                          </div>
-                          <p className="text-blue-800 text-xs font-medium">Aztec</p>
+                          <img src="/assets/aztec.png" alt="Aztec" className="w-6 h-6 object-contain" />
+                          <p className="text-blue-800 text-xs font-bold">AZ</p>
+                          <p className="text-blue-600 text-xs">Aztec</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <p className="text-gray-900 font-mono text-xs truncate flex-1">
@@ -896,10 +915,9 @@ export default function UnstoppableDashboard() {
                     {minaPublicKey && (
                       <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className="w-6 h-6 rounded bg-emerald-100 flex items-center justify-center">
-                            <span className="text-xs font-bold text-emerald-600">MINA</span>
-                          </div>
-                          <p className="text-emerald-800 text-xs font-medium">Mina</p>
+                          <img src="/assets/mina_logo.png" alt="Mina" className="w-6 h-6 object-contain" />
+                          <p className="text-emerald-800 text-xs font-bold">MINA</p>
+                          <p className="text-emerald-600 text-xs">Mina</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <p className="text-gray-900 font-mono text-xs truncate flex-1">
@@ -920,10 +938,9 @@ export default function UnstoppableDashboard() {
                     {ethereumAddress && (
                       <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className="w-6 h-6 rounded bg-indigo-100 flex items-center justify-center">
-                            <span className="text-xs font-bold text-indigo-600">ETH</span>
-                          </div>
-                          <p className="text-indigo-800 text-xs font-medium">Ethereum</p>
+                          <img src="/assets/eth-logo.png" alt="Ethereum" className="w-6 h-6 object-contain" />
+                          <p className="text-indigo-800 text-xs font-bold">ETH</p>
+                          <p className="text-indigo-600 text-xs">Ethereum</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <p className="text-gray-900 font-mono text-xs truncate flex-1">

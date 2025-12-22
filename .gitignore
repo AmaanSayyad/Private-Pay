@@ -43,3 +43,18 @@ public/circuits/
 .vercel
 .cursor/
 .env.local
+
+# ZK Circuit Build Artifacts (keep source .circom files only)
+hardhat/circuits/**/build/
+hardhat/circuits/**/*.r1cs
+hardhat/circuits/**/*.zkey
+hardhat/circuits/**/*.ptau
+hardhat/circuits/**/*.sym
+hardhat/circuits/**/*.json
+!hardhat/circuits/**/package.json
+hardhat/tools/*.zip
+
+# Public ZK artifacts (large proving keys)
+public/zk/**/*.zkey
+public/zk/**/*.ptau
+# Keep WASM files - they're small enough (~100-200KB)

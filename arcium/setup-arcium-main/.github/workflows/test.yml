@@ -1,0 +1,66 @@
+name: Test Setup Arcium Action
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use local action
+        uses: ./
+        with:
+          runner-arch-os: x86_64_linux
+
+      - name: Verify tools
+        run: |
+          node -v
+          solana --version
+          anchor --version
+          arcup --version
+          arcium --version
+        shell: bash
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: cache-node-modules
+        with:
+          path: |
+            test_project/node_modules
+          key: node-modules-${{ runner.os }}
+  
+      - name: Install ts deps
+        working-directory: test_project
+        run: yarn
+        shell: bash
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+
+      - name: Cache cargo target
+        uses: actions/cache@v4
+        id: cache-cargo-target
+        with:
+          path: |
+            test_project/target
+          key: cargo-target-${{ runner.os }}
+      - name: Cache encrypted-ixs target
+        uses: actions/cache@v4
+        id: cache-encrypted-ixs-target
+        with:
+          path: |
+              test_project/build
+              test_project/artifacts/circuit_hash.txt
+          key: cargo-target-${{ runner.os }}      
+      - name: Build arcium project
+        working-directory: test_project
+        run: arcium build
+        shell: bash
+        if: steps.cache-encrypted-ixs-target.outputs.cache-hit != 'true' && steps.cache-cargo-target.outputs.cache-hit != 'true'
+      - name: Test arcium project
+        working-directory: test_project
+        run: arcium test
+        shell: bash

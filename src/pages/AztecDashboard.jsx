@@ -23,13 +23,6 @@ export default function AztecDashboard() {
       path: "/bridge",
       stats: "Private Bridge",
     },
-    {
-      title: "Private Stablecoin",
-      description: "Privacy-first stablecoin (pZUSD) backed by Zcash",
-      icon: <Coins className="w-6 h-6" />,
-      path: "/stablecoin",
-      stats: "100% Private",
-    },
   ];
 
   const securityFeatures = [

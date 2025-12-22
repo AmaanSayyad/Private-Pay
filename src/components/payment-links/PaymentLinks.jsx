@@ -101,10 +101,11 @@ export default function PaymentLinks() {
                 layout
                 transition={{ duration: 0.4 }}
                 className={cnm(
-                  "relative rounded-2xl h-52 md:h-60 w-full overflow-hidden group",
+                  "relative rounded-2xl h-52 md:h-60 w-full overflow-hidden group cursor-pointer",
                   idx > 0 && "-mt-36 md:-mt-44"
                 )}
                 whileHover={{ rotate: -5, y: -20 }}
+                onClick={() => navigate(`/payment/${link.alias}`)}
               >
                 <img
                   src={bgImage}
@@ -121,13 +122,19 @@ export default function PaymentLinks() {
                   <p className="font-medium">{cardName}</p>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handleCopyLink(link.alias)}
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent navigation when clicking copy
+                        handleCopyLink(link.alias);
+                      }}
                       className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/20 backdrop-blur-sm rounded-full p-2"
                     >
                       <Icons.copy className="size-4" />
                     </button>
                     <button
-                      onClick={() => handleDeleteLink(link.id)}
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent navigation when clicking delete
+                        handleDeleteLink(link.id);
+                      }}
                       className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500/80 backdrop-blur-sm rounded-full p-2"
                     >
                       <Icons.close className="size-4 text-white" />

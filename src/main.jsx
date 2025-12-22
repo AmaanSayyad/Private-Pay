@@ -2,6 +2,7 @@ import { Buffer } from "buffer";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
+import activityLogger from "./lib/activityLogger.js";
 
 // Ensure Buffer is available globally
 if (typeof window !== "undefined") {
@@ -135,6 +136,182 @@ console.log("[Main] Environment variables:", {
   VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL ? "Set" : "Not set",
   VITE_APP_ENVIRONMENT: import.meta.env.VITE_APP_ENVIRONMENT || "Not set",
 });
+
+// ============================================
+// GLOBAL ACTIVITY LOGGING SETUP
+// ============================================
+
+// Check if verbose logging is enabled (only in dev mode)
+const ENABLE_VERBOSE_LOGGING = import.meta.env.DEV;
+
+if (ENABLE_VERBOSE_LOGGING) {
+  activityLogger.info('AppInit', 'Initializing global activity logging...');
+}
+
+// Intercept native fetch calls (optimized - non-blocking)
+const originalFetch = window.fetch;
+window.fetch = function(...args) {
+  const [url, options = {}] = args;
+  const method = options.method || 'GET';
+  const startTime = Date.now();
+  
+  // Log request (async, non-blocking) - only in verbose mode
+  if (ENABLE_VERBOSE_LOGGING) {
+    setTimeout(() => {
+      activityLogger.logNetworkRequest(url, method, {
+        // Only log minimal info to avoid performance issues
+        hasBody: !!options.body,
+      });
+    }, 0);
+  }
+  
+  return originalFetch.apply(this, args)
+    .then(response => {
+      const duration = Date.now() - startTime;
+      
+      // Log response (async, non-blocking, no body reading) - only in verbose mode
+      if (ENABLE_VERBOSE_LOGGING) {
+        setTimeout(() => {
+          activityLogger.logNetworkResponse(url, method, response.status, duration, {
+            // Don't read body - too expensive
+          });
+        }, 0);
+      }
+      
+      return response;
+    })
+    .catch(error => {
+      const duration = Date.now() - startTime;
+      // Only log errors (important)
+      activityLogger.logNetworkError(url, method, error);
+      throw error;
+    });
+};
+
+// Global click listener for all buttons and interactive elements (throttled)
+let lastClickTime = 0;
+let clickThrottleTimeout;
+const CLICK_THROTTLE_MS = 100; // Throttle clicks to max 10 per second
+
+document.addEventListener('click', (event) => {
+  const now = Date.now();
+  const timeSinceLastClick = now - lastClickTime;
+  
+  // Throttle rapid clicks
+  if (timeSinceLastClick < CLICK_THROTTLE_MS) {
+    clearTimeout(clickThrottleTimeout);
+    clickThrottleTimeout = setTimeout(() => {
+      processClick(event);
+    }, CLICK_THROTTLE_MS - timeSinceLastClick);
+    return;
+  }
+  
+  processClick(event);
+  lastClickTime = now;
+}, true);
+
+function processClick(event) {
+  const target = event.target;
+  
+  // Quick check - only process actual interactive elements
+  if (target.tagName === 'BUTTON' || target.tagName === 'A' || target.closest('button') || target.closest('a')) {
+    const element = target.closest('button') || target.closest('a') || target;
+    
+    // Use requestIdleCallback to avoid blocking UI
+    const logClick = () => {
+      const buttonText = element.textContent?.trim() || element.getAttribute('aria-label') || '';
+      activityLogger.logClick(element, {
+        buttonText: buttonText.substring(0, 50),
+        page: window.location.pathname,
+      });
+    };
+    
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(logClick, { timeout: 50 });
+    } else {
+      setTimeout(logClick, 0);
+    }
+  }
+}
+
+// Log all navigation changes
+let currentPath = window.location.pathname;
+const originalPushState = history.pushState;
+const originalReplaceState = history.replaceState;
+
+history.pushState = function(...args) {
+  const newPath = args[2] || window.location.pathname;
+  if (newPath !== currentPath) {
+    activityLogger.logNavigation(currentPath, newPath, 'pushState');
+    currentPath = newPath;
+  }
+  return originalPushState.apply(history, args);
+};
+
+history.replaceState = function(...args) {
+  const newPath = args[2] || window.location.pathname;
+  if (newPath !== currentPath) {
+    activityLogger.logNavigation(currentPath, newPath, 'replaceState');
+    currentPath = newPath;
+  }
+  return originalReplaceState.apply(history, args);
+};
+
+window.addEventListener('popstate', () => {
+  const newPath = window.location.pathname;
+  if (newPath !== currentPath) {
+    activityLogger.logNavigation(currentPath, newPath, 'popstate');
+    currentPath = newPath;
+  }
+});
+
+// Log page visibility changes
+document.addEventListener('visibilitychange', () => {
+  activityLogger.info('PageVisibility', `Page ${document.hidden ? 'hidden' : 'visible'}`);
+});
+
+// Log window focus/blur
+window.addEventListener('focus', () => {
+  activityLogger.info('WindowFocus', 'Window focused');
+});
+
+window.addEventListener('blur', () => {
+  activityLogger.info('WindowBlur', 'Window blurred');
+});
+
+// Log form submissions
+document.addEventListener('submit', (event) => {
+  const form = event.target;
+  activityLogger.info('FormSubmit', `Form submitted: ${form.id || form.className || 'unknown'}`, {
+    formId: form.id,
+    formAction: form.action,
+    formMethod: form.method,
+  });
+});
+
+// Log input changes (heavily throttled - only in verbose mode)
+if (ENABLE_VERBOSE_LOGGING) {
+  let inputChangeTimeout;
+  document.addEventListener('input', (event) => {
+    clearTimeout(inputChangeTimeout);
+    inputChangeTimeout = setTimeout(() => {
+      const target = event.target;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        // Only log if it's a significant input (not every keystroke)
+        if (target.value && target.value.length > 3) {
+          activityLogger.info('InputChange', `Input: ${target.name || target.id || 'unknown'}`, {
+            inputType: target.type,
+            valueLength: target.value?.length || 0,
+          });
+        }
+      }
+    }, 1000); // Heavy throttle - only log after 1 second of inactivity
+  });
+}
+
+if (ENABLE_VERBOSE_LOGGING) {
+  activityLogger.success('AppInit', 'Global activity logging initialized successfully');
+}
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
