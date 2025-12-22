@@ -59,16 +59,6 @@ export default function PrivacyNavbar() {
                     PoC Bridge
                 </Link>
                 <Link
-                    to={"/stablecoin"}
-                    className={cnm(
-                        "px-4 py-2 rounded-full flex items-center gap-2 transition-all duration-300 hover:bg-blue-50",
-                        `${location.pathname.startsWith("/stablecoin") ? "bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-200" : "text-gray-600"}`
-                    )}
-                >
-                    <Coins className="size-4" />
-                    Stablecoin
-                </Link>
-                <Link
                     to={"/starknet"}
                     className={cnm(
                         "px-4 py-2 rounded-full flex items-center gap-2 transition-all duration-300 hover:bg-purple-50",

@@ -27,11 +27,11 @@ export default function Stablecoin() {
       } catch (error) {
         console.error('Failed to fetch price:', error);
         // Fallback price for demo
-        setZecPrice(45.50);
+        setZecPrice(445);
       }
     }
     // Set fallback price immediately for demo
-    setZecPrice(45.50);
+    setZecPrice(445);
     fetchPrice();
     const interval = setInterval(fetchPrice, 60000); // Update every minute
     return () => clearInterval(interval);

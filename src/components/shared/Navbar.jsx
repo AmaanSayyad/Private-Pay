@@ -287,19 +287,6 @@ export default function Navbar() {
           <span>ZEC-Mina</span>
         </Link>
 
-        <div className="w-px h-6 bg-black/10 mx-0.5" />
-
-        {/* DeFi */}
-        <Link
-          to={"/stablecoin"}
-          className={cnm(
-            "px-2.5 py-2 rounded-full flex items-center gap-1.5 transition-all duration-300 whitespace-nowrap",
-            `${location.pathname.startsWith("/stablecoin") ? "bg-primary text-white" : ""}`
-          )}
-        >
-          <Coins className="size-3.5" />
-          <span>Stablecoin</span>
-        </Link>
       </div>
 
     </div>
