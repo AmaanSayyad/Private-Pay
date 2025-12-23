@@ -578,6 +578,26 @@ export function useAxelarPayment() {
           // === GMP TOKEN TRANSFER (via Bridge) ===
           console.log("Using GMP Bridge for cross-chain transfer...");
 
+          // Verify token contract exists on this chain
+          const tokenCode = await signer.provider.getCode(tokenAddress);
+          if (tokenCode === '0x' || tokenCode === '0x0') {
+            throw new Error(
+              `Token contract not found at ${tokenAddress} on ${srcChainConfig.name}. ` +
+              `Please verify TUSDC is deployed on this chain.`
+            );
+          }
+          console.log(`Token contract verified at ${tokenAddress}`);
+
+          // Verify bridge contract exists on this chain
+          const bridgeCode = await signer.provider.getCode(bridgeAddress);
+          if (bridgeCode === '0x' || bridgeCode === '0x0') {
+            throw new Error(
+              `Bridge contract not found at ${bridgeAddress} on ${srcChainConfig.name}. ` +
+              `Please verify the bridge is deployed on this chain.`
+            );
+          }
+          console.log(`Bridge contract verified at ${bridgeAddress}`);
+
           // Check allowance for bridge
           const currentAllowance = await tokenContract.allowance(signerAddress, bridgeAddress);
           if (currentAllowance < amountInWei) {
@@ -586,51 +606,203 @@ export function useAxelarPayment() {
             
             setTxStatus(TX_STATUS.APPROVING);
             
-            // Estimate gas for approval with better error handling
-            let gasLimit;
-            try {
-              const estimatedGas = await tokenContract.approve.estimateGas(bridgeAddress, amountInWei);
-              // Add 50% buffer for safety (approval transactions can be tricky)
-              gasLimit = estimatedGas + (estimatedGas / 2n);
-              console.log(`Estimated gas: ${estimatedGas.toString()}, Using: ${gasLimit.toString()}`);
-            } catch (estimateError) {
-              console.warn("Gas estimation failed, using safe default:", estimateError);
-              // Use a higher default for approval (ERC20 approve can vary)
-              gasLimit = 150000n; // Increased default gas limit
+            // Check token balance first
+            const tokenBalance = await tokenContract.balanceOf(signerAddress);
+            console.log(`Token balance: ${ethers.formatUnits(tokenBalance, decimals)} ${tokenSymbol}`);
+            if (tokenBalance < amountInWei) {
+              throw new Error(
+                `Insufficient token balance. You have ${ethers.formatUnits(tokenBalance, decimals)} ${tokenSymbol}, ` +
+                `but need ${ethers.formatUnits(amountInWei, decimals)} ${tokenSymbol}.`
+              );
+            }
+            
+            // Check native token (ETH) balance for gas
+            const ethBalance = await signer.provider.getBalance(signerAddress);
+            const minEthRequired = ethers.parseEther("0.001"); // Minimum 0.001 ETH for gas
+            console.log(`ETH balance: ${ethers.formatEther(ethBalance)} ETH`);
+            if (ethBalance < minEthRequired) {
+              throw new Error(
+                `Insufficient ETH for gas fees on ${srcChainConfig.name}. ` +
+                `You have ${ethers.formatEther(ethBalance)} ETH, but need at least 0.001 ETH. ` +
+                `Please add ETH to your wallet.`
+              );
+            }
+            
+            // Check if Arbitrum (needs higher gas and special handling)
+            const isArbitrum = srcChainConfig.chainId === 421614;
+            const baseGasLimit = isArbitrum ? 500000n : 150000n; // Much higher for Arbitrum L2
+            
+            // For Arbitrum, we need to handle gas differently due to L2 specifics
+            let gasLimit = baseGasLimit;
+            let gasPrice = null;
+            
+            if (isArbitrum) {
+              // Arbitrum L2: Get current gas price and use higher limit
+              try {
+                const feeData = await signer.provider.getFeeData();
+                // Use maxFeePerGas for Arbitrum if available
+                if (feeData.maxFeePerGas) {
+                  gasPrice = feeData.maxFeePerGas;
+                  console.log(`Arbitrum maxFeePerGas: ${ethers.formatUnits(gasPrice, 'gwei')} gwei`);
+                }
+              } catch (feeError) {
+                console.warn("Failed to get fee data for Arbitrum:", feeError);
+              }
+              
+              // Try to estimate gas, but use high fallback for Arbitrum
+              try {
+                const estimatedGas = await tokenContract.approve.estimateGas(bridgeAddress, amountInWei);
+                // Add 200% buffer for Arbitrum (L2 can be unpredictable)
+                gasLimit = estimatedGas * 3n;
+                console.log(`Arbitrum estimated gas: ${estimatedGas.toString()}, Using: ${gasLimit.toString()}`);
+              } catch (estimateError) {
+                console.warn("Arbitrum gas estimation failed, using high default:", estimateError.message);
+                gasLimit = 500000n; // High default for Arbitrum
+              }
+            } else {
+              // Non-Arbitrum chains: standard estimation
+              try {
+                const estimatedGas = await tokenContract.approve.estimateGas(bridgeAddress, amountInWei);
+                gasLimit = estimatedGas + (estimatedGas / 2n); // 50% buffer
+                console.log(`Estimated gas: ${estimatedGas.toString()}, Using: ${gasLimit.toString()}`);
+              } catch (estimateError) {
+                console.warn("Gas estimation failed, using safe default:", estimateError);
+                gasLimit = baseGasLimit;
+              }
             }
             
             // Ensure minimum gas limit
-            if (gasLimit < 50000n) {
-              gasLimit = 50000n;
+            const minGasLimit = isArbitrum ? 200000n : 50000n;
+            if (gasLimit < minGasLimit) {
+              gasLimit = minGasLimit;
             }
             
+            console.log(`Final gas limit: ${gasLimit.toString()} for ${isArbitrum ? 'Arbitrum' : 'Other'} chain`);
+            
             try {
-              const approveTx = await tokenContract.approve(bridgeAddress, amountInWei, { 
-                gasLimit,
-                // Don't set gasPrice, let the provider handle it
-              });
+              // For Arbitrum, first simulate the transaction to catch errors early
+              if (isArbitrum) {
+                console.log("Simulating approval transaction on Arbitrum...");
+                try {
+                  // Use eth_call to simulate
+                  const callResult = await tokenContract.approve.staticCall(bridgeAddress, amountInWei);
+                  console.log("Simulation successful, result:", callResult);
+                } catch (simError) {
+                  console.error("Simulation failed:", simError);
+                }
+              }
+              
+              console.log("Sending approval transaction...");
+              console.log("Options:", JSON.stringify({
+                gasLimit: gasLimit.toString(),
+                to: tokenAddress,
+                spender: bridgeAddress,
+                amount: amountInWei.toString(),
+              }));
+              
+              let approveTx;
+              
+              // For Arbitrum, try a different approach - populate transaction manually
+              if (isArbitrum) {
+                try {
+                  // Get nonce and fee data from a reliable RPC
+                  const arbitrumRpc = "https://sepolia-rollup.arbitrum.io/rpc";
+                  const reliableProvider = new ethers.JsonRpcProvider(arbitrumRpc);
+                  
+                  const [nonce, feeData] = await Promise.all([
+                    reliableProvider.getTransactionCount(signerAddress),
+                    reliableProvider.getFeeData(),
+                  ]);
+                  
+                  console.log(`Nonce: ${nonce}, MaxFeePerGas: ${feeData.maxFeePerGas?.toString()}`);
+                  
+                  // Populate the transaction with reliable data
+                  const populatedTx = await tokenContract.approve.populateTransaction(bridgeAddress, amountInWei);
+                  
+                  // Add gas parameters
+                  populatedTx.gasLimit = gasLimit;
+                  populatedTx.nonce = nonce;
+                  populatedTx.chainId = 421614n;
+                  
+                  // Use EIP-1559 fees if available
+                  if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+                    populatedTx.maxFeePerGas = feeData.maxFeePerGas * 2n;
+                    populatedTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas * 2n;
+                    populatedTx.type = 2;
+                  } else if (feeData.gasPrice) {
+                    populatedTx.gasPrice = feeData.gasPrice * 2n;
+                  }
+                  
+                  console.log("Populated transaction:", {
+                    to: populatedTx.to,
+                    gasLimit: populatedTx.gasLimit?.toString(),
+                    maxFeePerGas: populatedTx.maxFeePerGas?.toString(),
+                    nonce: populatedTx.nonce,
+                  });
+                  
+                  // Send the populated transaction through MetaMask
+                  approveTx = await signer.sendTransaction(populatedTx);
+                } catch (populateError) {
+                  console.warn("Populated transaction failed, trying standard approach:", populateError.message);
+                  // Fallback to standard approach
+                  approveTx = await tokenContract.approve(bridgeAddress, amountInWei, { gasLimit });
+                }
+              } else {
+                // Non-Arbitrum: use standard approach
+                approveTx = await tokenContract.approve(bridgeAddress, amountInWei, { gasLimit });
+              }
+              
               console.log(`Approval transaction: ${approveTx.hash}`);
               
-              // Wait for confirmation with timeout
+              // Wait for confirmation with timeout (longer for Arbitrum)
+              const timeout = isArbitrum ? 180000 : 120000;
               const receipt = await Promise.race([
                 approveTx.wait(),
                 new Promise((_, reject) => 
-                  setTimeout(() => reject(new Error("Approval transaction timeout")), 120000)
+                  setTimeout(() => reject(new Error("Approval transaction timeout")), timeout)
                 )
               ]);
               
               console.log("Token approval confirmed:", receipt.hash);
             } catch (approveError) {
               console.error("Approval transaction failed:", approveError);
+              console.error("Error details:", {
+                code: approveError?.code,
+                message: approveError?.message,
+                data: approveError?.data,
+                gasLimit: gasLimit.toString(),
+                chain: srcChainConfig.name,
+                chainId: srcChainConfig.chainId,
+                tokenAddress: tokenAddress,
+                bridgeAddress: bridgeAddress,
+              });
               
-              // Provide more helpful error message
+              // Provide more helpful error message based on chain and error type
               let errorMessage = "Token approval failed";
+              
               if (approveError?.code === -32603 || approveError?.message?.includes("Internal JSON-RPC")) {
-                errorMessage = "Token approval failed. This might be due to:\n" +
-                  "1. Insufficient gas limit\n" +
-                  "2. Token contract issue\n" +
-                  "3. Network congestion\n\n" +
-                  "Please try again or check your token balance.";
+                if (isArbitrum) {
+                  // Arbitrum-specific error handling
+                  errorMessage = `Token approval failed on Arbitrum Sepolia.\n\n` +
+                    `Possible causes:\n` +
+                    `1. Insufficient ETH for gas fees on Arbitrum\n` +
+                    `2. Token contract at ${tokenAddress} may not exist or be valid\n` +
+                    `3. Bridge address ${bridgeAddress} may be incorrect\n` +
+                    `4. Arbitrum RPC node issue - try again in a moment\n\n` +
+                    `Please ensure you have enough ETH on Arbitrum Sepolia for gas.`;
+                } else {
+                  errorMessage = `Token approval failed on ${srcChainConfig.name}.\n\n` +
+                    `Possible causes:\n` +
+                    `1. Insufficient gas (tried ${gasLimit.toString()})\n` +
+                    `2. Token contract issue\n` +
+                    `3. Network congestion\n` +
+                    `4. RPC node issue\n\n` +
+                    `Please try again or check your token balance.`;
+                }
+              } else if (approveError?.code === 'ACTION_REJECTED' || approveError?.code === 4001) {
+                errorMessage = "Transaction was rejected by user";
+              } else if (approveError?.message?.includes("insufficient funds")) {
+                errorMessage = `Insufficient ETH for gas fees on ${srcChainConfig.name}. Please add more ETH to your wallet.`;
               } else if (approveError?.message) {
                 errorMessage = approveError.message;
               }
@@ -645,6 +817,9 @@ export function useAxelarPayment() {
           const viewHintHex = viewHint.startsWith("0x") ? viewHint : "0x" + viewHint;
           const viewHintByte = viewHintHex.slice(0, 4);
 
+          // Check if source chain is Arbitrum (for special handling)
+          const isArbitrumChain = srcChainConfig.chainId === 421614;
+
           // For TUSDC (new deployments), check if it's in gateway
           // If not, use custom token function
           if (tokenSymbol === "TUSDC") {
@@ -654,35 +829,122 @@ export function useAxelarPayment() {
               GATEWAY_ABI,
               signer
             );
-            const gatewayTokenAddress = await gatewayContract.tokenAddresses(tokenSymbol);
-            
+            const gatewayTokenAddress =
+              await gatewayContract.tokenAddresses(tokenSymbol);
+
             if (gatewayTokenAddress === ethers.ZeroAddress) {
               // Use custom token function for new TUSDC deployments
-              console.log("TUSDC not in gateway, using custom token function...");
-              
+              console.log(
+                "TUSDC not in gateway, using custom token function..."
+              );
+
               // Get destination token address
-              const destinationTokenAddress = getITSTokenAddress(tokenSymbol, destinationChain, dstChainConfig.axelarName);
+              const destinationTokenAddress = getITSTokenAddress(
+                tokenSymbol,
+                destinationChain,
+                dstChainConfig.axelarName
+              );
               if (!destinationTokenAddress) {
                 throw new Error(
                   `TUSDC address not found for destination chain ${dstChainConfig.axelarName}. ` +
-                  `Please verify TUSDC is deployed on destination chain.`
+                    `Please verify TUSDC is deployed on destination chain.`
                 );
               }
-              
-              console.log(`Using custom token: source=${tokenAddress}, destination=${destinationTokenAddress}`);
-              
-              // Use custom token function
-              tx = await bridgeContract.sendCrossChainStealthPaymentCustomToken(
-                dstChainConfig.axelarName,
-                stealthAddress,
-                ephemeralPubKeyBytes,
-                viewHintByte,
-                k,
-                tokenAddress, // source token address
-                destinationTokenAddress, // destination token address
-                amountInWei,
-                { value: gasFeeWei }
+
+              console.log(
+                `Using custom token: source=${tokenAddress}, destination=${destinationTokenAddress}`
               );
+
+              // For Arbitrum, use populated transaction approach
+              if (isArbitrumChain) {
+                try {
+                  console.log("Using populated transaction for Arbitrum bridge call...");
+                  
+                  // Get reliable data from Arbitrum RPC
+                  const arbitrumRpc = "https://sepolia-rollup.arbitrum.io/rpc";
+                  const reliableProvider = new ethers.JsonRpcProvider(arbitrumRpc);
+                  
+                  const [nonce, feeData] = await Promise.all([
+                    reliableProvider.getTransactionCount(signerAddress),
+                    reliableProvider.getFeeData(),
+                  ]);
+                  
+                  // Estimate gas using reliable provider
+                  const gasEstimate = await reliableProvider.estimateGas({
+                    from: signerAddress,
+                    to: bridgeAddress,
+                    data: bridgeContract.interface.encodeFunctionData(
+                      "sendCrossChainStealthPaymentCustomToken",
+                      [
+                        dstChainConfig.axelarName,
+                        stealthAddress,
+                        ephemeralPubKeyBytes,
+                        viewHintByte,
+                        k,
+                        tokenAddress,
+                        destinationTokenAddress,
+                        amountInWei,
+                      ]
+                    ),
+                    value: gasFeeWei,
+                  });
+                  
+                  console.log(`Bridge gas estimate: ${gasEstimate.toString()}`);
+                  
+                  // Populate transaction
+                  const populatedTx = await bridgeContract.sendCrossChainStealthPaymentCustomToken.populateTransaction(
+                    dstChainConfig.axelarName,
+                    stealthAddress,
+                    ephemeralPubKeyBytes,
+                    viewHintByte,
+                    k,
+                    tokenAddress,
+                    destinationTokenAddress,
+                    amountInWei,
+                    { value: gasFeeWei }
+                  );
+                  
+                  // Add gas parameters
+                  populatedTx.gasLimit = gasEstimate * 2n; // 2x buffer
+                  populatedTx.nonce = nonce;
+                  populatedTx.chainId = 421614n;
+                  
+                  if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+                    populatedTx.maxFeePerGas = feeData.maxFeePerGas * 2n;
+                    populatedTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas * 2n;
+                    populatedTx.type = 2;
+                  }
+                  
+                  console.log("Sending populated bridge transaction...");
+                  tx = await signer.sendTransaction(populatedTx);
+                } catch (populateError) {
+                  console.warn("Populated transaction failed, trying standard:", populateError.message);
+                  tx = await bridgeContract.sendCrossChainStealthPaymentCustomToken(
+                    dstChainConfig.axelarName,
+                    stealthAddress,
+                    ephemeralPubKeyBytes,
+                    viewHintByte,
+                    k,
+                    tokenAddress,
+                    destinationTokenAddress,
+                    amountInWei,
+                    { value: gasFeeWei }
+                  );
+                }
+              } else {
+                // Non-Arbitrum: use standard approach
+                tx = await bridgeContract.sendCrossChainStealthPaymentCustomToken(
+                  dstChainConfig.axelarName,
+                  stealthAddress,
+                  ephemeralPubKeyBytes,
+                  viewHintByte,
+                  k,
+                  tokenAddress,
+                  destinationTokenAddress,
+                  amountInWei,
+                  { value: gasFeeWei }
+                );
+              }
             } else {
               // Use regular gateway function
               tx = await bridgeContract.sendCrossChainStealthPayment(
