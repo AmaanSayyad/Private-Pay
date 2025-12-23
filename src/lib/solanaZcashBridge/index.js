@@ -18,8 +18,8 @@ export function getBridgeProgramId() {
 }
 
 export function generateStealthMetaAddress() {
-  const spendingKeyPair = secp256k1.utils.randomPrivateKey();
-  const viewingKeyPair = secp256k1.utils.randomPrivateKey();
+  const spendingKeyPair = crypto.getRandomValues(new Uint8Array(32));
+  const viewingKeyPair = crypto.getRandomValues(new Uint8Array(32));
 
   const spendingPubKey = secp256k1.getPublicKey(spendingKeyPair, true);
   const viewingPubKey = secp256k1.getPublicKey(viewingKeyPair, true);
@@ -62,7 +62,7 @@ export function parseStealthMetaAddress(metaAddress) {
 export function generateStealthAddress(metaAddress) {
   const { spendingPublicKey, viewingPublicKey } = parseStealthMetaAddress(metaAddress);
 
-  const ephemeralPrivateKey = secp256k1.utils.randomPrivateKey();
+  const ephemeralPrivateKey = crypto.getRandomValues(new Uint8Array(32));
   const ephemeralPublicKey = secp256k1.getPublicKey(ephemeralPrivateKey, true);
 
   const viewingPubKeyPoint = secp256k1.ProjectivePoint.fromHex(viewingPublicKey);
@@ -291,7 +291,7 @@ export function deriveStealthMetaAddressPDA(owner) {
   const programId = new PublicKey(getBridgeProgramId());
   const ownerPubkey = new PublicKey(owner);
   const [pda, bump] = PublicKey.findProgramAddressSync(
-    [Buffer.from('stealth_meta'), ownerPubkey.toBuffer()],
+    [Buffer.from('meta'), ownerPubkey.toBuffer()],
     programId
   );
   return { pda, bump };

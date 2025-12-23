@@ -259,7 +259,7 @@ export class SolanaZcashBridgeClient {
     const accounts = {
       bridgeState: bridgeStatePda,
       withdrawalTicket: withdrawalTicketPda,
-      recipient: this.wallet.publicKey,
+      user: this.wallet.publicKey,
       systemProgram: SystemProgram.programId,
     };
 
@@ -335,7 +335,7 @@ export class SolanaZcashBridgeClient {
       )
       .accounts({
         metaAddress: metaAddressPda,
-        owner: this.wallet.publicKey,
+        user: this.wallet.publicKey,
         systemProgram: SystemProgram.programId,
       })
       .transaction();
