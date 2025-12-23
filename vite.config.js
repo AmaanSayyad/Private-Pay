@@ -12,16 +12,16 @@ export default defineConfig(({ mode }) => {
   const serverConfig =
     env.VITE_ENABLE_LOCAL_DNS === "true"
       ? {
+        host: "squidl.test",
+        port: 5173,
+        hmr: {
           host: "squidl.test",
-          port: 5173,
-          hmr: {
-            host: "squidl.test",
-            protocol: "ws",
-          },
-        }
+          protocol: "ws",
+        },
+      }
       : {
-          strictPort: false,
-        };
+        strictPort: false,
+      };
 
   return {
     base: '/', // Explicit base path for Vercel
@@ -64,6 +64,10 @@ export default defineConfig(({ mode }) => {
       include: [
         "readable-stream",
         "buffer",
+        "osmojs",
+        "@cosmjs/amino",
+        "@cosmjs/proto-signing",
+        "@cosmjs/stargate",
       ],
       esbuildOptions: {
         define: {
