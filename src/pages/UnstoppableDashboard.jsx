@@ -109,6 +109,14 @@ export default function UnstoppableDashboard() {
   const [sendAmount, setSendAmount] = useState("");
   const [isSending, setIsSending] = useState(false);
 
+  // Pagination state for transaction history
+  const [txLimit, setTxLimit] = useState(10);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Filter state for transaction history
+  const [filterChain, setFilterChain] = useState("All");
+  const [showFilters, setShowFilters] = useState(false);
+
   // Check password strength
   useEffect(() => {
     let strength = 0;
@@ -640,72 +648,105 @@ export default function UnstoppableDashboard() {
                     <TrendingUp className="w-5 h-5" />
                     Transaction History
                     <Chip size="sm" color="primary" variant="flat">
-                      {txHistory?.length || 0}
+                      {txHistory?.filter(tx => filterChain === "All" || tx.chain === filterChain).length || 0}
                     </Chip>
                   </h3>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={filterChain}
+                      onChange={(e) => setFilterChain(e.target.value)}
+                      className="px-3 py-2 text-sm border-2 rounded-lg font-medium"
+                      style={{ borderColor: '#0d08e3', color: '#0d08e3' }}
+                    >
+                      <option value="All">All Chains</option>
+                      <option value="Solana">Solana</option>
+                      <option value="Ethereum">Ethereum</option>
+                      <option value="Zcash">Zcash</option>
+                    </select>
+                  </div>
                 </div>
 
-                {txHistory && txHistory.length > 0 ? (
-                  <div className="space-y-3">
-                    {txHistory.map((tx, index) => (
-                      <div
-                        key={tx.hash || index}
-                        className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-primary-300 transition-all"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <div className={`px-2 py-1 rounded text-xs font-medium ${tx.chain === 'Solana' ? 'bg-purple-100 text-purple-700' :
-                              tx.chain === 'Ethereum' ? 'bg-indigo-100 text-indigo-700' :
-                                'bg-yellow-100 text-yellow-700'
-                              }`}>
-                              {tx.chain}
+                {txHistory && txHistory.filter(tx => filterChain === "All" || tx.chain === filterChain).length > 0 ? (
+                  <>
+                    <div className="space-y-3">
+                      {txHistory.filter(tx => filterChain === "All" || tx.chain === filterChain).map((tx, index) => (
+                        <div
+                          key={tx.hash || index}
+                          className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-primary-300 transition-all"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className={`px-2 py-1 rounded text-xs font-medium ${tx.chain === 'Solana' ? 'bg-purple-100 text-purple-700' :
+                                tx.chain === 'Ethereum' ? 'bg-indigo-100 text-indigo-700' :
+                                  'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                {tx.chain}
+                              </div>
+                              <div className={`px-2 py-1 rounded text-xs font-medium ${tx.status === 'success' || tx.status === 'confirmed'
+                                ? 'bg-green-100 text-green-700'
+                                : tx.status === 'failed'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                {tx.status}
+                              </div>
                             </div>
-                            <div className={`px-2 py-1 rounded text-xs font-medium ${tx.status === 'success' || tx.status === 'confirmed'
-                              ? 'bg-green-100 text-green-700'
-                              : tx.status === 'failed'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-yellow-100 text-yellow-700'
-                              }`}>
-                              {tx.status}
-                            </div>
+                            {tx.timestamp && (
+                              <p className="text-xs text-gray-500">
+                                {new Date(tx.timestamp).toLocaleString()}
+                              </p>
+                            )}
                           </div>
-                          {tx.timestamp && (
-                            <p className="text-xs text-gray-500">
-                              {new Date(tx.timestamp).toLocaleString()}
+
+                          <div className="flex items-center gap-2 mb-2">
+                            <p className="text-gray-900 font-mono text-xs truncate flex-1">
+                              {tx.hash}
+                            </p>
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="light"
+                              onClick={() => window.open(tx.explorerUrl, '_blank')}
+                            >
+                              <ExternalLink className="w-3 h-3 text-gray-500" />
+                            </Button>
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="light"
+                              onClick={() => copyToClipboard(tx.hash, "Transaction Hash")}
+                            >
+                              <Copy className="w-3 h-3 text-gray-500" />
+                            </Button>
+                          </div>
+
+                          {tx.value && (
+                            <p className="text-xs text-gray-600">
+                              Amount: {tx.value} {tx.chain === 'Ethereum' ? 'ETH' : tx.chain === 'Solana' ? 'SOL' : 'ZEC'}
                             </p>
                           )}
                         </div>
+                      ))}
+                    </div>
 
-                        <div className="flex items-center gap-2 mb-2">
-                          <p className="text-gray-900 font-mono text-xs truncate flex-1">
-                            {tx.hash}
-                          </p>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="light"
-                            onClick={() => window.open(tx.explorerUrl, '_blank')}
-                          >
-                            <ExternalLink className="w-3 h-3 text-gray-500" />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="light"
-                            onClick={() => copyToClipboard(tx.hash, "Transaction Hash")}
-                          >
-                            <Copy className="w-3 h-3 text-gray-500" />
-                          </Button>
-                        </div>
-
-                        {tx.value && (
-                          <p className="text-xs text-gray-600">
-                            Amount: {tx.value} {tx.chain === 'Ethereum' ? 'ETH' : tx.chain === 'Solana' ? 'SOL' : 'ZEC'}
-                          </p>
-                        )}
+                    {/* Load More Button */}
+                    {txHistory && txHistory.length >= txLimit && (
+                      <div className="flex justify-center mt-4">
+                        <Button
+                          variant="bordered"
+                          className="border-2 font-semibold"
+                          style={{ borderColor: '#0d08e3', color: '#0d08e3' }}
+                          onClick={() => {
+                            setTxLimit(prev => prev + 10);
+                          }}
+                          isLoading={isLoadingMore}
+                        >
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Load More Transactions
+                        </Button>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 ) : (
                   <div className="text-center py-8">
                     <TrendingUp className="w-12 h-12 text-gray-300 mx-auto mb-3" />

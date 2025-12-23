@@ -111,7 +111,8 @@ export function validateAddress(address, chain) {
             return ethers.isAddress(address);
         } else if (chain === 'Zcash') {
             // Basic validation for Zcash addresses
-            return address.startsWith('t') || address.startsWith('z');
+            // t-addresses (transparent), z-addresses (shielded sapling), u-addresses (unified)
+            return address.startsWith('t') || address.startsWith('z') || address.startsWith('u');
         }
         return false;
     } catch (error) {
@@ -120,8 +121,124 @@ export function validateAddress(address, chain) {
 }
 
 /**
+ * Send Zcash transaction via local RPC node
+ * Uses z_sendmany for shielded transactions
+ * @param {string} fromAddress - Source Zcash address
+ * @param {string} toAddress - Recipient Zcash address
+ * @param {number} amount - Amount in ZEC
+ * @param {string} network - Network: 'mainnet' or 'testnet'
+ * @returns {Promise<string>} Operation ID (can be used to track transaction)
+ */
+export async function sendZcashTransaction(fromAddress, toAddress, amount, network = 'testnet') {
+    try {
+        const rpcUrl = import.meta.env?.VITE_ZCASH_RPC_URL || 'http://localhost:18232';
+        const rpcUser = import.meta.env?.VITE_ZCASH_RPC_USER || '';
+        const rpcPassword = import.meta.env?.VITE_ZCASH_RPC_PASSWORD || '';
+
+        // Validate addresses
+        if (!validateAddress(fromAddress, 'Zcash')) {
+            throw new Error('Invalid source Zcash address');
+        }
+        if (!validateAddress(toAddress, 'Zcash')) {
+            throw new Error('Invalid destination Zcash address');
+        }
+
+        // Validate amount
+        if (!amount || amount <= 0) {
+            throw new Error('Invalid amount');
+        }
+
+        // Prepare recipients array for z_sendmany
+        const recipients = [
+            {
+                address: toAddress,
+                amount: parseFloat(amount)
+            }
+        ];
+
+        // Make RPC call to z_sendmany
+        const response = await fetch(rpcUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(rpcUser && rpcPassword ? {
+                    'Authorization': 'Basic ' + btoa(`${rpcUser}:${rpcPassword}`)
+                } : {})
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: Date.now(),
+                method: 'z_sendmany',
+                params: [
+                    fromAddress,
+                    recipients,
+                    1,          // minconf
+                    0.0001      // fee in ZEC
+                ]
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(data.error.message || 'Zcash RPC error');
+        }
+
+        // z_sendmany returns an operation ID
+        const operationId = data.result;
+        console.log('✅ Zcash transaction initiated, operation ID:', operationId);
+
+        return operationId;
+    } catch (error) {
+        console.error('Failed to send Zcash transaction:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get Zcash operation status
+ * @param {string} operationId - Operation ID from z_sendmany
+ * @returns {Promise<Object>} Operation status
+ */
+export async function getZcashOperationStatus(operationId) {
+    try {
+        const rpcUrl = import.meta.env?.VITE_ZCASH_RPC_URL || 'http://localhost:18232';
+        const rpcUser = import.meta.env?.VITE_ZCASH_RPC_USER || '';
+        const rpcPassword = import.meta.env?.VITE_ZCASH_RPC_PASSWORD || '';
+
+        const response = await fetch(rpcUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(rpcUser && rpcPassword ? {
+                    'Authorization': 'Basic ' + btoa(`${rpcUser}:${rpcPassword}`)
+                } : {})
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: Date.now(),
+                method: 'z_getoperationstatus',
+                params: [[operationId]]
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(data.error.message);
+        }
+
+        // Returns array of operation statuses
+        return data.result?.[0] || null;
+    } catch (error) {
+        console.error('Failed to get Zcash operation status:', error);
+        throw error;
+    }
+}
+
+/**
  * Estimate transaction fee
- * @param {string} chain - Chain: 'Solana', 'Ethereum'
+ * @param {string} chain - Chain: 'Solana', 'Ethereum', 'Zcash'
  * @param {string} network - Network
  * @returns {Promise<string>} Estimated fee
  */
@@ -146,6 +263,9 @@ export async function estimateTransactionFee(chain, network = 'devnet') {
             const estimatedGas = 21000n; // Standard transfer gas limit
             const estimatedFee = feeData.gasPrice * estimatedGas;
             return `${ethers.formatEther(estimatedFee)} ETH`;
+        } else if (chain === 'Zcash') {
+            // Zcash has a fixed fee of 0.0001 ZEC for shielded transactions
+            return '0.0001 ZEC';
         }
         return 'Unknown';
     } catch (error) {

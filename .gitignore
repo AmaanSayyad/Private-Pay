@@ -20,6 +20,16 @@ solana/.anchor/
 solana/node_modules/
 solana/criterion-*/
 
+# Circuit compilation artifacts (should be generated locally)
+keys/
+build/circuits/
+public/circuits/
+*.ptau
+*.zkey
+*.r1cs
+*.wasm
+*.sym
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
