@@ -717,6 +717,29 @@ export default function SolanaZcashBridgePage() {
                             </div>
                             <div className="mt-2 text-sm text-amber-600">
                               <p>Ticket ID: #{withdrawResult.ticketId}</p>
+                              {withdrawResult.signature && (
+                                <div className="flex items-center gap-2 mt-1 min-w-0">
+                                  <a
+                                    href={`https://solscan.io/tx/${withdrawResult.signature}?cluster=devnet`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-mono text-xs truncate flex-1 min-w-0 hover:text-amber-800 hover:underline cursor-pointer"
+                                  >
+                                    {withdrawResult.signature}
+                                  </a>
+                                  <a
+                                    href={`https://solscan.io/tx/${withdrawResult.signature}?cluster=devnet`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-shrink-0 hover:text-amber-800"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                  <button onClick={() => handleCopy(withdrawResult.signature)} className="flex-shrink-0">
+                                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </CardBody>
                         </Card>
