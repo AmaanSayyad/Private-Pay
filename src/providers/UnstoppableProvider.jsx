@@ -27,6 +27,10 @@ import { fetchAllTransactions } from "../lib/unstoppable/transactionService";
 // Import send transaction service
 import { sendSolanaTransaction, sendEthereumTransaction, validateAddress } from "../lib/unstoppable/sendService";
 
+// Import stealth payment receiving
+import stealthScanner from "../lib/unstoppable/stealthScanner";
+import { getAllReceivedPayments, getTotalUnspentBalance } from "../lib/unstoppable/indexedDB";
+
 // Utility functions
 const hexToBytes = (hex) => {
   if (!hex || typeof hex !== 'string') {
@@ -269,6 +273,10 @@ const generateMasterKeys = (mnemonic) => {
       ethereumAddress: multiChainKeys?.ethereum?.address || null,
       ethereumPublicKey: multiChainKeys?.ethereum?.publicKey || null,
       ethereumPrivateKey: multiChainKeys?.ethereum?.privateKey || null,
+      // Aptos
+      aptosAddress: multiChainKeys?.aptos?.address || null,
+      aptosPublicKey: multiChainKeys?.aptos?.publicKey || null,
+      aptosPrivateKey: multiChainKeys?.aptos?.privateKey || null,
     };
   } catch (error) {
     console.error("Error generating master keys:", error);
@@ -305,6 +313,7 @@ export default function UnstoppableProvider({ children }) {
 
   // Stealth addresses for receiving payments
   const [stealthAddresses, setStealthAddresses] = useState([]);
+  const [receivedPayments, setReceivedPayments] = useState([]); // Track received stealth payments
 
   // Privacy analytics (local only, no tracking)
   const [privacyScore, setPrivacyScore] = useState(0);
@@ -349,11 +358,11 @@ export default function UnstoppableProvider({ children }) {
   useEffect(() => {
     if (!isConnected || !wallet) return;
 
-    const loadTransactions = async () => {
+    const loadTransactions = async (limit = 10) => {
       try {
         console.log('🔄 Fetching transaction history from blockchain...');
 
-        const transactions = await fetchAllTransactions(wallet);
+        const transactions = await fetchAllTransactions(wallet, limit);
         console.log('✅ Transactions fetched:', transactions.length);
 
         setTxHistory(transactions);
@@ -365,9 +374,44 @@ export default function UnstoppableProvider({ children }) {
     loadTransactions();
 
     // Refresh transactions every 60 seconds
-    const interval = setInterval(loadTransactions, 60000);
+    const interval = setInterval(() => loadTransactions(), 60000);
     return () => clearInterval(interval);
   }, [isConnected, wallet]);
+
+  // Start/stop stealth payment scanner when wallet unlocks/locks
+  useEffect(() => {
+    if (!isConnected || !wallet || isLocked) {
+      // Stop scanner when locked
+      stealthScanner.stop();
+      return;
+    }
+
+    // Load received payments from Supabase
+    const loadReceivedPayments = async () => {
+      try {
+        const walletAddr = wallet.solanaPublicKey || wallet.ethereumAddress || wallet.zcashAddress;
+        const payments = await getAllReceivedPayments(walletAddr);
+        setReceivedPayments(payments);
+        console.log(`📦 Loaded ${payments.length} received stealth payment(s) from Supabase`);
+      } catch (error) {
+        console.error('Failed to load received payments:', error);
+      }
+    };
+
+    loadReceivedPayments();
+
+    // Start scanner with callback for new payments
+    stealthScanner.start(wallet, stealthAddresses, (payment) => {
+      console.log('🎉 New stealth payment received!', payment);
+      setReceivedPayments(prev => [payment, ...prev]);
+      toast.success(`Received ${payment.amount} ${payment.chain} to stealth address!`, {
+        duration: 5000,
+        icon: '🎉'
+      });
+    });
+
+    return () => stealthScanner.stop();
+  }, [isConnected, wallet, isLocked, stealthAddresses]);
 
   // Load wallet from encrypted storage
   useEffect(() => {
@@ -805,6 +849,23 @@ export default function UnstoppableProvider({ children }) {
           'sepolia'
         );
         toast.success(`Transaction sent! Hash: ${txHash.substring(0, 10)}...`);
+      } else if (chain === 'Zcash') {
+        // Import Zcash send function dynamically
+        const { sendZcashTransaction } = await import('../lib/unstoppable/sendService');
+
+        // Use wallet's Zcash address as source
+        if (!wallet.zcashAddress) {
+          throw new Error("No Zcash address in wallet");
+        }
+
+        const operationId = await sendZcashTransaction(
+          wallet.zcashAddress,
+          toAddress,
+          amount,
+          'testnet'
+        );
+        toast.success(`Zcash transaction initiated! Op: ${operationId.substring(0, 12)}...`);
+        return operationId;
       } else {
         throw new Error(`Sending not supported for ${chain}`);
       }
