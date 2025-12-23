@@ -111,7 +111,7 @@ export default function SolanaZcashBridgePage() {
         setBridgeStats(stats);
       }
     } catch (error) {
-      console.warn("Bridge stats not available:", error.message);
+      // Silently set demo stats for UI display
       // Set demo stats for UI display
       setBridgeStats({
         totalDeposits: 0,
@@ -351,8 +351,13 @@ export default function SolanaZcashBridgePage() {
             {connected && (
               <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${bridgeError ? 'bg-amber-50 border-amber-200' : 'bg-purple-50 border-purple-200'}`}>
                 <div className={`w-2 h-2 rounded-full animate-pulse ${bridgeError ? 'bg-amber-500' : 'bg-purple-500'}`} />
-                <span className={`text-sm font-medium ${bridgeError ? 'text-amber-700' : 'text-purple-700'}`}>
-                  {bridgeError ? "Demo Mode" : bridgeClient ? "Bridge Ready" : "Connecting..."}
+                <span className={`text-sm font-medium ${bridgeError ? 'text-amber-700' : 'text-purple-700'} flex items-center gap-1`}>
+                  {bridgeError ? "Demo Mode" : bridgeClient ? (
+                    <>
+                      <Zap className="w-3 h-3 fill-current" />
+                      Powered by Helius
+                    </>
+                  ) : "Connecting..."}
                 </span>
               </div>
             )}

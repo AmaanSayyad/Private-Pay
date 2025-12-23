@@ -103,11 +103,24 @@ export class HeliusClient {
       };
     }
 
+    // Skip API call on devnet to avoid 400 errors (API not supported on devnet)
+    if (this.network === 'devnet') {
+      return {
+        priorityFeeEstimate: 5000,
+        priorityFeeLevels: {
+          low: 1000,
+          medium: 5000,
+          high: 10000,
+          veryHigh: 50000,
+          unsafeMax: 100000,
+        },
+      };
+    }
+
     try {
       return await this.rpcCall('getPriorityFeeEstimate', [params]);
     } catch (error) {
-      // If the RPC call fails (e.g., on devnet), return sensible defaults
-      console.warn('getPriorityFeeEstimate failed, using defaults:', error.message);
+      // getPriorityFeeEstimate may not be available on devnet, silently use defaults
       return {
         priorityFeeEstimate: 5000,
         priorityFeeLevels: {
@@ -128,7 +141,7 @@ export class HeliusClient {
 
     try {
       const serializedTx = bs58.encode(transaction.serialize({ requireAllSignatures: false }));
-      
+
       const estimate = await this.getPriorityFeeEstimate({
         transaction: serializedTx,
         priorityLevel,
@@ -137,7 +150,7 @@ export class HeliusClient {
 
       priorityFee = estimate?.priorityFeeEstimate || estimate?.priorityFeeLevels?.medium || 5000;
     } catch (error) {
-      console.warn('Failed to estimate priority fee, using default:', error.message);
+      // Silently use default priority fee
     }
 
     const priorityFeeIx = ComputeBudgetProgram.setComputeUnitPrice({
@@ -145,13 +158,13 @@ export class HeliusClient {
     });
 
     transaction.instructions.unshift(priorityFeeIx);
-    
+
     return { transaction, priorityFee };
   }
 
   async parseTransactions(signatures) {
     const url = `${this.baseApiUrl}/transactions/?api-key=${this.apiKey}`;
-    
+
     const response = await axios.post(url, {
       transactions: signatures,
     }, {
@@ -163,9 +176,9 @@ export class HeliusClient {
 
   async getTransactionHistory(address, options = {}) {
     const { limit = 100, before, until, type } = options;
-    
+
     let url = `${this.baseApiUrl}/addresses/${address}/transactions?api-key=${this.apiKey}`;
-    
+
     if (limit) url += `&limit=${limit}`;
     if (before) url += `&before=${before}`;
     if (until) url += `&until=${until}`;
@@ -187,7 +200,7 @@ export class HeliusClient {
       }
 
       const transactions = await this.getTransactionHistory(address, queryOptions);
-      
+
       if (!transactions || transactions.length === 0) {
         break;
       }
@@ -201,7 +214,7 @@ export class HeliusClient {
 
   async createWebhook(webhookConfig) {
     const url = `https://api.helius.xyz/v0/webhooks?api-key=${this.apiKey}`;
-    
+
     const response = await axios.post(url, webhookConfig, {
       headers: { 'Content-Type': 'application/json' },
     });
@@ -239,7 +252,7 @@ export class HeliusClient {
 
   async updateWebhookAddresses(webhookId, addresses) {
     const url = `https://api.helius.xyz/v0/webhooks/${webhookId}?api-key=${this.apiKey}`;
-    
+
     const response = await axios.put(url, {
       accountAddresses: addresses,
     }, {
@@ -267,7 +280,7 @@ export class HeliusClient {
 
   async getRecentBlockhashWithPriorityFee(priorityLevel = 'Medium') {
     const blockhashResult = await this.rpcCall('getLatestBlockhash', [{ commitment: 'finalized' }]);
-    
+
     let priorityFee = 5000; // Default
     try {
       const priorityFeeResult = await this.getPriorityFeeEstimate({ priorityLevel });
@@ -319,24 +332,24 @@ export class HeliusClient {
 
   async confirmTransaction(signature, timeout = 30000, commitment = 'confirmed') {
     const startTime = Date.now();
-    
+
     while (Date.now() - startTime < timeout) {
       const result = await this.getSignatureStatuses([signature]);
-      
+
       if (result?.value?.[0]) {
         const status = result.value[0];
         if (status.err) {
           throw new Error(`Transaction failed: ${JSON.stringify(status.err)}`);
         }
-        if (status.confirmationStatus === commitment || 
-            status.confirmationStatus === 'finalized') {
+        if (status.confirmationStatus === commitment ||
+          status.confirmationStatus === 'finalized') {
           return { signature, status };
         }
       }
-      
+
       await new Promise(resolve => setTimeout(resolve, 500));
     }
-    
+
     throw new Error(`Transaction confirmation timeout: ${signature}`);
   }
 }
@@ -348,10 +361,10 @@ export function createHeliusClient(apiKey, network = 'devnet') {
 export function getHeliusClientFromEnv() {
   const apiKey = import.meta.env?.VITE_HELIUS_API_KEY || process.env?.HELIUS_API_KEY;
   const network = import.meta.env?.VITE_SOLANA_NETWORK || process.env?.SOLANA_NETWORK || 'devnet';
-  
+
   if (!apiKey) {
     throw new Error('HELIUS_API_KEY environment variable is required');
   }
-  
+
   return createHeliusClient(apiKey, network);
 }
