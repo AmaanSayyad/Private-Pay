@@ -10,8 +10,12 @@ import { Shield, Eye, EyeOff, ArrowLeftRight, Coins, Zap, RefreshCw, BarChart3, 
 import toast from 'react-hot-toast';
 import { getOsmosisRestEndpoint } from '../providers/CosmosProvider';
 
+// Check if testnet
+const isTestnet = import.meta.env.VITE_OSMOSIS_CHAIN_ID === 'osmo-test-5';
+const chainName = isTestnet ? 'osmosistestnet' : 'osmosis';
+
 export default function OsmosisPage() {
-  const { address, status } = useChain('osmosis');
+  const { address, status } = useChain(chainName);
   const [balance, setBalance] = useState(null);
   const [loading, setLoading] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(false);
@@ -108,6 +112,7 @@ export default function OsmosisPage() {
             </h1>
             <div className="flex items-center gap-2">
               <Chip size="sm" variant="flat" color="primary" className="font-bold text-[10px] uppercase tracking-wider">L5 Privacy</Chip>
+              {isTestnet && <Chip size="sm" variant="flat" color="warning" className="font-bold text-[10px] uppercase tracking-wider">TESTNET</Chip>}
               <div className="w-1 h-1 rounded-full bg-gray-300" />
               <span className="text-gray-400 text-xs font-medium uppercase tracking-widest">Interchain DEX</span>
             </div>
@@ -220,7 +225,7 @@ export default function OsmosisPage() {
                     <Chip size="sm" color="success" variant="flat" className="font-bold text-[10px]">LIVE</Chip>
                   </div>
                   <h3 className="text-lg font-black text-gray-900">Chain Activity</h3>
-                  <p className="text-gray-500 text-xs mt-1">Osmosis Mainnet-1</p>
+                  <p className="text-gray-500 text-xs mt-1">{isTestnet ? 'Osmosis Testnet (osmo-test-5)' : 'Osmosis Mainnet-1'}</p>
                 </div>
                 <div className="space-y-3 mt-6">
                   <div className="flex justify-between items-center text-xs">

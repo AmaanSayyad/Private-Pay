@@ -5,6 +5,10 @@ import { ArrowDownUp, RefreshCw, Zap, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getOsmosisRestEndpoint } from '../../providers/CosmosProvider';
 
+// Check if testnet
+const isTestnet = import.meta.env.VITE_OSMOSIS_CHAIN_ID === 'osmo-test-5';
+const chainName = isTestnet ? 'osmosistestnet' : 'osmosis';
+
 const TOKENS = [
     { id: 'uosmo', symbol: 'OSMO', name: 'Osmosis', icon: '/assets/osmosis-logo.png', decimals: 6 },
     { id: 'ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2', symbol: 'ATOM', name: 'Cosmos Hub', icon: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/cosmoshub/images/atom.png', decimals: 6 },
@@ -25,7 +29,7 @@ const EXCHANGE_RATES = {
 };
 
 export const SwapComponent = () => {
-    const { address, status, getSigningStargateClient } = useChain('osmosis');
+    const { address, status, getSigningStargateClient } = useChain(chainName);
     const [fromToken, setFromToken] = useState('uosmo');
     const [toToken, setToToken] = useState('ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2');
     const [fromAmount, setFromAmount] = useState('');

@@ -5,12 +5,28 @@ import { wallets as keplrWallets } from '@cosmos-kit/keplr';
 import { wallets as leapWallets } from '@cosmos-kit/leap';
 import '@interchain-ui/react/styles';
 
-const supportedChains = [osmosisChain];
+// Osmosis Testnet chain config
+const osmosisTestnet = {
+  ...osmosisChain,
+  chain_id: 'osmo-test-5',
+  chain_name: 'osmosistestnet',
+  pretty_name: 'Osmosis Testnet',
+  network_type: 'testnet',
+  apis: {
+    rpc: [{ address: 'https://rpc.testnet.osmosis.zone' }],
+    rest: [{ address: 'https://lcd.testnet.osmosis.zone' }],
+  },
+};
+
+// Use testnet for development, mainnet for production
+const isTestnet = import.meta.env.VITE_OSMOSIS_CHAIN_ID === 'osmo-test-5';
+const supportedChains = isTestnet ? [osmosisTestnet] : [osmosisChain];
 const supportedAssets = [osmosisAssets];
 
-// CORS-friendly RPC endpoints for Osmosis
-const OSMOSIS_RPC = import.meta.env.VITE_OSMOSIS_RPC_URL || 'https://rpc.osmosis.zone';
-const OSMOSIS_REST = import.meta.env.VITE_OSMOSIS_LCD_URL || 'https://lcd.osmosis.zone';
+// Osmosis Testnet (osmo-test-5) endpoints for testing
+// Switch to mainnet by changing these to rpc.osmosis.zone / lcd.osmosis.zone
+const OSMOSIS_RPC = import.meta.env.VITE_OSMOSIS_RPC_URL || 'https://rpc.testnet.osmosis.zone';
+const OSMOSIS_REST = import.meta.env.VITE_OSMOSIS_LCD_URL || 'https://lcd.testnet.osmosis.zone';
 
 export function CosmosProvider({ children }) {
   return (
@@ -34,6 +50,10 @@ export function CosmosProvider({ children }) {
         isLazy: true,
         endpoints: {
           osmosis: {
+            rpc: [OSMOSIS_RPC],
+            rest: [OSMOSIS_REST],
+          },
+          osmosistestnet: {
             rpc: [OSMOSIS_RPC],
             rest: [OSMOSIS_REST],
           },
