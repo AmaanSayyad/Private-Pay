@@ -637,7 +637,7 @@ export default function UnstoppableProvider({ children }) {
     let score = 0;
 
     // Using stealth addresses
-    score += Math.min(stealthAddresses.length * 5, 25);
+    score += Math.min(stealthAddresses.length * 5, 40); // Up to 40 points (8 addresses)
 
     // Hidden assets
     score += hiddenAssets.length * 5;

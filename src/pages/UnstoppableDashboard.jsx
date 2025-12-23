@@ -47,6 +47,7 @@ import {
   Send,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { isStealthAddress } from "../lib/unstoppable/stealthSender";
 
 export default function UnstoppableDashboard() {
   const navigate = useNavigate();
@@ -108,6 +109,9 @@ export default function UnstoppableDashboard() {
   const [sendRecipient, setSendRecipient] = useState("");
   const [sendAmount, setSendAmount] = useState("");
   const [isSending, setIsSending] = useState(false);
+
+  // Check if recipient is a stealth address
+  const isSendingToStealth = sendRecipient && isStealthAddress(sendRecipient);
 
   // Pagination state for transaction history
   const [txLimit, setTxLimit] = useState(10);
@@ -543,7 +547,7 @@ export default function UnstoppableDashboard() {
                         'APT': '/assets/aptos-logo.png',
                         'ETH': '/assets/eth-logo.png'
                       };
-                      
+
                       return (
                         <div
                           key={asset.id}
@@ -556,9 +560,9 @@ export default function UnstoppableDashboard() {
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
                               {assetLogos[asset.symbol] && (
-                                <img 
-                                  src={assetLogos[asset.symbol]} 
-                                  alt={asset.symbol} 
+                                <img
+                                  src={assetLogos[asset.symbol]}
+                                  alt={asset.symbol}
                                   className="w-6 h-6 object-contain"
                                 />
                               )}
@@ -1440,6 +1444,17 @@ export default function UnstoppableDashboard() {
                 }}
                 description={`Enter the ${sendChain} address of the recipient`}
               />
+
+              {/* Stealth Address Indicator */}
+              {isSendingToStealth && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg">
+                  <span className="text-2xl">🎭</span>
+                  <div>
+                    <p className="text-sm font-semibold text-purple-700">Sending to Stealth Address</p>
+                    <p className="text-xs text-purple-600">Recipient will need to scan blockchain to detect payment</p>
+                  </div>
+                </div>
+              )}
 
               {/* Amount */}
               <Input
