@@ -52,6 +52,7 @@ public/zk/**/*.ptau
 # Cloned repositories
 zec2eth/
 librustzcash/
+axelar-docs/
 
 # Rust build artifacts
 target/

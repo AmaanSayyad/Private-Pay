@@ -396,8 +396,28 @@ VITE_DARK_POOL_PROGRAM_ID=your_dark_pool_program_id
 VITE_ARCIUM_CLUSTER_OFFSET=0
 VITE_SOLANA_RPC_URL=https://api.devnet.solana.com
 
-# Axelar bridge
+# Axelar bridge (on-chain deployment addresses)
 VITE_AXELAR_BRIDGE_ADDRESS=your_axelar_bridge_address
+VITE_AXELAR_BRIDGE_ADDRESS_ARBITRUM_SEPOLIA=your_arbitrum_sepolia_bridge_address
+VITE_AXELAR_BRIDGE_ADDRESS_BASE_SEPOLIA=your_base_sepolia_bridge_address
+VITE_AXELAR_BRIDGE_ADDRESS_POLYGON_SEPOLIA=your_polygon_sepolia_bridge_address
+
+# TUSDC token addresses (chain-specific)
+VITE_AXELAR_TUSDC_ADDRESS_BASE_SEPOLIA=0x2823Af7e1F2F50703eD9f81Ac4B23DC1E78B9E53
+VITE_AXELAR_TUSDC_ADDRESS_ARBITRUM_SEPOLIA=0xd17beb0fE91B2aE5a57cE39D1c3D15AF1a968817
+
+# Deployer private key (TESTNET ONLY - for token faucet functionality)
+# WARNING: Never commit this to version control or use in production!
+VITE_DEPLOYER_PRIVATE_KEY=your_deployer_private_key
+
+# Axelar network configuration
+VITE_NETWORK=testnet
+
+# Axelar gas configuration (optional, defaults provided)
+VITE_AXELAR_GAS_MULTIPLIER=1.8
+VITE_AXELAR_ITS_GAS_MULTIPLIER=3.0
+VITE_AXELAR_MIN_GAS_FEE_WEI=0
+VITE_AXELAR_MIN_GAS_FEE_WEI_ITS=0
 
 # Zcash (frontend)
 VITE_ZCASH_NETWORK=testnet

@@ -18,15 +18,39 @@ import {
   hexToBytes,
 } from "../lib/evm/stealthAddress";
 
+// TUSDC addresses per chain (new deployments)
+const TUSDC_ADDRESSES = {
+  "base-sepolia": import.meta.env.VITE_AXELAR_TUSDC_ADDRESS_BASE_SEPOLIA || "0x2823Af7e1F2F50703eD9f81Ac4B23DC1E78B9E53",
+  "arbitrum-sepolia": import.meta.env.VITE_AXELAR_TUSDC_ADDRESS_ARBITRUM_SEPOLIA || "0xd17beb0fE91B2aE5a57cE39D1c3D15AF1a968817",
+  "ethereum-sepolia": "0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B", // Old ITS token
+  "polygon-sepolia": "0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B", // Old ITS token
+  "polygon-amoy": "0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B", // Old ITS token
+};
+
 // Custom ITS tokens configuration (deployed via Axelar ITS)
 const ITS_TOKENS = {
   TUSDC: {
     symbol: "TUSDC",
     name: "Test USDC",
     decimals: 6,
+    // Chain-specific addresses for new deployments
+    getAddress: (chainKey, axelarChainName) => {
+      // Use axelarChainName if provided, otherwise construct from chainKey
+      let chainName = axelarChainName;
+      if (!chainName && chainKey) {
+        chainName = chainKey.includes("sepolia") ? chainKey : `${chainKey}-sepolia`;
+      }
+      // Try to get chain-specific address
+      if (chainName && TUSDC_ADDRESSES[chainName]) {
+        return TUSDC_ADDRESSES[chainName];
+      }
+      // Fallback to ethereum-sepolia (old ITS token)
+      return TUSDC_ADDRESSES["ethereum-sepolia"] || "0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B";
+    },
+    // Legacy: same address for old ITS token (for backward compatibility)
     address: "0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B",
     tokenManagerAddress: "0x1e2f2E68ea65212Ec6F3D91f39E6B644fE41e29B",
-    deployedChains: ["ethereum-sepolia", "base-sepolia", "polygon-sepolia", "polygon-amoy"],
+    deployedChains: ["ethereum-sepolia", "base-sepolia", "arbitrum-sepolia", "polygon-sepolia", "polygon-amoy"],
   },
 };
 
@@ -58,9 +82,32 @@ function getBridgeAddressForChainKey(chainKey, chainConfig) {
 
 /**
  * Check if token is a custom ITS token
+ * Note: New TUSDC deployments (Base/Arbitrum) are standard ERC20, not ITS tokens
  */
-function isITSToken(symbol) {
-  return !!ITS_TOKENS[symbol];
+function isITSToken(symbol, chainKey = null, axelarChainName = null) {
+  if (!ITS_TOKENS[symbol]) return false;
+  
+  // New TUSDC deployments on Base and Arbitrum are NOT ITS tokens
+  if (symbol === "TUSDC") {
+    // Use axelarChainName if provided, otherwise construct from chainKey
+    let chainName = axelarChainName;
+    if (!chainName && chainKey) {
+      chainName = chainKey.includes("sepolia") ? chainKey : `${chainKey}-sepolia`;
+    }
+    
+    console.log(`[isITSToken] TUSDC check - chainKey: ${chainKey}, axelarChainName: ${axelarChainName}, chainName: ${chainName}`);
+    
+    // Only Ethereum Sepolia and Polygon have ITS TUSDC
+    if (chainName === "base-sepolia" || chainName === "arbitrum-sepolia") {
+      console.log(`[isITSToken] TUSDC on ${chainName} is NOT an ITS token (new deployment)`);
+      return false; // New deployments are standard ERC20
+    }
+    // Ethereum Sepolia and Polygon use old ITS token
+    console.log(`[isITSToken] TUSDC on ${chainName} IS an ITS token (old deployment)`);
+    return true;
+  }
+  
+  return true;
 }
 
 /**
@@ -71,16 +118,26 @@ function getITSTokenConfig(symbol) {
 }
 
 /**
- * Get ITS token address (same on all chains)
+ * Get ITS token address (chain-specific for new deployments)
  */
-function getITSTokenAddress(symbol) {
-  return ITS_TOKENS[symbol]?.address || null;
+function getITSTokenAddress(symbol, chainKey = null, axelarChainName = null) {
+  const token = ITS_TOKENS[symbol];
+  if (!token) return null;
+  
+  // Use getAddress function if available (for chain-specific addresses)
+  if (typeof token.getAddress === 'function') {
+    return token.getAddress(chainKey, axelarChainName);
+  }
+  
+  // Fallback to static address
+  return token.address || null;
 }
 
 // ABI for AxelarStealthBridge contract (must match contract signature)
 const AXELAR_STEALTH_BRIDGE_ABI = [
   "function sendCrossChainStealthPayment(string destinationChain, address stealthAddress, bytes ephemeralPubKey, bytes1 viewHint, uint32 k, string symbol, uint256 amount) external payable",
   "function sendCrossChainStealthPaymentITS(string destinationChain, address stealthAddress, bytes ephemeralPubKey, bytes1 viewHint, uint32 k, bytes32 tokenId, uint256 amount) external payable",
+  "function sendCrossChainStealthPaymentCustomToken(string destinationChain, address stealthAddress, bytes ephemeralPubKey, bytes1 viewHint, uint32 k, address sourceTokenAddress, address destinationTokenAddress, uint256 amount) external payable",
   "function gateway() external view returns (address)",
   "function gatewayWithToken() external view returns (address)",
   "event CrossChainStealthPaymentSent(string indexed destinationChain, address indexed sender, address stealthAddress, uint256 amount, string symbol, bytes32 paymentId)",
@@ -206,7 +263,8 @@ export function useAxelarPayment() {
         const itsMultiplier =
           Number(import.meta.env.VITE_AXELAR_ITS_GAS_MULTIPLIER) ||
           (import.meta.env.VITE_NETWORK === "mainnet" ? 1.2 : 3.0);
-        const gasMultiplier = isITSToken(tokenSymbol) ? itsMultiplier : baseMultiplier;
+        const axelarChainName = srcChainConfig.axelarName || sourceChain;
+        const gasMultiplier = isITSToken(tokenSymbol, sourceChain, axelarChainName) ? itsMultiplier : baseMultiplier;
 
         const estimate = await estimateCrossChainGas({
           sourceChain,
@@ -304,10 +362,11 @@ export function useAxelarPayment() {
         const itsMultiplier =
           Number(import.meta.env.VITE_AXELAR_ITS_GAS_MULTIPLIER) ||
           (import.meta.env.VITE_NETWORK === "mainnet" ? 1.2 : 3.0);
-        const gasMultiplier = isITSToken(tokenSymbol) ? itsMultiplier : baseMultiplier;
+        const axelarChainName = srcChainConfig.axelarName || sourceChain;
+        const gasMultiplier = isITSToken(tokenSymbol, sourceChain, axelarChainName) ? itsMultiplier : baseMultiplier;
 
         const minGasFeeWei = (() => {
-          const raw = isITSToken(tokenSymbol)
+          const raw = isITSToken(tokenSymbol, sourceChain, axelarChainName)
             ? import.meta.env.VITE_AXELAR_MIN_GAS_FEE_WEI_ITS
             : import.meta.env.VITE_AXELAR_MIN_GAS_FEE_WEI;
           if (!raw) return 0n;
@@ -350,26 +409,35 @@ export function useAxelarPayment() {
         // Get token address - check ITS tokens first, then gateway
         let tokenAddress;
 
-        if (isITSToken(tokenSymbol)) {
-          // ITS tokens have the same address on all chains
-          tokenAddress = getITSTokenAddress(tokenSymbol);
-          console.log(`ITS Token ${tokenSymbol} at ${tokenAddress}`);
+        // axelarChainName is already defined above (line 364)
+        if (isITSToken(tokenSymbol, sourceChain, axelarChainName)) {
+          // ITS tokens - use chain-specific address for new deployments
+          tokenAddress = getITSTokenAddress(tokenSymbol, sourceChain, axelarChainName);
+          console.log(`ITS Token ${tokenSymbol} at ${tokenAddress} on ${axelarChainName}`);
         } else {
-          // For gateway tokens, query the gateway contract
-          const gatewayAddress = await bridgeContract.gateway();
-          const gatewayContract = new ethers.Contract(
-            gatewayAddress,
-            GATEWAY_ABI,
-            signer
-          );
-          tokenAddress = await gatewayContract.tokenAddresses(tokenSymbol);
-          if (tokenAddress === ethers.ZeroAddress) {
-            throw new Error(
-              `Token ${tokenSymbol} is not supported on ${srcChainConfig.name}. ` +
-              `Please select a different token or verify the gateway configuration.`
+          // For gateway tokens or new TUSDC deployments (standard ERC20)
+          // New TUSDC deployments are not in gateway, so use direct address
+          if (tokenSymbol === "TUSDC") {
+            // Use chain-specific TUSDC address (already deployed)
+            tokenAddress = getITSTokenAddress(tokenSymbol, sourceChain, axelarChainName);
+            console.log(`TUSDC Token (standard ERC20) at ${tokenAddress} on ${axelarChainName}`);
+          } else {
+            // For other gateway tokens, query the gateway contract
+            const gatewayAddress = await bridgeContract.gateway();
+            const gatewayContract = new ethers.Contract(
+              gatewayAddress,
+              GATEWAY_ABI,
+              signer
             );
+            tokenAddress = await gatewayContract.tokenAddresses(tokenSymbol);
+            if (tokenAddress === ethers.ZeroAddress) {
+              throw new Error(
+                `Token ${tokenSymbol} is not supported on ${srcChainConfig.name}. ` +
+                `Please select a different token or verify the gateway configuration.`
+              );
+            }
+            console.log(`Gateway Token ${tokenSymbol} verified at ${tokenAddress}`);
           }
-          console.log(`Gateway Token ${tokenSymbol} verified at ${tokenAddress}`);
         }
 
         // Step 4: Check and approve token spending
@@ -401,11 +469,18 @@ export function useAxelarPayment() {
 
         let tx;
 
-        if (isITSToken(tokenSymbol)) {
+        // Check if this is a real ITS token (not new TUSDC deployments)
+        const isRealITSToken = isITSToken(tokenSymbol, sourceChain, axelarChainName);
+        console.log(`Token ${tokenSymbol} on ${axelarChainName}: isITSToken=${isRealITSToken}`);
+
+        if (isRealITSToken) {
           // === STEALTH TRANSFER FOR ITS TOKENS (via Bridge) ===
           console.log("Using Bridge ITS function for stealth transfer...");
 
           const itsConfig = getITSTokenConfig(tokenSymbol);
+          if (!itsConfig || !itsConfig.tokenManagerAddress) {
+            throw new Error(`ITS token config not found for ${tokenSymbol}`);
+          }
 
           // Get tokenId from token manager
           const tokenManager = new ethers.Contract(
@@ -423,9 +498,61 @@ export function useAxelarPayment() {
           const currentAllowance = await tokenContract.allowance(signerAddress, bridgeAddress);
           if (currentAllowance < amountInWei) {
             console.log("Approving Bridge to spend tokens...");
-            const approveTx = await tokenContract.approve(bridgeAddress, amountInWei);
-            await approveTx.wait();
-            console.log("Bridge approval confirmed");
+            setTxStatus(TX_STATUS.APPROVING);
+            
+            // Check token balance first
+            const tokenBalance = await tokenContract.balanceOf(signerAddress);
+            if (tokenBalance < amountInWei) {
+              throw new Error(
+                `Insufficient token balance. You have ${ethers.formatUnits(tokenBalance, decimals)} ${tokenSymbol}, ` +
+                `but need ${ethers.formatUnits(amountInWei, decimals)} ${tokenSymbol}.`
+              );
+            }
+            
+            // Estimate gas for approval
+            let gasLimit;
+            try {
+              const estimatedGas = await tokenContract.approve.estimateGas(bridgeAddress, amountInWei);
+              gasLimit = estimatedGas + (estimatedGas / 2n); // Add 50% buffer
+              console.log(`Estimated gas: ${estimatedGas.toString()}, Using: ${gasLimit.toString()}`);
+            } catch (estimateError) {
+              console.warn("Gas estimation failed, using safe default:", estimateError);
+              gasLimit = 150000n; // Increased default
+            }
+            
+            // Ensure minimum gas limit
+            if (gasLimit < 50000n) {
+              gasLimit = 50000n;
+            }
+            
+            try {
+              const approveTx = await tokenContract.approve(bridgeAddress, amountInWei, { gasLimit });
+              console.log(`Approval transaction: ${approveTx.hash}`);
+              
+              const receipt = await Promise.race([
+                approveTx.wait(),
+                new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error("Approval transaction timeout")), 120000)
+                )
+              ]);
+              
+              console.log("Bridge approval confirmed:", receipt.hash);
+            } catch (approveError) {
+              console.error("Approval transaction failed:", approveError);
+              
+              let errorMessage = "Token approval failed";
+              if (approveError?.code === -32603 || approveError?.message?.includes("Internal JSON-RPC")) {
+                errorMessage = "Token approval failed. This might be due to:\n" +
+                  "1. Insufficient gas limit\n" +
+                  "2. Token contract issue\n" +
+                  "3. Network congestion\n\n" +
+                  "Please try again or check your token balance.";
+              } else if (approveError?.message) {
+                errorMessage = approveError.message;
+              }
+              
+              throw new Error(errorMessage);
+            }
           }
 
           // Convert ephemeralPubKey to bytes
@@ -455,9 +582,61 @@ export function useAxelarPayment() {
           const currentAllowance = await tokenContract.allowance(signerAddress, bridgeAddress);
           if (currentAllowance < amountInWei) {
             console.log("Approving token spending...");
-            const approveTx = await tokenContract.approve(bridgeAddress, amountInWei);
-            await approveTx.wait();
-            console.log("Token approval confirmed");
+            console.log(`Approving ${ethers.formatUnits(amountInWei, decimals)} ${tokenSymbol} to bridge ${bridgeAddress}`);
+            
+            setTxStatus(TX_STATUS.APPROVING);
+            
+            // Estimate gas for approval with better error handling
+            let gasLimit;
+            try {
+              const estimatedGas = await tokenContract.approve.estimateGas(bridgeAddress, amountInWei);
+              // Add 50% buffer for safety (approval transactions can be tricky)
+              gasLimit = estimatedGas + (estimatedGas / 2n);
+              console.log(`Estimated gas: ${estimatedGas.toString()}, Using: ${gasLimit.toString()}`);
+            } catch (estimateError) {
+              console.warn("Gas estimation failed, using safe default:", estimateError);
+              // Use a higher default for approval (ERC20 approve can vary)
+              gasLimit = 150000n; // Increased default gas limit
+            }
+            
+            // Ensure minimum gas limit
+            if (gasLimit < 50000n) {
+              gasLimit = 50000n;
+            }
+            
+            try {
+              const approveTx = await tokenContract.approve(bridgeAddress, amountInWei, { 
+                gasLimit,
+                // Don't set gasPrice, let the provider handle it
+              });
+              console.log(`Approval transaction: ${approveTx.hash}`);
+              
+              // Wait for confirmation with timeout
+              const receipt = await Promise.race([
+                approveTx.wait(),
+                new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error("Approval transaction timeout")), 120000)
+                )
+              ]);
+              
+              console.log("Token approval confirmed:", receipt.hash);
+            } catch (approveError) {
+              console.error("Approval transaction failed:", approveError);
+              
+              // Provide more helpful error message
+              let errorMessage = "Token approval failed";
+              if (approveError?.code === -32603 || approveError?.message?.includes("Internal JSON-RPC")) {
+                errorMessage = "Token approval failed. This might be due to:\n" +
+                  "1. Insufficient gas limit\n" +
+                  "2. Token contract issue\n" +
+                  "3. Network congestion\n\n" +
+                  "Please try again or check your token balance.";
+              } else if (approveError?.message) {
+                errorMessage = approveError.message;
+              }
+              
+              throw new Error(errorMessage);
+            }
           }
 
           // Convert ephemeralPubKey to bytes
@@ -466,16 +645,70 @@ export function useAxelarPayment() {
           const viewHintHex = viewHint.startsWith("0x") ? viewHint : "0x" + viewHint;
           const viewHintByte = viewHintHex.slice(0, 4);
 
-          tx = await bridgeContract.sendCrossChainStealthPayment(
-            dstChainConfig.axelarName,
-            stealthAddress,
-            ephemeralPubKeyBytes,
-            viewHintByte,
-            k,
-            tokenSymbol,
-            amountInWei,
-            { value: gasFeeWei }
-          );
+          // For TUSDC (new deployments), check if it's in gateway
+          // If not, use custom token function
+          if (tokenSymbol === "TUSDC") {
+            const gatewayAddress = await bridgeContract.gateway();
+            const gatewayContract = new ethers.Contract(
+              gatewayAddress,
+              GATEWAY_ABI,
+              signer
+            );
+            const gatewayTokenAddress = await gatewayContract.tokenAddresses(tokenSymbol);
+            
+            if (gatewayTokenAddress === ethers.ZeroAddress) {
+              // Use custom token function for new TUSDC deployments
+              console.log("TUSDC not in gateway, using custom token function...");
+              
+              // Get destination token address
+              const destinationTokenAddress = getITSTokenAddress(tokenSymbol, destinationChain, dstChainConfig.axelarName);
+              if (!destinationTokenAddress) {
+                throw new Error(
+                  `TUSDC address not found for destination chain ${dstChainConfig.axelarName}. ` +
+                  `Please verify TUSDC is deployed on destination chain.`
+                );
+              }
+              
+              console.log(`Using custom token: source=${tokenAddress}, destination=${destinationTokenAddress}`);
+              
+              // Use custom token function
+              tx = await bridgeContract.sendCrossChainStealthPaymentCustomToken(
+                dstChainConfig.axelarName,
+                stealthAddress,
+                ephemeralPubKeyBytes,
+                viewHintByte,
+                k,
+                tokenAddress, // source token address
+                destinationTokenAddress, // destination token address
+                amountInWei,
+                { value: gasFeeWei }
+              );
+            } else {
+              // Use regular gateway function
+              tx = await bridgeContract.sendCrossChainStealthPayment(
+                dstChainConfig.axelarName,
+                stealthAddress,
+                ephemeralPubKeyBytes,
+                viewHintByte,
+                k,
+                tokenSymbol,
+                amountInWei,
+                { value: gasFeeWei }
+              );
+            }
+          } else {
+            // For other tokens, use regular gateway function
+            tx = await bridgeContract.sendCrossChainStealthPayment(
+              dstChainConfig.axelarName,
+              stealthAddress,
+              ephemeralPubKeyBytes,
+              viewHintByte,
+              k,
+              tokenSymbol,
+              amountInWei,
+              { value: gasFeeWei }
+            );
+          }
         }
 
         console.log("Transaction sent:", tx.hash);

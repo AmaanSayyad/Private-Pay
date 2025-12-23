@@ -36,11 +36,22 @@
     "network": "base-sepolia",
     "chainId": 84532,
     "axelarChainName": "base-sepolia",
-    "contractAddress": "0x955a7a85B346b0d49E3BC451774DdcDb11805788",
+    "contractAddress": "0x38e3f8c4822b5147FA254c7B873ED6aAC6E08112",
     "gateway": "0xe432150cce91c13a887f7D836923d5597adD8E31",
     "gasService": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
-    "deployer": "0xD25a9d413285Ed8963C46397c6f36C844330Fe3B",
-    "timestamp": "2025-12-17T19:27:26.821Z",
-    "txHash": "0xfc0b25b41374d329a535142de11bca22c016e6048a3df04ab2d478a00f71bd5c"
+    "deployer": "0x71197e7a1CA5A2cb2AD82432B924F69B1E3dB123",
+    "timestamp": "2025-12-23T00:21:20.984Z",
+    "txHash": "0x9d840262c59f7f0e339f4cb8abc52a5431ce814efb4968dd2245128479c6014e"
+  },
+  "arbitrum-sepolia": {
+    "network": "arbitrum-sepolia",
+    "chainId": 421614,
+    "axelarChainName": "arbitrum-sepolia",
+    "contractAddress": "0x5FC2646D45355EC01B8F56fD2284FD4A7e616357",
+    "gateway": "0xe1cE95479C84e9809269227C7F8524aE051Ae77a",
+    "gasService": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
+    "deployer": "0x71197e7a1CA5A2cb2AD82432B924F69B1E3dB123",
+    "timestamp": "2025-12-23T00:21:09.175Z",
+    "txHash": "0xdddc7a5655faab5a4539f093801f96ff46aa87b47facee684a867e798fb2750b"
   }
 }

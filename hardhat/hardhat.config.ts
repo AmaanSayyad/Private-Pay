@@ -56,7 +56,9 @@ const config: HardhatUserConfig = {
     },
     'arbitrum-sepolia': {
       url: process.env.ARBITRUM_SEPOLIA_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.ARBITRUM_TREASURY_PRIVATE_KEY 
+        ? [process.env.ARBITRUM_TREASURY_PRIVATE_KEY] 
+        : process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 421614,
     },
     'optimism-sepolia': {
@@ -66,7 +68,9 @@ const config: HardhatUserConfig = {
     },
     'base-sepolia': {
       url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.BASE_TREASURY_PRIVATE_KEY 
+        ? [process.env.BASE_TREASURY_PRIVATE_KEY] 
+        : process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 84532,
     },
     'bnb-testnet': {
@@ -81,6 +85,11 @@ const config: HardhatUserConfig = {
     }
   },
   etherscan: {
+    apiKey: {
+      arbitrumSepolia: process.env.ARBISCAN_API_KEY || "",
+      baseSepolia: process.env.BASESCAN_API_KEY || "",
+      sepolia: process.env.ETHERSCAN_API_KEY || "",
+    },
     customChains: [
       {
         network: "sapphire-testnet",
@@ -88,6 +97,22 @@ const config: HardhatUserConfig = {
         urls: {
           apiURL: "https://explorer.oasis.io/testnet/sapphire/api",
           browserURL: "https://explorer.oasis.io/testnet/sapphire/",
+        },
+      },
+      {
+        network: "arbitrum-sepolia",
+        chainId: 421614,
+        urls: {
+          apiURL: "https://api-sepolia.arbiscan.io/api",
+          browserURL: "https://sepolia.arbiscan.io",
+        },
+      },
+      {
+        network: "base-sepolia",
+        chainId: 84532,
+        urls: {
+          apiURL: "https://api-sepolia.basescan.org/api",
+          browserURL: "https://sepolia.basescan.org",
         },
       },
     ],

@@ -24,7 +24,7 @@ const AXELAR_CONTRACTS: Record<string, { gateway: string; gasService: string }> 
     gasService: "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
   },
   "arbitrum-sepolia": {
-    gateway: "0xe432150cce91c13a887f7D836923d5597adD8E31",
+    gateway: "0xe1cE95479C84e9809269227C7F8524aE051Ae77a", // ✅ Correct Arbitrum Sepolia gateway
     gasService: "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
   },
   "optimism-sepolia": {

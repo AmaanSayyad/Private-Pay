@@ -158,6 +158,7 @@ export const AXELAR_CHAINS = {
     icon: "/chains/arbitrum.svg",
     gasToken: GAS_TOKENS.ETH,
     color: "#28A0F0",
+    stealthBridge: isMainnet ? "" : (import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS_ARBITRUM_SEPOLIA || import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS || ""),
   },
   optimism: {
     name: "Optimism",
@@ -201,6 +202,7 @@ export const AXELAR_CHAINS = {
     tokens: isMainnet ? ["axlUSDC", "WETH", "USDC", "aUSDC"] : ["aUSDC", "axlUSDC", "WETH"], // TUSDC not deployed on Base yet
     icon: "/chains/base.svg",
     gasToken: GAS_TOKENS.ETH,
+    stealthBridge: isMainnet ? "" : (import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS_BASE_SEPOLIA || import.meta.env.VITE_AXELAR_BRIDGE_ADDRESS || ""),
     color: "#0052FF",
     stealthBridge: isMainnet ? "" : "0xE09f184968cdAD4D0B94e2968Cfbf1395FB66D79",
   },
@@ -627,22 +629,57 @@ function getFallbackAssets() {
 }
 
 // Custom ITS tokens deployed for testing (not in Axelar API)
+// New TUSDC deployments (chain-specific addresses)
+const TUSDC_ADDRESSES = {
+  "base-sepolia": import.meta.env.VITE_AXELAR_TUSDC_ADDRESS_BASE_SEPOLIA || "0x2823Af7e1F2F50703eD9f81Ac4B23DC1E78B9E53",
+  "arbitrum-sepolia": import.meta.env.VITE_AXELAR_TUSDC_ADDRESS_ARBITRUM_SEPOLIA || "0xd17beb0fE91B2aE5a57cE39D1c3D15AF1a968817",
+  "ethereum-sepolia": "0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B", // Old ITS token
+};
+
 const CUSTOM_ITS_TOKENS = {
   TUSDC: {
     symbol: "TUSDC",
     name: "Test USDC",
     decimals: 6,
-    address: "0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B",
-    // Interchain tokenId (stable across chains) for our deployed ITS token.
-    // Override via env if you redeploy.
+    // Use chain-specific address if available, otherwise fallback to old ITS address
+    address: (chainKey) => {
+      const chainName = chainKey?.includes("sepolia") ? chainKey : `${chainKey}-sepolia`;
+      return TUSDC_ADDRESSES[chainName] || TUSDC_ADDRESSES["ethereum-sepolia"] || "0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B";
+    },
+    // Interchain tokenId (stable across chains) for old ITS token.
+    // New deployments are standard ERC20, not ITS tokens.
     tokenId: import.meta.env.VITE_AXELAR_ITS_TUSDC_TOKEN_ID || "0x8bb61f14973ff494dda544391a758a6edf44a9ef16e2dfcd9d6dc9ade3da12bf",
-    deployedChains: ["ethereum-sepolia", "base-sepolia", "polygon-sepolia", "polygon-amoy"],
+    deployedChains: ["ethereum-sepolia", "base-sepolia", "arbitrum-sepolia", "polygon-sepolia", "polygon-amoy"],
   },
 };
 
-export function getCustomItsToken(symbol) {
+export function getCustomItsToken(symbol, chainKey = null) {
   if (!symbol) return null;
-  return CUSTOM_ITS_TOKENS[String(symbol).toUpperCase()] || null;
+  const token = CUSTOM_ITS_TOKENS[String(symbol).toUpperCase()];
+  if (!token) return null;
+  
+  // If address is a function, call it with chainKey
+  if (typeof token.address === 'function' && chainKey) {
+    return {
+      ...token,
+      address: token.address(chainKey),
+    };
+  }
+  
+  // If address is a string, return as is
+  if (typeof token.address === 'string') {
+    return token;
+  }
+  
+  // Fallback: try to get address from function with default chain
+  if (typeof token.address === 'function') {
+    return {
+      ...token,
+      address: token.address(chainKey || 'base-sepolia'),
+    };
+  }
+  
+  return token;
 }
 
 export function getItsTokenId(symbol) {
@@ -744,7 +781,7 @@ export function getSupportedTokens(sourceChain, destinationChain) {
 
   // ITS test tokens (handled via ITS path, not Gateway tokenAddresses()).
   if (!isMainnet) {
-    const tusdc = getCustomItsToken("TUSDC");
+    const tusdc = getCustomItsToken("TUSDC", sourceChainKey);
     if (tusdc) {
       const srcOk = tusdc.deployedChains.some((c) => c.toLowerCase().includes(srcChain.axelarName.toLowerCase().split("-")[0]));
       const dstOk = tusdc.deployedChains.some((c) => c.toLowerCase().includes(dstChain.axelarName.toLowerCase().split("-")[0]));

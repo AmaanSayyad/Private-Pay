@@ -64,6 +64,12 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, InterchainTokenExecut
         uint256 nonce;
     }
 
+    struct CustomTokenPayment {
+        StealthPayment payment;
+        address tokenAddress; // Custom token address on destination chain
+        uint256 amount; // Amount to transfer on destination
+    }
+
     struct MetaAddress {
         bytes spendPubKey;
         bytes viewingPubKey;
@@ -253,6 +259,116 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, InterchainTokenExecut
             stealthAddress,
             amountAfterFee,
             symbol,
+            paymentId
+        );
+    }
+
+    /**
+     * @notice Send a cross-chain stealth payment with custom token address (not in gateway)
+     * @param destinationChain The name of the destination chain (Axelar format)
+     * @param stealthAddress The computed stealth address on destination
+     * @param ephemeralPubKey The ephemeral public key for recipient detection
+     * @param viewHint The view hint byte for fast scanning
+     * @param k The index used in stealth address generation
+     * @param tokenAddress The custom token address (not registered in gateway)
+     * @param amount The amount of tokens to send
+     * @dev This function uses ITS to transfer custom tokens that are not in gateway
+     *      The token must be deployed on both source and destination chains
+     */
+    /**
+     * @notice Send a cross-chain stealth payment with custom token address (not in gateway)
+     * @param destinationChain The name of the destination chain (Axelar format)
+     * @param stealthAddress The computed stealth address on destination
+     * @param ephemeralPubKey The ephemeral public key for recipient detection
+     * @param viewHint The view hint byte for fast scanning
+     * @param k The index used in stealth address generation
+     * @param sourceTokenAddress The token address on source chain
+     * @param destinationTokenAddress The token address on destination chain (can be same or different)
+     * @param amount The amount of tokens to send
+     * @dev This function uses message-only GMP. Tokens are transferred to bridge on source,
+     *      and must be pre-funded on destination chain. The bridge contract must have
+     *      sufficient balance of destinationTokenAddress on destination chain.
+     */
+    function sendCrossChainStealthPaymentCustomToken(
+        string calldata destinationChain,
+        address stealthAddress,
+        bytes calldata ephemeralPubKey,
+        bytes1 viewHint,
+        uint32 k,
+        address sourceTokenAddress,
+        address destinationTokenAddress,
+        uint256 amount
+    ) external payable nonReentrant whenNotPaused {
+        // Validate inputs
+        if (bytes(destinationChain).length == 0) revert InvalidDestination();
+        if (stealthAddress == address(0)) revert InvalidStealthAddress();
+        if (amount == 0) revert InvalidAmount();
+        if (msg.value == 0) revert InsufficientGasPayment();
+        if (ephemeralPubKey.length != 33) revert InvalidEphemeralKeyLength();
+        if (sourceTokenAddress == address(0)) revert InvalidTokenAddress();
+        if (destinationTokenAddress == address(0)) revert InvalidTokenAddress();
+        
+        string memory destinationContract = trustedRemotes[destinationChain];
+        if (bytes(destinationContract).length == 0) revert UntrustedRemote();
+
+        // Calculate protocol fee
+        uint256 fee = (amount * protocolFeeBps) / 10000;
+        uint256 amountAfterFee = amount - fee;
+        
+        if (amountAfterFee < 1000) revert AmountTooSmall();
+
+        // Transfer tokens from sender to bridge (on source chain)
+        IERC20(sourceTokenAddress).safeTransferFrom(msg.sender, address(this), amount);
+        
+        // Transfer fee to recipient (on source chain)
+        if (fee > 0 && feeRecipient != address(0)) {
+            IERC20(sourceTokenAddress).safeTransfer(feeRecipient, fee);
+        }
+
+        // Generate unique payment ID
+        uint256 nonce = paymentNonces[msg.sender]++;
+        bytes32 paymentId = keccak256(
+            abi.encodePacked(msg.sender, nonce, block.timestamp, stealthAddress)
+        );
+
+        // Encode payload with custom token info
+        bytes memory payload = abi.encode(
+            CustomTokenPayment({
+                payment: StealthPayment({
+                    stealthAddress: stealthAddress,
+                    ephemeralPubKey: ephemeralPubKey,
+                    viewHint: viewHint,
+                    k: k,
+                    sender: msg.sender,
+                    nonce: nonce
+                }),
+                tokenAddress: destinationTokenAddress,
+                amount: amountAfterFee
+            })
+        );
+
+        // Pay for gas on destination chain (message-only, no tokens)
+        gasService.payNativeGasForContractCall{value: msg.value}(
+            address(this),
+            destinationChain,
+            destinationContract,
+            payload,
+            msg.sender
+        );
+
+        // Send cross-chain message (no tokens, message-only)
+        gateway().callContract(
+            destinationChain,
+            destinationContract,
+            payload
+        );
+
+        emit CrossChainStealthPaymentSent(
+            destinationChain,
+            msg.sender,
+            stealthAddress,
+            amountAfterFee,
+            "CUSTOM_TOKEN",
             paymentId
         );
     }
@@ -473,14 +589,14 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, InterchainTokenExecut
         string calldata sourceAddress,
         bytes calldata payload
     ) internal override {
+        // Verify source is trusted
+        string memory trusted = trustedRemotes[sourceChain];
+        if (keccak256(bytes(trusted)) != keccak256(bytes(sourceAddress))) {
+            revert UntrustedRemote();
+        }
+
         // Check if it's our Sync message
         if (payload.length >= 4 && bytes4(payload) == SYNC_SELECTOR) {
-            // Verify source is trusted
-            string memory trusted = trustedRemotes[sourceChain];
-            if (keccak256(bytes(trusted)) != keccak256(bytes(sourceAddress))) {
-                revert UntrustedRemote();
-            }
-
             // Decode payload (skip selector)
             (, address user, bytes memory spendPubKey, bytes memory viewingPubKey) = 
                 abi.decode(payload, (bytes4, address, bytes, bytes));
@@ -497,9 +613,41 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, InterchainTokenExecut
             } else {
                 emit MetaAddressSyncSkipped(sourceChain, user);
             }
-        } else {
-            revert InvalidMessage();
+            return;
         }
+
+        // Try to decode as CustomTokenPayment
+        try this.decodeCustomTokenPayment(payload) returns (CustomTokenPayment memory customPayment) {
+            // This is a custom token payment
+            // Transfer tokens from bridge to stealth address
+            // Note: Bridge must have sufficient balance of customPayment.tokenAddress
+            uint256 bridgeBalance = IERC20(customPayment.tokenAddress).balanceOf(address(this));
+            if (bridgeBalance < customPayment.amount) {
+                revert("Insufficient bridge balance for custom token");
+            }
+            
+            IERC20(customPayment.tokenAddress).safeTransfer(
+                customPayment.payment.stealthAddress,
+                customPayment.amount
+            );
+
+            // Emit event for recipient's scanner to detect
+            emit StealthPaymentReceived(
+                sourceChain,
+                customPayment.payment.stealthAddress,
+                customPayment.amount,
+                "CUSTOM_TOKEN",
+                customPayment.payment.ephemeralPubKey,
+                customPayment.payment.viewHint,
+                customPayment.payment.k
+            );
+            return;
+        } catch {
+            // Not a custom token payment, continue
+        }
+
+        // If we get here, it's an invalid message
+        revert InvalidMessage();
     }
 
     /**
@@ -675,6 +823,22 @@ contract AxelarStealthBridge is AxelarExecutableWithToken, InterchainTokenExecut
     ) external view returns (bool) {
         return keccak256(bytes(trustedRemotes[chainName])) == 
                keccak256(bytes(contractAddress));
+    }
+
+    /**
+     * @notice Decode CustomTokenPayment from payload (external for try-catch)
+     * @dev This is marked external so it can be called via try-catch in _execute
+     */
+    function decodeCustomTokenPayment(bytes calldata payload) external pure returns (CustomTokenPayment memory) {
+        return abi.decode(payload, (CustomTokenPayment));
+    }
+
+    /**
+     * @notice Decode StealthPayment from payload (external for try-catch)
+     * @dev This is marked external so it can be called via try-catch
+     */
+    function decodeStealthPayment(bytes calldata payload) external pure returns (StealthPayment memory) {
+        return abi.decode(payload, (StealthPayment));
     }
 
     /**

@@ -7,7 +7,7 @@ import { useAxelarPayment, TX_STATUS } from "../hooks/useAxelarPayment.js";
 import { scanStealthPayments, deriveStealthPrivateKey, ERC20_ABI, GATEWAY_ABI } from "../lib/axelar/crossChainPayment.js";
 import { AXELAR_CHAINS, getSupportedChains, getAxelarscanUrl, getAvailableTokens, getItsTokenId } from "../lib/axelar/index.js";
 import { deriveKeysFromSignature } from "../lib/aptos/stealthAddress.js";
-import { ArrowLeftRight, Shield, Send, Eye, CheckCircle2, AlertCircle, Zap, ExternalLink, ArrowDown, ArrowUp, Coins } from "lucide-react";
+import { ArrowLeftRight, Shield, Send, Eye, CheckCircle2, AlertCircle, Zap, ExternalLink, ArrowDown, ArrowUp, Coins, Gift } from "lucide-react";
 import { AxelarPrivacyPoolPanel } from "../components/axelar/AxelarPrivacyPoolPanel.jsx";
 
 // Bridge contract address (same on all chains)
@@ -80,15 +80,18 @@ export default function CrossChainPaymentPage() {
 
   const [sourceChain, setSourceChain] = useState("");
   const [destinationChain, setDestinationChain] = useState("");
-  const isPrivacyRoute = sourceChain === "base" && destinationChain === "polygon";
+  // Privacy pool route disabled for now (only Base and Arbitrum available)
+  const isPrivacyRoute = false; // sourceChain === "base" && destinationChain === "polygon";
   const [transferMode, setTransferMode] = useState("direct");
   const [modeManuallySelected, setModeManuallySelected] = useState(false);
   const [recipientAddress, setRecipientAddress] = useState("");
   const [amount, setAmount] = useState("");
-  const [selectedToken, setSelectedToken] = useState("");
+  const [selectedToken, setSelectedToken] = useState("TUSDC"); // Default to TUSDC
   const [availableTokens, setAvailableTokens] = useState(FALLBACK_TOKENS);
   const [loadingTokens, setLoadingTokens] = useState(false);
   const [estimatingGas, setEstimatingGas] = useState(false);
+  const [requestingToken, setRequestingToken] = useState(false);
+  const [lastTokenRequestTx, setLastTokenRequestTx] = useState(null); // { hash, explorerUrl, chainName }
 
   // Bridge address to use for *source-chain* reads (meta address lookup, etc).
   // This is intentionally keyed off the selected source chain, not the currently-connected wallet chain.
@@ -493,13 +496,16 @@ export default function CrossChainPaymentPage() {
         const tokens = await getAvailableTokens(sourceChain, destinationChain);
         if (tokens.length > 0) {
           setAvailableTokens(tokens);
-          // Auto-select first token if none selected
-          if (!selectedToken || !tokens.find(t => t.symbol === selectedToken)) {
-            setSelectedToken(tokens[0].symbol);
+          // Prefer TUSDC if available, otherwise use first token
+          const tusdcToken = tokens.find(t => t.symbol === "TUSDC");
+          if (tusdcToken) {
+            setSelectedToken("TUSDC");
+          } else if (!selectedToken || !tokens.find(t => t.symbol === selectedToken)) {
+            setSelectedToken(tokens[0]?.symbol || "TUSDC");
           }
         } else {
           setAvailableTokens(FALLBACK_TOKENS);
-          setSelectedToken(FALLBACK_TOKENS[0].symbol);
+          setSelectedToken("TUSDC"); // Always default to TUSDC
         }
       } catch (err) {
         console.error("Error fetching tokens:", err);
@@ -626,14 +632,148 @@ export default function CrossChainPaymentPage() {
   };
 
   // Get all available chains
+  // Only allow Base Sepolia and Arbitrum Sepolia for now
   const availableChains = useMemo(() => {
-    return getSupportedChains();
+    const allChains = getSupportedChains();
+    return allChains.filter(chain => chain.key === "base" || chain.key === "arbitrum");
   }, []);
 
   // Filter destination chains (exclude source)
   const destinationChains = useMemo(() => {
     return availableChains.filter(chain => chain.key !== sourceChain);
   }, [availableChains, sourceChain]);
+
+  // TUSDC addresses per chain
+  const TUSDC_ADDRESSES = {
+    "base-sepolia": import.meta.env.VITE_AXELAR_TUSDC_ADDRESS_BASE_SEPOLIA || "0x2823Af7e1F2F50703eD9f81Ac4B23DC1E78B9E53",
+    "arbitrum-sepolia": import.meta.env.VITE_AXELAR_TUSDC_ADDRESS_ARBITRUM_SEPOLIA || "0xd17beb0fE91B2aE5a57cE39D1c3D15AF1a968817",
+    "ethereum-sepolia": "0x5EF8B232E6e5243bf9fAe7E725275A8B0800924B",
+  };
+
+  // Request TUSDC tokens from deployer
+  const handleRequestTUSDC = async () => {
+    if (!evmAddress) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
+    if (!chainId) {
+      toast.error("Please connect to a supported chain");
+      return;
+    }
+
+    // Find current chain
+    const currentChain = Object.entries(AXELAR_CHAINS).find(([, chain]) => chain.chainId === chainId);
+    if (!currentChain) {
+      toast.error("Unsupported chain. Please switch to Base Sepolia or Arbitrum Sepolia");
+      return;
+    }
+
+    const [chainKey, chainConfig] = currentChain;
+    const chainName = chainConfig.axelarName || `${chainKey}-sepolia`;
+    const tusdcAddress = TUSDC_ADDRESSES[chainName] || TUSDC_ADDRESSES["base-sepolia"];
+
+    if (!tusdcAddress) {
+      toast.error("TUSDC not deployed on this chain");
+      return;
+    }
+
+    setRequestingToken(true);
+    const toastId = toast.loading("Requesting TUSDC tokens...");
+
+    try {
+      const walletProvider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await walletProvider.getSigner();
+
+      // ERC20 ABI for transfer
+      const ERC20_ABI = [
+        "function transfer(address to, uint256 amount) external returns (bool)",
+        "function balanceOf(address account) external view returns (uint256)",
+        "function decimals() external view returns (uint8)",
+      ];
+
+      const tokenContract = new ethers.Contract(tusdcAddress, ERC20_ABI, signer);
+      const decimals = await tokenContract.decimals();
+      const requestAmount = ethers.parseUnits("100", decimals); // 100 TUSDC
+
+      // Get deployer private key and calculate address
+      const deployerPrivateKey = import.meta.env.VITE_DEPLOYER_PRIVATE_KEY;
+      if (!deployerPrivateKey) {
+        toast.error("Deployer private key not configured. Please contact admin.", { id: toastId });
+        return;
+      }
+
+      // Create deployer wallet to get actual address
+      const deployerWallet = new ethers.Wallet(deployerPrivateKey);
+      const deployerAddress = deployerWallet.address;
+      
+      console.log("Deployer Address:", deployerAddress);
+      
+      // Check deployer balance using actual address
+      const deployerBalance = await tokenContract.balanceOf(deployerAddress);
+      const balanceFormatted = ethers.formatUnits(deployerBalance, decimals);
+      
+      console.log(`Deployer TUSDC Balance: ${balanceFormatted}`);
+      
+      if (deployerBalance < requestAmount) {
+        toast.error(`Insufficient balance. Deployer has ${balanceFormatted} TUSDC, need 100 TUSDC`, { id: toastId });
+        return;
+      }
+
+      // Connect deployer wallet to provider for sending transaction
+      const deployerWalletConnected = deployerWallet.connect(walletProvider);
+      const deployerTokenContract = new ethers.Contract(tusdcAddress, ERC20_ABI, deployerWalletConnected);
+      
+      toast.loading("Sending transaction...", { id: toastId });
+      
+      // Estimate gas first to catch errors early
+      try {
+        await deployerTokenContract.transfer.estimateGas(evmAddress, requestAmount);
+      } catch (estimateError) {
+        console.error("Gas estimation error:", estimateError);
+        toast.error(`Transfer failed: ${estimateError?.reason || estimateError?.message || "Unknown error"}`, { id: toastId });
+        return;
+      }
+      
+      const tx = await deployerTokenContract.transfer(evmAddress, requestAmount);
+      
+      // Get explorer URL
+      const explorerUrl = chainConfig.explorer 
+        ? `${chainConfig.explorer}/tx/${tx.hash}`
+        : null;
+      
+      // Store transaction info in state
+      setLastTokenRequestTx({
+        hash: tx.hash,
+        explorerUrl,
+        chainName: chainConfig.name || chainKey,
+      });
+      
+      // Show transaction hash immediately
+      const shortHash = `${tx.hash.substring(0, 6)}...${tx.hash.substring(tx.hash.length - 4)}`;
+      toast.loading(`Transaction sent: ${shortHash}`, { id: toastId });
+      
+      toast.loading("Waiting for transaction confirmation...", { id: toastId });
+      const receipt = await tx.wait();
+      
+      toast.success(`✅ Successfully received 100 TUSDC!`, { 
+        id: toastId,
+        duration: 3000,
+      });
+      
+      // Refresh token balance if needed
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+
+    } catch (error) {
+      console.error("Token request error:", error);
+      const errorMessage = error?.reason || error?.message || "Failed to request tokens";
+      toast.error(errorMessage, { id: toastId });
+    } finally {
+      setRequestingToken(false);
+    }
+  };
 
   // Handle gas estimation
   const handleEstimateGas = async () => {
@@ -753,11 +893,24 @@ export default function CrossChainPaymentPage() {
   // Tabs state
   const [activeTab, setActiveTab] = useState("send");
 
-  // Default route for your current testing goal: Base Sepolia -> Polygon Sepolia.
+  // Default route: Arbitrum Sepolia -> Base Sepolia
   useEffect(() => {
-    if (!sourceChain) setSourceChain("base");
-    if (!destinationChain) setDestinationChain("polygon");
-  }, [sourceChain, destinationChain]);
+    if (!sourceChain) {
+      setSourceChain("arbitrum");
+    }
+    // Only set destination if source is set and destination is not set or invalid
+    if (sourceChain && (!destinationChain || !destinationChains.find(c => c.key === destinationChain))) {
+      // Set to the other available chain
+      const otherChain = destinationChains.find(c => c.key !== sourceChain);
+      if (otherChain) {
+        setDestinationChain(otherChain.key);
+      } else if (sourceChain === "arbitrum") {
+        setDestinationChain("base");
+      } else if (sourceChain === "base") {
+        setDestinationChain("arbitrum");
+      }
+    }
+  }, [sourceChain, destinationChain, destinationChains]);
 
   return (
     <div className="flex flex-col items-center w-full min-h-screen bg-white py-6 px-4 pb-24">
@@ -1023,6 +1176,69 @@ export default function CrossChainPaymentPage() {
                   ))}
                 </Select>
                             </div>
+                            {/* Request TUSDC Button */}
+                            {selectedToken === "TUSDC" && evmAddress && (
+                              <div className="mt-3">
+                                {/* Check if on supported chain for TUSDC */}
+                                {chainId && (chainId === 84532 || chainId === 421614) ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      color="primary"
+                                      variant="flat"
+                                      onPress={handleRequestTUSDC}
+                                      isLoading={requestingToken}
+                                      isDisabled={requestingToken}
+                                      startContent={!requestingToken && <Gift className="w-4 h-4" />}
+                                      className="w-full"
+                                    >
+                                      {requestingToken ? "Requesting..." : "Request 100 TUSDC"}
+                                    </Button>
+                                    <p className="text-xs text-gray-500 mt-1 text-center">
+                                      Get test tokens from deployer account
+                                    </p>
+                                  </>
+                                ) : (
+                                  <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-2">
+                                    <p className="text-xs text-yellow-800 text-center">
+                                      Switch to Base Sepolia or Arbitrum Sepolia to request TUSDC
+                                    </p>
+                                  </div>
+                                )}
+                                
+                                {/* Show last transaction hash */}
+                                {lastTokenRequestTx && (
+                                  <Card className="bg-white border border-green-200 mt-3">
+                                    <CardBody className="p-3">
+                                      <div className="flex items-center gap-2">
+                                        <CheckCircle2 className="size-4 text-green-600" />
+                                        <div className="flex-1">
+                                          <p className="text-xs font-semibold text-green-900 mb-1">
+                                            Last Request Transaction
+                                          </p>
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-xs font-mono text-gray-600">
+                                              {lastTokenRequestTx.hash.substring(0, 10)}...{lastTokenRequestTx.hash.substring(lastTokenRequestTx.hash.length - 8)}
+                                            </span>
+                                            {lastTokenRequestTx.explorerUrl && (
+                                              <a
+                                                href={lastTokenRequestTx.explorerUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+                                              >
+                                                <ExternalLink className="w-3 h-3" />
+                                                View on Explorer
+                                              </a>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </CardBody>
+                                  </Card>
+                                )}
+                              </div>
+                            )}
                           </CardBody>
                         </Card>
                       </div>
@@ -1279,7 +1495,16 @@ export default function CrossChainPaymentPage() {
                 <Button
                   onClick={handleSendPayment}
                   isLoading={loading}
-                  isDisabled={!evmAddress || !isOnSourceChain || !sourceChain || !destinationChain || !recipientAddress || !amount || isProcessing}
+                  isDisabled={
+                    !evmAddress || 
+                    !isOnSourceChain || 
+                    !sourceChain || 
+                    !destinationChain || 
+                    !recipientAddress || 
+                    !amount || 
+                    isProcessing ||
+                    (amount && parseFloat(amount) <= 0)
+                  }
                           className="w-full h-14 font-bold text-white shadow-xl hover:scale-[1.01] transition-all"
                           style={{ backgroundColor: '#0d08e3' }}
                   size="lg"
@@ -1290,7 +1515,19 @@ export default function CrossChainPaymentPage() {
                             </div>
                           )}
                 >
-                          {!evmAddress ? "Connect Wallet First" : isProcessing ? "Processing..." : "Send Payment"}
+                          {!evmAddress 
+                            ? "Connect Wallet First" 
+                            : !isOnSourceChain 
+                            ? `Switch to ${sourceChain ? AXELAR_CHAINS[sourceChain]?.name || sourceChain : "Source Chain"}` 
+                            : !sourceChain || !destinationChain
+                            ? "Select Chains"
+                            : !recipientAddress
+                            ? "Enter Recipient"
+                            : !amount || (amount && parseFloat(amount) <= 0)
+                            ? "Enter Amount"
+                            : isProcessing 
+                            ? "Processing..." 
+                            : "Send Payment"}
                 </Button>
                       </div>
 
