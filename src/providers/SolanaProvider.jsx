@@ -122,9 +122,23 @@ function HeliusSolanaProvider({ children }) {
   useEffect(() => {
     if (heliusClient && publicKey) {
       heliusClient
-        .getPriorityFeeEstimate([publicKey.toBase58()])
-        .then(setPriorityFees)
-        .catch(console.error);
+        .getPriorityFeeEstimate({ accountKeys: [publicKey.toBase58()] })
+        .then((result) => {
+          // Handle both response formats
+          if (result?.priorityFeeLevels) {
+            setPriorityFees(result.priorityFeeLevels);
+          } else if (result?.priorityFeeEstimate) {
+            setPriorityFees({
+              low: Math.floor(result.priorityFeeEstimate * 0.5),
+              medium: result.priorityFeeEstimate,
+              high: Math.floor(result.priorityFeeEstimate * 2),
+            });
+          }
+        })
+        .catch((error) => {
+          console.warn("Failed to fetch priority fees via Helius, using defaults:", error.message);
+          setPriorityFees({ low: 1000, medium: 5000, high: 10000 });
+        });
     }
   }, [heliusClient, publicKey]);
 
@@ -157,10 +171,10 @@ function HeliusSolanaProvider({ children }) {
         throw new Error("Helius client or wallet not initialized");
       }
 
-      // Add priority fee to transaction
-      const txWithFee = await heliusClient.addPriorityFee(
+      // Add priority fee to transaction using Helius estimate
+      const { transaction: txWithFee } = await heliusClient.addPriorityFee(
         transaction,
-        publicKey.toBase58()
+        { accountKeys: [publicKey.toBase58()] }
       );
 
       // Sign and send

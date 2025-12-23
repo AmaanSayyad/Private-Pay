@@ -52,42 +52,93 @@ export class HeliusClient {
     return response.data.result;
   }
 
+  normalizePriorityOptions(options = {}) {
+    // Allow passing an array of account keys directly for convenience
+    if (Array.isArray(options)) {
+      return {
+        accountKeys: options,
+        priorityLevel: 'Medium',
+      };
+    }
+
+    return options;
+  }
+
   async getPriorityFeeEstimate(options = {}) {
+    const normalized = this.normalizePriorityOptions(options);
     const {
       transaction,
       accountKeys,
       priorityLevel = 'Medium',
       includeAllPriorityFeeLevels = false,
       lookbackSlots = 150,
-    } = options;
+    } = normalized;
 
-    const params = [{
+    // Build the params object according to Helius API spec
+    const params = {
       options: {
         priorityLevel,
         includeAllPriorityFeeLevels,
         lookbackSlots,
         recommended: true,
       },
-    }];
+    };
 
+    // Helius requires either transaction OR accountKeys, not both
     if (transaction) {
-      params[0].transaction = transaction;
+      params.transaction = transaction;
     } else if (accountKeys && accountKeys.length > 0) {
-      params[0].accountKeys = accountKeys;
+      params.accountKeys = accountKeys;
+    } else {
+      // Fallback: return default estimates if no keys provided
+      return {
+        priorityFeeEstimate: 5000,
+        priorityFeeLevels: {
+          low: 1000,
+          medium: 5000,
+          high: 10000,
+          veryHigh: 50000,
+          unsafeMax: 100000,
+        },
+      };
     }
 
-    return this.rpcCall('getPriorityFeeEstimate', params);
+    try {
+      return await this.rpcCall('getPriorityFeeEstimate', [params]);
+    } catch (error) {
+      // If the RPC call fails (e.g., on devnet), return sensible defaults
+      console.warn('getPriorityFeeEstimate failed, using defaults:', error.message);
+      return {
+        priorityFeeEstimate: 5000,
+        priorityFeeLevels: {
+          low: 1000,
+          medium: 5000,
+          high: 10000,
+          veryHigh: 50000,
+          unsafeMax: 100000,
+        },
+      };
+    }
   }
 
-  async addPriorityFee(transaction, priorityLevel = 'Medium') {
-    const serializedTx = bs58.encode(transaction.serialize({ requireAllSignatures: false }));
-    
-    const estimate = await this.getPriorityFeeEstimate({
-      transaction: serializedTx,
-      priorityLevel,
-    });
+  async addPriorityFee(transaction, options = {}) {
+    const { priorityLevel = 'Medium', accountKeys = [] } = this.normalizePriorityOptions(options);
 
-    const priorityFee = estimate.priorityFeeEstimate || 50000;
+    let priorityFee = 5000; // Default fallback
+
+    try {
+      const serializedTx = bs58.encode(transaction.serialize({ requireAllSignatures: false }));
+      
+      const estimate = await this.getPriorityFeeEstimate({
+        transaction: serializedTx,
+        priorityLevel,
+        accountKeys,
+      });
+
+      priorityFee = estimate?.priorityFeeEstimate || estimate?.priorityFeeLevels?.medium || 5000;
+    } catch (error) {
+      console.warn('Failed to estimate priority fee, using default:', error.message);
+    }
 
     const priorityFeeIx = ComputeBudgetProgram.setComputeUnitPrice({
       microLamports: priorityFee,
@@ -215,15 +266,20 @@ export class HeliusClient {
   }
 
   async getRecentBlockhashWithPriorityFee(priorityLevel = 'Medium') {
-    const [blockhashResult, priorityFeeResult] = await Promise.all([
-      this.rpcCall('getLatestBlockhash', [{ commitment: 'finalized' }]),
-      this.getPriorityFeeEstimate({ priorityLevel }),
-    ]);
+    const blockhashResult = await this.rpcCall('getLatestBlockhash', [{ commitment: 'finalized' }]);
+    
+    let priorityFee = 5000; // Default
+    try {
+      const priorityFeeResult = await this.getPriorityFeeEstimate({ priorityLevel });
+      priorityFee = priorityFeeResult?.priorityFeeEstimate || priorityFeeResult?.priorityFeeLevels?.medium || 5000;
+    } catch (error) {
+      console.warn('Failed to get priority fee estimate:', error.message);
+    }
 
     return {
       blockhash: blockhashResult.value.blockhash,
       lastValidBlockHeight: blockhashResult.value.lastValidBlockHeight,
-      priorityFee: priorityFeeResult.priorityFeeEstimate,
+      priorityFee,
     };
   }
 

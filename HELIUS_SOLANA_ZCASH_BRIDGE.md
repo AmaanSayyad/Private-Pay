@@ -344,7 +344,7 @@ graph TD
 
 ## Environment Variables
 
-### Frontend (.env)
+### Frontend (.env) – frontend-only mode
 
 ```env
 # Helius API Key (from helius.dev)
@@ -354,11 +354,16 @@ VITE_HELIUS_API_KEY=your_helius_api_key
 VITE_SOLANA_NETWORK=devnet
 
 # Deployed Bridge Program ID
-VITE_ZCASH_BRIDGE_PROGRAM_ID=6zEeAV8FZqqDHJ1fnoeYKgok9XNkCaGi77ES3xG8k3qa
+VITE_ZCASH_BRIDGE_PROGRAM_ID=HgwLh6yHgCNeYckHkspupFsxTu7jXzYv4nYPZAdAkQh5
 
 # USDC Mint (devnet)
 VITE_USDC_MINT=4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+
+# Optional: custom RPC fallback (used if no Helius key)
+VITE_SOLANA_RPC_URL=https://api.devnet.solana.com
 ```
+
+If you run **frontend-only** (no backend webhook handler), these variables are sufficient. The app will use Helius RPC for priority fees, enhanced transaction parsing, and status polling directly from the browser.
 
 ### Backend (backend/.env)
 
@@ -368,7 +373,7 @@ HELIUS_API_KEY=your_helius_api_key
 SOLANA_NETWORK=devnet
 
 # Bridge Program
-ZCASH_BRIDGE_PROGRAM_ID=6zEeAV8FZqqDHJ1fnoeYKgok9XNkCaGi77ES3xG8k3qa
+ZCASH_BRIDGE_PROGRAM_ID=HgwLh6yHgCNeYckHkspupFsxTu7jXzYv4nYPZAdAkQh5
 
 # Operator (for automated processing)
 BRIDGE_OPERATOR_PRIVATE_KEY=your_base58_private_key

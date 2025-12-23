@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  Button, 
-  Card, 
-  CardBody, 
-  Input, 
-  Tabs, 
+import {
+  Button,
+  Card,
+  CardBody,
+  Input,
+  Tabs,
   Tab,
   Chip,
   Progress,
@@ -23,7 +23,7 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useZcash } from "../providers/ZcashProvider";
 import { useSolana } from "../providers/SolanaProvider";
 import { SolanaZcashBridgeClient } from "../lib/solanaZcashBridge/client";
-import { 
+import {
   generateStealthMetaAddress,
   isValidZcashAddress,
   formatSolAmount,
@@ -33,10 +33,10 @@ import {
   BRIDGE_CONSTANTS,
 } from "../lib/solanaZcashBridge/index";
 import toast from "react-hot-toast";
-import { 
-  ArrowDown, 
-  ArrowLeftRight, 
-  Shield, 
+import {
+  ArrowDown,
+  ArrowLeftRight,
+  Shield,
   Lock,
   Zap,
   Eye,
@@ -78,6 +78,9 @@ export default function SolanaZcashBridgePage() {
   const [priorityFee, setPriorityFee] = useState(null);
   const [transactionHistory, setTransactionHistory] = useState([]);
   const [pendingTickets, setPendingTickets] = useState([]);
+  const [bridgeError, setBridgeError] = useState(null);
+  const [isMinting, setIsMinting] = useState(false);
+  const [wZecBalance, setWZecBalance] = useState(null);
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [copied, setCopied] = useState(false);
@@ -87,8 +90,16 @@ export default function SolanaZcashBridgePage() {
       const client = new SolanaZcashBridgeClient(connection, wallet.adapter, heliusClient);
       client.initialize().then(() => {
         setBridgeClient(client);
-        loadBridgeStats(client);
+        if (client.isInitialized && client.program) {
+          loadBridgeStats(client);
+          setBridgeError(null);
+        } else {
+          setBridgeError("Bridge program not deployed on devnet. Demo mode active.");
+        }
         loadPriorityFee(client);
+      }).catch((error) => {
+        console.error("Failed to initialize bridge client:", error);
+        setBridgeError("Failed to connect to bridge program.");
       });
     }
   }, [connected, connection, wallet, heliusClient]);
@@ -100,16 +111,36 @@ export default function SolanaZcashBridgePage() {
         setBridgeStats(stats);
       }
     } catch (error) {
-      console.error("Failed to load bridge stats:", error);
+      console.warn("Bridge stats not available:", error.message);
+      // Set demo stats for UI display
+      setBridgeStats({
+        totalDeposits: 0,
+        totalWithdrawals: 0,
+        feeBps: 30,
+        isPaused: false,
+      });
     }
   };
 
   const loadPriorityFee = async (client) => {
     try {
       const fee = await client.estimatePriorityFee();
-      setPriorityFee(fee);
+      // Normalize the fee response format
+      if (fee?.priorityFeeLevels) {
+        setPriorityFee(fee.priorityFeeLevels);
+      } else if (fee?.priorityFeeEstimate) {
+        setPriorityFee({
+          low: Math.floor(fee.priorityFeeEstimate * 0.5),
+          medium: fee.priorityFeeEstimate,
+          high: Math.floor(fee.priorityFeeEstimate * 2),
+        });
+      } else {
+        // Use the fee object directly if it has low/medium/high
+        setPriorityFee(fee);
+      }
     } catch (error) {
-      console.error("Failed to estimate priority fee:", error);
+      console.warn("Failed to estimate priority fee, using defaults:", error.message);
+      setPriorityFee({ low: 1000, medium: 5000, high: 10000 });
     }
   };
 
@@ -118,6 +149,25 @@ export default function SolanaZcashBridgePage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     toast.success("Copied to clipboard!");
+  };
+
+  const handleMintTestTokens = async () => {
+    if (!bridgeClient) {
+      toast.error("Bridge not initialized");
+      return;
+    }
+
+    setIsMinting(true);
+    try {
+      const result = await bridgeClient.mintTestTokens(100);
+      setWZecBalance(result.balance);
+      toast.success(`Minted 100 wZEC! New balance: ${result.balance} wZEC`);
+    } catch (error) {
+      console.error("Mint failed:", error);
+      toast.error(error.message || "Failed to mint test tokens");
+    } finally {
+      setIsMinting(false);
+    }
   };
 
   const handleDeposit = async () => {
@@ -142,7 +192,7 @@ export default function SolanaZcashBridgePage() {
       const result = await bridgeClient.initiateDeposit(amount, zcashDestAddress);
       setDepositResult(result);
       toast.success(`Deposit initiated! Ticket #${result.ticketId}`);
-      
+
       setPendingTickets(prev => [...prev, {
         ...result,
         type: "deposit",
@@ -181,7 +231,7 @@ export default function SolanaZcashBridgePage() {
       const result = await bridgeClient.initiateWithdrawal(amount, zcashTxId, null);
       setWithdrawResult(result);
       toast.success(`Withdrawal initiated! Ticket #${result.ticketId}`);
-      
+
       setPendingTickets(prev => [...prev, {
         ...result,
         type: "withdrawal",
@@ -238,8 +288,8 @@ export default function SolanaZcashBridgePage() {
       }
 
       if (status) {
-        setPendingTickets(prev => 
-          prev.map(t => 
+        setPendingTickets(prev =>
+          prev.map(t =>
             t.ticketId === ticket.ticketId ? { ...t, ...status } : t
           )
         );
@@ -290,28 +340,52 @@ export default function SolanaZcashBridgePage() {
           </div>
           <div className="text-center">
             <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-purple-600 to-amber-500 bg-clip-text text-transparent mb-2 px-4 text-center">
-                  Solana ↔ Zcash Bridge
-              </h1>
+              Solana ↔ Zcash Bridge
+            </h1>
             <p className="text-gray-600 max-w-lg px-4 text-center text-sm sm:text-base">
               Cross-chain privacy bridge powered by Helius. Transfer between Solana and Zcash with zero-knowledge privacy.
-              </p>
-            </div>
+            </p>
+          </div>
           <div className="flex items-center gap-3">
 
             {connected && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-purple-50 rounded-full border border-purple-200">
-                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
-                <span className="text-purple-700 text-sm font-medium">
-                  {bridgeClient ? "Bridge Ready" : "Connecting..."}
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${bridgeError ? 'bg-amber-50 border-amber-200' : 'bg-purple-50 border-purple-200'}`}>
+                <div className={`w-2 h-2 rounded-full animate-pulse ${bridgeError ? 'bg-amber-500' : 'bg-purple-500'}`} />
+                <span className={`text-sm font-medium ${bridgeError ? 'text-amber-700' : 'text-purple-700'}`}>
+                  {bridgeError ? "Demo Mode" : bridgeClient ? "Bridge Ready" : "Connecting..."}
                 </span>
               </div>
             )}
-            <WalletMultiButton 
-              className="!bg-[#0d08e3] !rounded-xl !h-10 hover:!bg-[#0e0dc6] !text-white" 
+            {connected && (
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-semibold"
+                onClick={handleMintTestTokens}
+                isLoading={isMinting}
+              >
+                {isMinting ? "Minting..." : "Get Test wZEC"}
+              </Button>
+            )}
+            <WalletMultiButton
+              className="!bg-[#0d08e3] !rounded-xl !h-10 hover:!bg-[#0e0dc6] !text-white"
               style={{ backgroundColor: '#0d08e3' }}
             />
           </div>
         </div>
+
+        {bridgeError && (
+          <Card className="bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 shadow-sm mb-6">
+            <CardBody className="p-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                <div>
+                  <p className="text-amber-800 font-medium text-sm">{bridgeError}</p>
+                  <p className="text-amber-600 text-xs mt-1">The bridge UI is functional but transactions require the on-chain program to be deployed.</p>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+        )}
 
         <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 shadow-sm mb-6">
           <CardBody className="p-6">
@@ -319,11 +393,11 @@ export default function SolanaZcashBridgePage() {
               <div className="flex items-center gap-3 flex-shrink-0">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-indigo-400 flex items-center justify-center flex-shrink-0">
                   <Shield className="w-6 h-6 text-white" />
-            </div>
+                </div>
                 <div className="min-w-0">
                   <h3 className="text-gray-900 font-bold text-sm sm:text-base">Privacy-Preserving Bridge</h3>
                   <p className="text-gray-600 text-xs sm:text-sm">Powered by Helius Monitoring</p>
-              </div>
+                </div>
               </div>
               <div className="flex items-center gap-3 sm:gap-6 flex-wrap justify-center">
                 <div className="flex items-center gap-2 text-gray-700">
@@ -400,7 +474,7 @@ export default function SolanaZcashBridgePage() {
           <div className="lg:col-span-2">
             <Card className="bg-white border border-gray-200 shadow-lg">
               <CardBody className="p-6">
-                <Tabs 
+                <Tabs
                   selectedKey={activeTab}
                   onSelectionChange={setActiveTab}
                   variant="underlined"
@@ -517,9 +591,22 @@ export default function SolanaZcashBridgePage() {
                             <div className="mt-2 text-sm text-purple-600">
                               <p>Ticket ID: #{depositResult.ticketId}</p>
                               <div className="flex items-center gap-2 mt-1 min-w-0">
-                                <span className="font-mono text-xs truncate flex-1 min-w-0">
+                                <a
+                                  href={`https://solscan.io/tx/${depositResult.signature}?cluster=devnet`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-mono text-xs truncate flex-1 min-w-0 hover:text-purple-800 hover:underline cursor-pointer"
+                                >
                                   {depositResult.signature}
-                                </span>
+                                </a>
+                                <a
+                                  href={`https://solscan.io/tx/${depositResult.signature}?cluster=devnet`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-shrink-0 hover:text-purple-800"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
                                 <button onClick={() => handleCopy(depositResult.signature)} className="flex-shrink-0">
                                   {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                                 </button>
@@ -597,8 +684,8 @@ export default function SolanaZcashBridgePage() {
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <img src="/assets/solana_logo.png" alt="Solana" className="w-6 h-6 rounded-full flex-shrink-0" />
                             <span className="text-gray-700 text-sm font-semibold whitespace-nowrap">To Solana</span>
-                        </div>
                           </div>
+                        </div>
                         <div className="flex items-center gap-3 bg-white p-4 rounded-lg border border-gray-200">
                           <img src="/assets/solana_logo.png" alt="Solana" className="w-10 h-10 rounded-full" />
                           <div className="flex-1">
@@ -661,7 +748,7 @@ export default function SolanaZcashBridgePage() {
                         </div>
 
                         <p className="text-gray-600 text-sm mb-6">
-                          Generate a stealth meta-address that allows senders to create 
+                          Generate a stealth meta-address that allows senders to create
                           one-time addresses for you. Only you can detect and claim these payments
                           using your private viewing key.
                         </p>
@@ -782,7 +869,7 @@ export default function SolanaZcashBridgePage() {
                 ) : (
                   <div className="space-y-3">
                     {pendingTickets.map((ticket, idx) => (
-                      <div 
+                      <div
                         key={idx}
                         className="p-3 bg-gray-50 rounded-lg border border-gray-100"
                       >
@@ -806,7 +893,7 @@ export default function SolanaZcashBridgePage() {
                           <span className="whitespace-nowrap">
                             {formatSolAmount(ticket.amount)} {ticket.type === "deposit" ? "SOL" : "ZEC"}
                           </span>
-                          <button 
+                          <button
                             onClick={() => refreshTicketStatus(ticket)}
                             className="p-1 hover:bg-gray-200 rounded flex-shrink-0"
                           >
@@ -856,7 +943,7 @@ export default function SolanaZcashBridgePage() {
                   <span className="font-bold text-sm">Privacy Notice</span>
                 </div>
                 <p className="text-xs text-amber-700">
-                  Zcash shielded transactions provide strong privacy. The bridge 
+                  Zcash shielded transactions provide strong privacy. The bridge
                   operator cannot see shielded balances or transaction details.
                   Only commitments and nullifiers are verified.
                 </p>
@@ -909,8 +996,8 @@ export default function SolanaZcashBridgePage() {
               <Button variant="flat" onPress={onClose}>
                 Cancel
               </Button>
-              <Button 
-                color="primary" 
+              <Button
+                color="primary"
                 onPress={handleRegisterStealthAddress}
                 isLoading={isRegistering}
               >
