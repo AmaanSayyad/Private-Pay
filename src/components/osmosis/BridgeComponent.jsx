@@ -1,13 +1,10 @@
 import { useChain } from '@cosmos-kit/react';
-import { coins } from '@cosmjs/amino';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardBody, Input, Button } from '@nextui-org/react';
 import { ArrowLeftRight, Shield, CheckCircle2, Loader2, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-// PrivatePay Bridge Vault on Osmosis
-const BRIDGE_VAULT_ADDRESS = 'osmo18s5lynnx550aw5rqlmg32cne6083893nq8p5q4';
+import { bridgeService } from '../../lib/osmosis/bridgeService.js';
 
 export const BridgeComponent = () => {
   const { address, getSigningStargateClient } = useChain('osmosis');
@@ -16,6 +13,23 @@ export const BridgeComponent = () => {
   const [isBridging, setIsBridging] = useState(false);
   const [step, setStep] = useState('idle'); // idle, signing, bridging, completed
   const [txHash, setTxHash] = useState('');
+  const [zcashTxId, setZcashTxId] = useState('');
+  const [estimatedZec, setEstimatedZec] = useState('0.00');
+
+  // Update ZEC estimation when amount changes
+  const updateEstimation = async (osmoAmount) => {
+    if (osmoAmount && parseFloat(osmoAmount) > 0) {
+      try {
+        const zcashAmount = await bridgeService.getZcashExchangeRate(osmoAmount);
+        setEstimatedZec(zcashAmount.toFixed(6));
+      } catch (error) {
+        console.error('Error getting exchange rate:', error);
+        setEstimatedZec((parseFloat(osmoAmount) * 0.05).toFixed(6));
+      }
+    } else {
+      setEstimatedZec('0.00');
+    }
+  };
 
   const handleBridge = async () => {
     if (!amount || !address || !zcashAddress) {
@@ -23,52 +37,80 @@ export const BridgeComponent = () => {
       return;
     }
 
+    if (!bridgeService.isValidZcashAddress(zcashAddress)) {
+      toast.error('Invalid Zcash shielded address. Use zs1... or u1... address');
+      return;
+    }
+
     setIsBridging(true);
     setStep('signing');
 
     try {
-      const client = await getSigningStargateClient();
-
-      // 1. Convert amount to uosmo (6 decimals)
-      const microAmount = Math.floor(parseFloat(amount) * 1_000_000).toString();
-
-      const fee = {
-        amount: coins(5000, 'uosmo'),
-        gas: '200000'
-      };
-
-      // Construct memo with the user's Zcash address
-      const memo = `BRIDGE_TO_ZCASH:${zcashAddress}`;
-
-      const result = await client.sendTokens(
+      const result = await bridgeService.bridgeToZcash(
         address,
-        BRIDGE_VAULT_ADDRESS,
-        coins(microAmount, 'uosmo'),
-        fee,
-        memo
+        amount,
+        zcashAddress,
+        getSigningStargateClient
       );
 
       if (result.code === 0) {
         setTxHash(result.transactionHash);
         setStep('bridging');
-        // Simulate bridge operator time (on-chain part is done)
-        setTimeout(() => {
-          setStep('completed');
-          setIsBridging(false);
-        }, 2000);
+        toast.success('Bridge transaction submitted!');
+
+        // Monitor bridge status
+        monitorBridgeStatus(result.transactionHash);
       } else {
-        console.error('Transaction Failed:', result);
-        setIsBridging(false);
-        setStep('idle');
-        toast.error(`Transaction failed: ${result.rawLog}`);
+        throw new Error(result.rawLog || 'Transaction failed');
       }
 
     } catch (error) {
       console.error('Bridge Error:', error);
       setIsBridging(false);
       setStep('idle');
-      toast.error(error.message);
+      toast.error(`Bridge failed: ${error.message}`);
     }
+  };
+
+  const monitorBridgeStatus = async (txHash) => {
+    const maxAttempts = 60; // 2 minutes
+    let attempts = 0;
+
+    const checkStatus = () => {
+      try {
+        const status = bridgeService.getBridgeStatus(txHash);
+        
+        if (status.status === 'completed') {
+          setZcashTxId(status.zcashTxId);
+          setStep('completed');
+          setIsBridging(false);
+          toast.success('Bridge completed successfully!');
+        } else if (status.status === 'failed') {
+          setStep('idle');
+          setIsBridging(false);
+          toast.error(`Bridge failed: ${status.error}`);
+        } else if (attempts < maxAttempts) {
+          attempts++;
+          setTimeout(checkStatus, 2000);
+        } else {
+          setStep('idle');
+          setIsBridging(false);
+          toast.error('Bridge timeout - please check status manually');
+        }
+      } catch (error) {
+        if (attempts < maxAttempts) {
+          attempts++;
+          setTimeout(checkStatus, 2000);
+        } else {
+          setStep('idle');
+          setIsBridging(false);
+          toast.error('Unable to monitor bridge status');
+        }
+      }
+    };
+
+    // Start monitoring after a short delay
+    setTimeout(checkStatus, 1000);
   };
 
   return (
@@ -76,7 +118,7 @@ export const BridgeComponent = () => {
       <CardBody className="p-6">
         <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
           <ArrowLeftRight className="w-5 h-5 text-blue-600" />
-          Privacy Bridge (IBC ↔ Zcash)
+          Privacy Bridge (Osmosis ↔ Zcash)
         </h3>
 
         <div className="space-y-4">
@@ -89,7 +131,10 @@ export const BridgeComponent = () => {
                 type="number"
                 placeholder="0.00"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  updateEstimation(e.target.value);
+                }}
                 isDisabled={isBridging}
                 classNames={{
                   inputWrapper: "h-12 bg-white border-gray-200 flex-1 focus-within:border-blue-400",
@@ -120,14 +165,14 @@ export const BridgeComponent = () => {
                 <img src="/assets/zcash_logo.png" alt="Zcash" className="w-8 h-8 rounded-full" />
                 <div className="flex-1 bg-white/70 rounded-lg px-4 py-2 border border-gray-200">
                   <div className="text-xl font-bold text-gray-900">
-                    {amount ? (parseFloat(amount) * 0.05).toFixed(4) : '0.00'}
+                    {estimatedZec}
                   </div>
                   <div className="text-xs text-gray-500 font-semibold uppercase">Estimated ZEC</div>
                 </div>
               </div>
 
               <Input
-                placeholder="zs1..."
+                placeholder="zs1... or u1..."
                 label="Destination Zcash Shielded Address"
                 value={zcashAddress}
                 onChange={(e) => setZcashAddress(e.target.value)}
@@ -137,6 +182,7 @@ export const BridgeComponent = () => {
                   inputWrapper: "bg-white border-gray-200 focus-within:border-blue-400",
                   label: "text-gray-700 font-semibold text-xs"
                 }}
+                description="Must be a Zcash shielded address (zs1... or u1...)"
               />
 
               <div className="flex items-center gap-2 text-[10px] text-blue-600 px-1">
@@ -145,6 +191,24 @@ export const BridgeComponent = () => {
               </div>
             </div>
           </div>
+
+          {/* Bridge Info */}
+          {amount && (
+            <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-gray-500">Exchange Rate</span>
+                <span className="text-gray-900 font-medium">Live market rate</span>
+              </div>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-gray-500">Bridge Fee</span>
+                <span className="text-gray-900 font-medium">0.1%</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Estimated Time</span>
+                <span className="text-gray-900 font-medium">2-5 minutes</span>
+              </div>
+            </div>
+          )}
 
           {/* Status */}
           {step !== 'idle' && step !== 'completed' && (
@@ -158,9 +222,13 @@ export const BridgeComponent = () => {
                   )}
                   <div>
                     <p className="font-semibold text-gray-900">
-                      {step === 'signing' ? 'Signing Transaction...' : 'Bridging Assets...'}
+                      {step === 'signing' ? 'Signing Transaction...' : 'Processing Bridge...'}
                     </p>
-                    <p className="text-xs text-gray-600">Processing your bridge request</p>
+                    <p className="text-xs text-gray-600">
+                      {step === 'signing' 
+                        ? 'Please confirm in your wallet' 
+                        : 'Converting OSMO to ZEC and sending to shielded address'}
+                    </p>
                   </div>
                 </div>
               </CardBody>
@@ -176,18 +244,32 @@ export const BridgeComponent = () => {
                     <CheckCircle2 className="w-8 h-8 text-green-600" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-green-900">Bridge Successful!</p>
-                    <p className="text-sm text-green-700">Assets sent to Bridge Vault.</p>
-                    {txHash && (
-                      <a
-                        href={`https://www.mintscan.io/osmosis/tx/${txHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-green-600 hover:text-green-700 hover:underline flex items-center gap-1 mt-1"
-                      >
-                        View Transaction <ExternalLink size={12} />
-                      </a>
-                    )}
+                    <p className="font-bold text-green-900">Bridge Completed!</p>
+                    <p className="text-sm text-green-700">
+                      {estimatedZec} ZEC sent to your shielded address
+                    </p>
+                    <div className="flex flex-col gap-1 mt-2">
+                      {txHash && (
+                        <a
+                          href={`https://www.mintscan.io/osmosis/tx/${txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-green-600 hover:text-green-700 hover:underline flex items-center gap-1"
+                        >
+                          Osmosis TX <ExternalLink size={12} />
+                        </a>
+                      )}
+                      {zcashTxId && (
+                        <a
+                          href={`https://explorer.zcha.in/transactions/${zcashTxId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-green-600 hover:text-green-700 hover:underline flex items-center gap-1"
+                        >
+                          Zcash TX <ExternalLink size={12} />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <Button
@@ -196,10 +278,13 @@ export const BridgeComponent = () => {
                   onClick={() => {
                     setStep('idle');
                     setAmount('');
+                    setZcashAddress('');
                     setTxHash('');
+                    setZcashTxId('');
+                    setEstimatedZec('0.00');
                   }}
                 >
-                  Bridge More
+                  Bridge More Assets
                 </Button>
               </CardBody>
             </Card>
@@ -207,12 +292,12 @@ export const BridgeComponent = () => {
             <Button
               className="w-full h-12 font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg hover:shadow-xl hover:from-blue-500 hover:to-indigo-500 transition-all"
               onClick={handleBridge}
-              isDisabled={!amount || isBridging}
+              isDisabled={!amount || !zcashAddress || isBridging}
               isLoading={isBridging}
             >
               {step === 'signing' ? 'Signing Transaction...' :
-                step === 'bridging' ? 'Bridging Assets...' :
-                  'Bridge to Privacy'}
+                step === 'bridging' ? 'Processing Bridge...' :
+                  `Bridge ${amount || '0'} OSMO to Privacy`}
             </Button>
           )}
         </div>

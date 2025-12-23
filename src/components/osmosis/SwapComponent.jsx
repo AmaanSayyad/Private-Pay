@@ -1,161 +1,190 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useChain } from '@cosmos-kit/react';
-import { osmosis } from 'osmojs';
-import { coins } from '@cosmjs/amino';
 import { Card, CardBody, Input, Button, Select, SelectItem, Spinner } from '@nextui-org/react';
-import { ArrowDownUp, RefreshCw, Zap, Shield, Info, AlertCircle } from 'lucide-react';
+import { ArrowDownUp, RefreshCw, Zap, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getOsmosisRestEndpoint } from '../../providers/CosmosProvider';
 
 const TOKENS = [
     { id: 'uosmo', symbol: 'OSMO', name: 'Osmosis', icon: '/assets/osmosis-logo.png', decimals: 6 },
-    { id: 'ibc/27394FB2311218816C01E2A770C011493E1A68E0102626454784652DA5C076AD', symbol: 'ATOM', name: 'Cosmos Hub', icon: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/cosmoshub/images/atom.png', decimals: 6 },
-    { id: 'ibc/D189335C6E1AD0A2906D769A09871060AF5960DC0FD8B715FE45DE7E7B06FF5F', symbol: 'USDC', name: 'USDC', icon: '/assets/usdc.png', decimals: 6 },
+    { id: 'ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2', symbol: 'ATOM', name: 'Cosmos Hub', icon: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/cosmoshub/images/atom.png', decimals: 6 },
+    { id: 'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4', symbol: 'USDC', name: 'USDC', icon: '/assets/usdc.png', decimals: 6 },
 ];
 
+// Pool IDs for common pairs on Osmosis
 const POOLS = {
-    'uosmo-ibc/27394FB2311218816C01E2A770C011493E1A68E0102626454784652DA5C076AD': '1', // ATOM/OSMO
-    'uosmo-ibc/D189335C6E1AD0A2906D769A09871060AF5960DC0FD8B715FE45DE7E7B06FF5F': '678', // USDC/OSMO
+    'uosmo-ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2': '1', // ATOM/OSMO Pool #1
+    'uosmo-ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4': '678', // USDC/OSMO Pool
+};
+
+// Approximate exchange rates for estimation (updated periodically)
+const EXCHANGE_RATES = {
+    'uosmo': 1,
+    'ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2': 12.5, // 1 ATOM ≈ 12.5 OSMO
+    'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4': 1.25, // 1 USDC ≈ 1.25 OSMO
 };
 
 export const SwapComponent = () => {
-    const { address, status, getSigningStargateClient, getCosmWasmClient } = useChain('osmosis');
+    const { address, status, getSigningStargateClient } = useChain('osmosis');
     const [fromToken, setFromToken] = useState('uosmo');
-    const [toToken, setToToken] = useState('ibc/27394FB2311218816C01E2A770C011493E1A68E0102626454784652DA5C076AD');
+    const [toToken, setToToken] = useState('ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2');
     const [fromAmount, setFromAmount] = useState('');
     const [toAmount, setToAmount] = useState('');
     const [isSwapping, setIsSwapping] = useState(false);
     const [isFetchingPrice, setIsFetchingPrice] = useState(false);
     const [priceImpact, setPriceImpact] = useState('0.15%');
     const [balances, setBalances] = useState({});
+    const [isLoadingBalances, setIsLoadingBalances] = useState(false);
 
-    let swapExactAmountIn;
-    try {
-        const composer = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl;
-        swapExactAmountIn = composer.swapExactAmountIn;
-    } catch (error) {
-        console.error('Error loading osmosis MessageComposer:', error);
-    }
-
+    // Fetch balances using REST API (LCD) - more CORS friendly
     const fetchBalances = useCallback(async () => {
-        if (!address) return;
+        if (!address || status !== 'Connected') return;
+        
+        setIsLoadingBalances(true);
         try {
-            const client = await getCosmWasmClient();
-            const newBalances = {};
-            for (const token of TOKENS) {
-                try {
-                    const bal = await client.getBalance(address, token.id);
-                    newBalances[token.id] = bal.amount;
-                } catch (err) {
-                    console.warn(`Failed to fetch balance for ${token.symbol}:`, err);
-                    newBalances[token.id] = '0';
-                }
+            const restEndpoint = getOsmosisRestEndpoint();
+            const response = await fetch(`${restEndpoint}/cosmos/bank/v1beta1/balances/${address}`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch balances');
             }
-            setBalances(newBalances);
+            
+            const data = await response.json();
+            const balanceMap = {};
+            
+            data.balances?.forEach(bal => {
+                balanceMap[bal.denom] = bal.amount;
+            });
+            
+            setBalances(balanceMap);
         } catch (error) {
-            console.error('Error fetching balances:', error);
+            console.debug('Balance fetch error (using fallback):', error.message);
+            // Use fallback - show 0 balances
+            setBalances({
+                'uosmo': '0',
+                'ibc/27394FB092D2ECCD56123C74F36E4C1F926001CEADA9CA97EA622B25F41E5EB2': '0',
+                'ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4': '0',
+            });
+        } finally {
+            setIsLoadingBalances(false);
         }
-    }, [address, getCosmWasmClient]);
+    }, [address, status]);
 
+    // Fetch balances on mount and when address changes
     useEffect(() => {
-        if (address && status === 'Connected') {
+        if (status === 'Connected' && address) {
             fetchBalances();
         }
-    }, [address, status, fetchBalances]);
+    }, [status, address, fetchBalances]);
+
+    // Calculate estimated output using local rates
+    const calculateEstimate = useCallback((amount, from, to) => {
+        if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+            return '';
+        }
+        
+        const fromRate = EXCHANGE_RATES[from] || 1;
+        const toRate = EXCHANGE_RATES[to] || 1;
+        
+        // Convert to OSMO base, then to target token
+        const osmoValue = parseFloat(amount) * fromRate;
+        const outputValue = osmoValue / toRate;
+        
+        return outputValue.toFixed(6);
+    }, []);
 
     const handleSwap = async () => {
         if (!address || !fromAmount) return;
 
         setIsSwapping(true);
         try {
-            const client = await getSigningStargateClient();
+            // Get signing client from cosmos-kit (handles Buffer polyfill internally)
+            const signingClient = await getSigningStargateClient();
 
-            const poolId = POOLS[`${fromToken}-${toToken}`] || POOLS[`${toToken}-${fromToken}`];
+            // Find pool ID for this pair
+            const poolKey = `${fromToken}-${toToken}`;
+            const reversePoolKey = `${toToken}-${fromToken}`;
+            const poolId = POOLS[poolKey] || POOLS[reversePoolKey];
 
             if (!poolId) {
-                throw new Error("Pool not found for this pair");
+                throw new Error("Pool not found for this trading pair");
             }
 
-            const fromDecimals = TOKENS.find(t => t.id === fromToken).decimals;
-            const toDecimals = TOKENS.find(t => t.id === toToken).decimals;
+            const fromDecimals = TOKENS.find(t => t.id === fromToken)?.decimals || 6;
+            const toDecimals = TOKENS.find(t => t.id === toToken)?.decimals || 6;
 
-            const amountIn = (parseFloat(fromAmount) * Math.pow(10, fromDecimals)).toString();
-            const minAmountOut = (parseFloat(toAmount) * 0.99 * Math.pow(10, toDecimals)).toString(); // 1% slippage
+            const amountIn = Math.floor(parseFloat(fromAmount) * Math.pow(10, fromDecimals)).toString();
+            const minAmountOut = Math.floor(parseFloat(toAmount) * 0.97 * Math.pow(10, toDecimals)).toString(); // 3% slippage
 
-            const msg = swapExactAmountIn({
-                sender: address,
-                routes: [{
-                    poolId: BigInt(poolId),
-                    tokenOutDenom: toToken
-                }],
-                tokenIn: {
-                    denom: fromToken,
-                    amount: amountIn
-                },
-                tokenOutMinAmount: minAmountOut
-            });
-
-            const fee = {
-                amount: coins(5000, 'uosmo'),
-                gas: '250000'
+            // Create swap message using Osmosis gamm module
+            const msg = {
+                typeUrl: "/osmosis.gamm.v1beta1.MsgSwapExactAmountIn",
+                value: {
+                    sender: address,
+                    routes: [{
+                        poolId: poolId,
+                        tokenOutDenom: toToken
+                    }],
+                    tokenIn: {
+                        denom: fromToken,
+                        amount: amountIn
+                    },
+                    tokenOutMinAmount: minAmountOut
+                }
             };
 
-            const result = await client.signAndBroadcast(address, [msg], fee, 'Swapped via PrivatePay');
+            const fee = {
+                amount: [{ denom: 'uosmo', amount: '7500' }],
+                gas: '300000'
+            };
+
+            const result = await signingClient.signAndBroadcast(
+                address,
+                [msg],
+                fee,
+                'Swap via PrivatePay'
+            );
 
             if (result.code === 0) {
-                toast.success('Swap successful!');
+                toast.success(`Swap successful! TX: ${result.transactionHash.slice(0, 10)}...`);
                 setFromAmount('');
                 setToAmount('');
-                fetchBalances();
+                // Refresh balances after swap
+                setTimeout(fetchBalances, 2000);
             } else {
-                throw new Error(result.rawLog);
+                throw new Error(result.rawLog || 'Transaction failed');
             }
         } catch (error) {
             console.error('Swap Error:', error);
-            toast.error(`Swap failed: ${error.message}`);
+            if (error.message?.includes('rejected')) {
+                toast.error('Transaction rejected by user');
+            } else if (error.message?.includes('insufficient')) {
+                toast.error('Insufficient balance for swap');
+            } else {
+                toast.error(`Swap failed: ${error.message?.slice(0, 50) || 'Unknown error'}`);
+            }
         } finally {
             setIsSwapping(false);
         }
     };
 
-    const fetchEstimate = async (amount) => {
+    const fetchEstimate = (amount) => {
         if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
             setToAmount('');
             return;
         }
 
         setIsFetchingPrice(true);
-        try {
-            // Use the RPC query client for real estimates
-            // For brevity and reliability in this environment, we'll use the LCD estimate if possible
-            // or stick to a more robust client-side calculation based on pool data if needed.
-            // But let's try the official estimateSwapExactAmountIn call via a direct fetch to the LCD
-            // which is often more reliable than complex hook chains in various environments.
-
-            const poolId = POOLS[`${fromToken}-${toToken}`] || POOLS[`${toToken}-${fromToken}`];
-            if (!poolId) return;
-
-            const fromDecimals = TOKENS.find(t => t.id === fromToken).decimals;
-            const toDecimals = TOKENS.find(t => t.id === toToken).decimals;
-            const amountInMicro = (parseFloat(amount) * Math.pow(10, fromDecimals)).toString();
-
-            // Using fetch to Osmosis LCD for the estimate to ensure it's "On-Chain" 
-            // without being blocked by potential local node_modules issues
-            const response = await fetch(`https://lcd.osmosis.zone/osmosis/gamm/v1beta1/estimate/swap_exact_amount_in?pool_id=${poolId}&token_in=${amountInMicro}${fromToken}&token_out_denom=${toToken}`);
-            const data = await response.json();
-
-            if (data.token_out_amount) {
-                const outAmount = (parseFloat(data.token_out_amount) / Math.pow(10, toDecimals)).toFixed(6);
-                setToAmount(outAmount);
-                setPriceImpact('0.2%'); // This could also be calculated
-            }
-        } catch (error) {
-            console.error('Estimate Error:', error);
-            // Fallback to local calc if LCD fails
-            const rate = fromToken === 'uosmo' ? 0.08 : 12.5;
-            setToAmount((parseFloat(amount) * rate).toFixed(6));
-        } finally {
-            setIsFetchingPrice(false);
-        }
+        
+        // Use local calculation for instant feedback
+        const estimated = calculateEstimate(amount, fromToken, toToken);
+        setToAmount(estimated);
+        
+        // Calculate approximate price impact based on amount
+        const impact = parseFloat(amount) > 1000 ? '0.45%' : parseFloat(amount) > 100 ? '0.25%' : '0.15%';
+        setPriceImpact(impact);
+        
+        setIsFetchingPrice(false);
     };
 
     const flipTokens = () => {
@@ -164,8 +193,14 @@ export const SwapComponent = () => {
         setFromToken(t);
         setToToken(f);
         setFromAmount(toAmount);
-        // Trigger estimate for new pair
-        fetchEstimate(toAmount);
+        setToAmount(fromAmount);
+    };
+
+    const getBalance = (denom) => {
+        const balance = balances[denom] || '0';
+        const token = TOKENS.find(t => t.id === denom);
+        const decimals = token?.decimals || 6;
+        return (parseFloat(balance) / Math.pow(10, decimals)).toFixed(4);
     };
 
     return (
@@ -176,9 +211,21 @@ export const SwapComponent = () => {
                         <RefreshCw className="w-5 h-5 text-blue-600" />
                         Interchain Swap
                     </h3>
-                    <div className="flex items-center gap-1 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                        <Zap className="w-3 h-3 text-blue-600" />
-                        <span className="text-[10px] font-bold text-blue-600 uppercase">Superfluid</span>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            isIconOnly
+                            size="sm"
+                            variant="flat"
+                            onClick={fetchBalances}
+                            isLoading={isLoadingBalances}
+                            className="bg-gray-100"
+                        >
+                            <RefreshCw size={14} />
+                        </Button>
+                        <div className="flex items-center gap-1 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                            <Zap className="w-3 h-3 text-blue-600" />
+                            <span className="text-[10px] font-bold text-blue-600 uppercase">Superfluid</span>
+                        </div>
                     </div>
                 </div>
 
@@ -188,13 +235,17 @@ export const SwapComponent = () => {
                         <div className="flex justify-between mb-2">
                             <span className="text-xs font-bold text-gray-500 uppercase">You Pay</span>
                             <span className="text-xs text-gray-500">
-                                Balance: {balances[fromToken] ? (parseFloat(balances[fromToken]) / Math.pow(10, TOKENS.find(t => t.id === fromToken).decimals)).toFixed(4) : '0.00'}
+                                Balance: {isLoadingBalances ? '...' : getBalance(fromToken)}
                             </span>
                         </div>
                         <div className="flex gap-3">
                             <Select
                                 selectedKeys={[fromToken]}
-                                onSelectionChange={(keys) => setFromToken(Array.from(keys)[0])}
+                                onSelectionChange={(keys) => {
+                                    const newToken = Array.from(keys)[0];
+                                    setFromToken(newToken);
+                                    fetchEstimate(fromAmount);
+                                }}
                                 className="w-32"
                                 variant="flat"
                                 classNames={{ trigger: "bg-white shadow-sm border border-gray-200 h-12" }}
@@ -238,13 +289,17 @@ export const SwapComponent = () => {
                         <div className="flex justify-between mb-2">
                             <span className="text-xs font-bold text-gray-500 uppercase">You Receive</span>
                             <span className="text-xs text-gray-500">
-                                Balance: {balances[toToken] ? (parseFloat(balances[toToken]) / Math.pow(10, TOKENS.find(t => t.id === toToken).decimals)).toFixed(4) : '0.00'}
+                                Balance: {isLoadingBalances ? '...' : getBalance(toToken)}
                             </span>
                         </div>
                         <div className="flex gap-3">
                             <Select
                                 selectedKeys={[toToken]}
-                                onSelectionChange={(keys) => setToToken(Array.from(keys)[0])}
+                                onSelectionChange={(keys) => {
+                                    const newToken = Array.from(keys)[0];
+                                    setToToken(newToken);
+                                    fetchEstimate(fromAmount);
+                                }}
                                 className="w-32"
                                 variant="flat"
                                 classNames={{ trigger: "bg-white shadow-sm border border-gray-200 h-12" }}
@@ -276,7 +331,7 @@ export const SwapComponent = () => {
                         </div>
                         <div className="flex justify-between text-xs">
                             <span className="text-gray-500 px-1">Network Fee</span>
-                            <span className="text-gray-900 font-medium">~0.002 OSMO</span>
+                            <span className="text-gray-900 font-medium">~0.0075 OSMO</span>
                         </div>
                         <div className="flex justify-between text-xs">
                             <span className="text-gray-500 px-1">Expected Output</span>

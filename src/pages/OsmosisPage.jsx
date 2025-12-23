@@ -4,53 +4,85 @@ import { BridgeComponent } from '../components/osmosis/BridgeComponent';
 import { PrivacyPayment } from '../components/osmosis/PrivacyPayment';
 import { SwapComponent } from '../components/osmosis/SwapComponent';
 import { CosmosWalletButton } from '../components/osmosis/CosmosWalletButton';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Card, CardBody, Chip, Tabs, Tab, Button, Tooltip } from '@nextui-org/react';
 import { Shield, Eye, EyeOff, ArrowLeftRight, Coins, Zap, RefreshCw, BarChart3, Lock, ExternalLink, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getOsmosisRestEndpoint } from '../providers/CosmosProvider';
 
 export default function OsmosisPage() {
-  const { address, status, getCosmWasmClient } = useChain('osmosis');
+  const { address, status } = useChain('osmosis');
   const [balance, setBalance] = useState(null);
   const [loading, setLoading] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
-  const [blockHeight, setBlockHeight] = useState('...');
+  const [blockHeight, setBlockHeight] = useState('--');
 
-  const fetchChainData = useCallback(async () => {
-    if (status === 'Connected' && address) {
-      try {
-        setLoading(true);
-        const client = await getCosmWasmClient();
-        const coin = await client.getBalance(address, 'uosmo');
-        setBalance(coin);
-
-        const height = await client.getHeight();
-        setBlockHeight(height.toLocaleString());
-      } catch (error) {
-        console.error('Error fetching chain data:', error);
-      } finally {
-        setLoading(false);
+  // Fetch OSMO balance using REST API
+  const fetchBalance = useCallback(async () => {
+    if (!address || status !== 'Connected') return;
+    
+    setLoading(true);
+    try {
+      const restEndpoint = getOsmosisRestEndpoint();
+      const response = await fetch(`${restEndpoint}/cosmos/bank/v1beta1/balances/${address}/by_denom?denom=uosmo`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setBalance({ amount: data.balance?.amount || '0' });
       }
-    } else {
-      setBalance(null);
+    } catch (error) {
+      console.debug('Balance fetch error:', error.message);
+    } finally {
+      setLoading(false);
     }
-  }, [status, address, getCosmWasmClient]);
+  }, [address, status]);
 
+  // Fetch latest block height
+  const fetchBlockHeight = useCallback(async () => {
+    try {
+      const restEndpoint = getOsmosisRestEndpoint();
+      const response = await fetch(`${restEndpoint}/cosmos/base/tendermint/v1beta1/blocks/latest`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        const height = data.block?.header?.height;
+        if (height) {
+          setBlockHeight(parseInt(height).toLocaleString());
+        }
+      }
+    } catch (error) {
+      console.debug('Block height fetch error:', error.message);
+    }
+  }, []);
+
+  // Fetch data on mount and when connected
   useEffect(() => {
-    fetchChainData();
-
-    // Refresh height every 15s
-    const interval = setInterval(fetchChainData, 15000);
-    return () => clearInterval(interval);
-  }, [fetchChainData]);
+    if (status === 'Connected' && address) {
+      fetchBalance();
+    }
+    fetchBlockHeight();
+  }, [status, address, fetchBalance, fetchBlockHeight]);
 
   const togglePrivacy = () => {
     setPrivacyMode(!privacyMode);
     if (!privacyMode) {
       toast.success('Privacy Mode Enabled: Shielding active');
     }
+  };
+
+  // Calculate USD value (OSMO price ~$0.80)
+  const getUsdValue = () => {
+    if (!balance?.amount) return '$0.00';
+    const osmoAmount = Number(balance.amount) / 1_000_000;
+    const usdValue = osmoAmount * 0.80;
+    return `$${usdValue.toFixed(2)}`;
+  };
+
+  const getOsmoBalance = () => {
+    if (!balance?.amount) return '0.00';
+    return (Number(balance.amount) / 1_000_000).toFixed(2);
   };
 
   return (
@@ -113,7 +145,7 @@ export default function OsmosisPage() {
         <div className="flex flex-col w-full max-w-7xl gap-8">
           {/* Top Stats Dashboard */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="md:col-span-2 bg-gradient-to-br from-blue-600 to-indigo-700 border-none shadow-xl rounded--[32px] overflow-hidden group">
+            <Card className="md:col-span-2 bg-gradient-to-br from-blue-600 to-indigo-700 border-none shadow-xl rounded-[32px] overflow-hidden group">
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl transition-transform group-hover:scale-110" />
               <CardBody className="p-8 relative z-10">
                 <div className="flex items-start justify-between">
@@ -123,7 +155,7 @@ export default function OsmosisPage() {
                       <div className="flex items-baseline gap-3">
                         <h2 className="text-5xl font-black text-white tracking-tighter">
                           {showBalance && !privacyMode
-                            ? (loading ? '...' : balance ? `$${(Number(balance.amount) / 1_000_000 * 1.5).toFixed(2)}` : '$0.00')
+                            ? (loading ? '...' : getUsdValue())
                             : '••••••'}
                         </h2>
                         <span className="text-blue-200 font-bold">USD</span>
@@ -131,13 +163,13 @@ export default function OsmosisPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="flex flex-col">
-                        <span className="text-blue-200 text-[10px] font-bold uppercase">Staked OSMO</span>
-                        <span className="text-white font-bold opacity-90">{showBalance ? '1,240.45' : '••••'}</span>
+                        <span className="text-blue-200 text-[10px] font-bold uppercase">OSMO Balance</span>
+                        <span className="text-white font-bold opacity-90">{showBalance ? getOsmoBalance() : '••••'}</span>
                       </div>
                       <div className="w-px h-8 bg-white/20" />
                       <div className="flex flex-col">
-                        <span className="text-blue-200 text-[10px] font-bold uppercase">Pending Rewards</span>
-                        <span className="text-emerald-300 font-bold">+12.4%</span>
+                        <span className="text-blue-200 text-[10px] font-bold uppercase">Staking APR</span>
+                        <span className="text-emerald-300 font-bold">~12.4%</span>
                       </div>
                     </div>
                   </div>
@@ -149,6 +181,16 @@ export default function OsmosisPage() {
                         className="bg-white/20 backdrop-blur-md text-white hover:bg-white/30 border border-white/30 rounded-2xl"
                       >
                         {showBalance ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </Button>
+                    </Tooltip>
+                    <Tooltip content="Refresh Balance" closeDelay={0}>
+                      <Button
+                        isIconOnly
+                        onClick={fetchBalance}
+                        isLoading={loading}
+                        className="bg-white/20 backdrop-blur-md text-white hover:bg-white/30 border border-white/30 rounded-2xl"
+                      >
+                        <RefreshCw size={18} />
                       </Button>
                     </Tooltip>
                     <Tooltip content="Privacy Status" closeDelay={0}>
@@ -367,7 +409,7 @@ export default function OsmosisPage() {
 
             {/* Sidebar / Activity Feed */}
             <div className="xl:col-span-4 space-y-6">
-              <Card className="bg-white border border-gray-100 shadow-xl rounded--[32px]">
+              <Card className="bg-white border border-gray-100 shadow-xl rounded-[32px]">
                 <CardBody className="p-6">
                   <h3 className="font-black text-gray-900 mb-6 flex items-center gap-2">
                     <BarChart3 className="w-5 h-5 text-blue-600" />
