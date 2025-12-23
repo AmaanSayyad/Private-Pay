@@ -3,8 +3,9 @@
  * Handles transaction signing and broadcasting
  */
 
-import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Keypair } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Keypair, TransactionInstruction } from '@solana/web3.js';
 import { ethers } from 'ethers';
+import { isStealthAddress, prepareStealthPayment } from './stealthSender';
 
 // Solana RPC endpoints
 const SOLANA_RPC_ENDPOINTS = {
@@ -30,8 +31,19 @@ export async function sendSolanaTransaction(fromSecretKey, toAddress, amount, ne
         const secretKeyBuffer = Buffer.from(fromSecretKey, 'base64');
         const fromKeypair = Keypair.fromSecretKey(secretKeyBuffer);
 
+        // Check if sending to stealth address
+        let stealthData = null;
+        let actualRecipient = toAddress;
+
+        if (isStealthAddress(toAddress)) {
+            console.log('🎭 Sending to stealth address');
+            stealthData = prepareStealthPayment(toAddress, amount, 'solana');
+            // For stealth, we still send to the stealth pubkey directly
+            // The ephemeral key is in the memo
+        }
+
         // Create recipient public key
-        const toPublicKey = new PublicKey(toAddress);
+        const toPublicKey = new PublicKey(actualRecipient);
 
         // Create transaction
         const transaction = new Transaction().add(
@@ -41,6 +53,18 @@ export async function sendSolanaTransaction(fromSecretKey, toAddress, amount, ne
                 lamports: amount * LAMPORTS_PER_SOL,
             })
         );
+
+        // Add memo instruction if stealth payment
+        if (stealthData) {
+            const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+            const memoInstruction = new TransactionInstruction({
+                keys: [],
+                programId: MEMO_PROGRAM_ID,
+                data: Buffer.from(stealthData.memo, 'utf-8')
+            });
+            transaction.add(memoInstruction);
+            console.log('📝 Added memo with ephemeral pubkey:', stealthData.memo.substring(0, 20) + '...');
+        }
 
         // Send transaction
         const signature = await connection.sendTransaction(transaction, [fromKeypair]);
@@ -77,11 +101,28 @@ export async function sendEthereumTransaction(privateKey, toAddress, amount, net
         // Create wallet from private key
         const wallet = new ethers.Wallet(privateKey, provider);
 
+        // Check if sending to stealth address
+        let stealthData = null;
+        let txData = undefined; // Default no data
+
+        if (isStealthAddress(toAddress)) {
+            console.log('🎭 Sending to stealth address (Ethereum)');
+            stealthData = prepareStealthPayment(toAddress, amount, 'ethereum');
+            // For Ethereum, we encode ephemeral key in data field
+            txData = ethers.hexlify(ethers.toUtf8Bytes(stealthData.txData));
+            console.log('📝 Added tx data with ephemeral pubkey:', stealthData.txData.substring(0, 20) + '...');
+        }
+
         // Create transaction
         const tx = {
             to: toAddress,
             value: ethers.parseEther(amount.toString()),
         };
+
+        // Add data field if stealth payment
+        if (txData) {
+            tx.data = txData;
+        }
 
         // Send transaction
         const txResponse = await wallet.sendTransaction(tx);
