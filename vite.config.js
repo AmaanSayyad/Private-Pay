@@ -75,7 +75,7 @@ export default defineConfig(({ mode }) => {
         },
         target: 'esnext',
       },
-      exclude: ['@chainsafe/webzjs-wallet', '@chainsafe/webzjs-keys', 'cofhejs'],
+      exclude: ['@chainsafe/webzjs-wallet', '@chainsafe/webzjs-keys', 'cofhejs', '@provablehq/sdk', '@provablehq/wasm'],
     },
     worker: {
       format: 'es',

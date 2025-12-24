@@ -39,6 +39,9 @@ const UnstoppableDashboard = lazy(() => import("./pages/UnstoppableDashboard.jsx
 const SolanaZcashBridgePage = lazy(() => import("./pages/SolanaZcashBridgePage.jsx"));
 // Fhenix Confidential Payments
 const FhenixPaymentsPage = lazy(() => import("./pages/FhenixPayments.jsx"));
+// Aleo Zero-Knowledge Privacy
+const AleoPage = lazy(() => import("./pages/AleoPage.jsx"));
+import AleoErrorBoundary from "./components/aleo/AleoErrorBoundary.jsx";
 
 // Loading component
 const PageLoader = () => (
@@ -50,7 +53,7 @@ const PageLoader = () => (
 // Wrapper component for lazy-loaded routes with navigation logging
 const LazyRoute = ({ Component, routeName }) => {
   const location = useLocation();
-  
+
   useEffect(() => {
     // Log route navigation
     activityLogger.logNavigation(
@@ -65,11 +68,38 @@ const LazyRoute = ({ Component, routeName }) => {
       routeName,
     });
   }, [location.pathname, routeName]);
-  
+
   return (
     <Suspense fallback={<PageLoader />}>
       <Component />
     </Suspense>
+  );
+};
+
+// Special wrapper for Aleo with error boundary
+const AleoRoute = ({ routeName }) => {
+  const location = useLocation();
+
+  useEffect(() => {
+    activityLogger.logNavigation(
+      document.referrer || 'unknown',
+      location.pathname,
+      'ReactRouter'
+    );
+    activityLogger.info('RouteLoad', `Loading route: ${routeName || location.pathname}`, {
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+      routeName,
+    });
+  }, [location.pathname, routeName]);
+
+  return (
+    <AleoErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
+        <AleoPage />
+      </Suspense>
+    </AleoErrorBoundary>
   );
 };
 
@@ -238,6 +268,11 @@ export const router = createBrowserRouter([
       {
         path: "/fhenix",
         element: <LazyRoute Component={FhenixPaymentsPage} routeName="Fhenix Payments" />,
+      },
+      // Aleo Zero-Knowledge Privacy
+      {
+        path: "/aleo",
+        element: <AleoRoute routeName="Aleo" />,
       },
     ],
   },

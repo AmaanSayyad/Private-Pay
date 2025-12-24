@@ -1,11 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
-import { 
-  DollarSign, 
-  LayoutDashboard, 
-  Wallet, 
-  Shield, 
-  Lock, 
-  ArrowLeftRight, 
+import {
+  DollarSign,
+  LayoutDashboard,
+  Wallet,
+  Shield,
+  Lock,
+  ArrowLeftRight,
   Zap,
   Coins,
   Network,
@@ -23,9 +23,9 @@ export default function Navbar() {
   const starknetRef = useRef(null);
   const [dropdownPosition, setDropdownPosition] = useState({ bottom: 0, left: 0 });
 
-  const isStarknetActive = 
-    location.pathname.startsWith("/starknet") || 
-    location.pathname.startsWith("/ztarknet") || 
+  const isStarknetActive =
+    location.pathname.startsWith("/starknet") ||
+    location.pathname.startsWith("/ztarknet") ||
     location.pathname.startsWith("/zcash-starknet");
 
   useEffect(() => {
@@ -147,11 +147,22 @@ export default function Navbar() {
           <span>Fhenix</span>
         </Link>
 
+        <Link
+          to={"/aleo"}
+          className={cnm(
+            "px-2.5 py-2 rounded-full flex items-center gap-1.5 transition-all duration-300 whitespace-nowrap",
+            `${location.pathname.startsWith("/aleo") ? "bg-primary text-white" : ""}`
+          )}
+        >
+          <Shield className="size-3.5" />
+          <span>Aleo</span>
+        </Link>
+
         <div className="w-px h-6 bg-black/10 mx-0.5" />
 
         {/* Starknet Group with Dropdown */}
-        <div 
-          className="relative" 
+        <div
+          className="relative"
           ref={starknetRef}
           onMouseEnter={() => {
             if (starknetRef.current) {
@@ -194,9 +205,9 @@ export default function Navbar() {
 
         {/* Dropdown rendered in fixed position */}
         {starknetOpen && (
-          <div 
+          <div
             className="fixed bg-white shadow-2xl border border-black/20 rounded-2xl p-2 min-w-[220px] flex flex-col gap-1"
-            style={{ 
+            style={{
               bottom: `${dropdownPosition.bottom}px`,
               left: `${dropdownPosition.left}px`,
               zIndex: 100
@@ -204,51 +215,51 @@ export default function Navbar() {
             onMouseEnter={() => setStarknetOpen(true)}
             onMouseLeave={() => setStarknetOpen(false)}
           >
-              <Link
-                to={"/starknet"}
-                onClick={() => setStarknetOpen(false)}
-                className={cnm(
-                  "px-3 py-2 rounded-lg flex items-center gap-2 transition-all duration-300",
-                  `${location.pathname === "/starknet" ? "bg-primary text-white" : "hover:bg-black/5"}`
-                )}
-              >
-                <Zap className="size-3.5" />
-                <span>Starknet</span>
-              </Link>
-              <Link
-                to={"/zcash-starknet-bridge"}
-                onClick={() => setStarknetOpen(false)}
-                className={cnm(
-                  "px-3 py-2 rounded-lg flex items-center gap-2 transition-all duration-300",
-                  `${location.pathname.startsWith("/zcash-starknet-bridge") ? "bg-primary text-white" : "hover:bg-black/5"}`
-                )}
-              >
-                <ArrowLeftRight className="size-3.5" />
-                <span>Zcash-Starknet Bridge</span>
-              </Link>
-              <Link
-                to={"/ztarknet-lending"}
-                onClick={() => setStarknetOpen(false)}
-                className={cnm(
-                  "px-3 py-2 rounded-lg flex items-center gap-2 transition-all duration-300",
-                  `${location.pathname.startsWith("/ztarknet-lending") ? "bg-primary text-white" : "hover:bg-black/5"}`
-                )}
-              >
-                <TrendingUp className="size-3.5" />
-                <span>Ztarknet Lending</span>
-              </Link>
-              <Link
-                to={"/ztarknet-swap"}
-                onClick={() => setStarknetOpen(false)}
-                className={cnm(
-                  "px-3 py-2 rounded-lg flex items-center gap-2 transition-all duration-300",
-                  `${location.pathname.startsWith("/ztarknet-swap") ? "bg-primary text-white" : "hover:bg-black/5"}`
-                )}
-              >
-                <Repeat className="size-3.5" />
-                <span>Ztarknet Swap</span>
-              </Link>
-            </div>
+            <Link
+              to={"/starknet"}
+              onClick={() => setStarknetOpen(false)}
+              className={cnm(
+                "px-3 py-2 rounded-lg flex items-center gap-2 transition-all duration-300",
+                `${location.pathname === "/starknet" ? "bg-primary text-white" : "hover:bg-black/5"}`
+              )}
+            >
+              <Zap className="size-3.5" />
+              <span>Starknet</span>
+            </Link>
+            <Link
+              to={"/zcash-starknet-bridge"}
+              onClick={() => setStarknetOpen(false)}
+              className={cnm(
+                "px-3 py-2 rounded-lg flex items-center gap-2 transition-all duration-300",
+                `${location.pathname.startsWith("/zcash-starknet-bridge") ? "bg-primary text-white" : "hover:bg-black/5"}`
+              )}
+            >
+              <ArrowLeftRight className="size-3.5" />
+              <span>Zcash-Starknet Bridge</span>
+            </Link>
+            <Link
+              to={"/ztarknet-lending"}
+              onClick={() => setStarknetOpen(false)}
+              className={cnm(
+                "px-3 py-2 rounded-lg flex items-center gap-2 transition-all duration-300",
+                `${location.pathname.startsWith("/ztarknet-lending") ? "bg-primary text-white" : "hover:bg-black/5"}`
+              )}
+            >
+              <TrendingUp className="size-3.5" />
+              <span>Ztarknet Lending</span>
+            </Link>
+            <Link
+              to={"/ztarknet-swap"}
+              onClick={() => setStarknetOpen(false)}
+              className={cnm(
+                "px-3 py-2 rounded-lg flex items-center gap-2 transition-all duration-300",
+                `${location.pathname.startsWith("/ztarknet-swap") ? "bg-primary text-white" : "hover:bg-black/5"}`
+              )}
+            >
+              <Repeat className="size-3.5" />
+              <span>Ztarknet Swap</span>
+            </Link>
+          </div>
         )}
 
         <div className="w-px h-6 bg-black/10 mx-0.5" />
