@@ -1,0 +1,6 @@
+{
+    "program": "treasury_management.aleo",
+    "version": "0.0.0",
+    "description": "Treasury Management Program for private fund allocation, multi-sig wallets, payroll processing, and DAO treasury management",
+    "license": "MIT"
+}

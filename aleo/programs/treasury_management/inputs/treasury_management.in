@@ -1,0 +1,67 @@
+// Input file for treasury_management.aleo
+
+// create_multisig_wallet inputs
+[create_multisig_wallet]
+wallet_id: field = 1field;
+required_signatures: u8 = 2u8;
+total_signers: u8 = 3u8;
+policy_hash: field = 123456789field;
+initial_balance: u64 = 1000000u64;
+
+// add_signer inputs
+[add_signer]
+signer_address: address = aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8;
+signer_index: u8 = 0u8;
+public_key: field = 987654321field;
+
+// allocate_funds inputs
+[allocate_funds]
+allocation_id: field = 2field;
+strategy_hash: field = 555666777field;
+amount: u64 = 100000u64;
+target_yield: u64 = 5000u64;
+risk_level: u8 = 3u8;
+view_key: field = 111222333field;
+
+// process_payroll inputs
+[process_payroll]
+payroll_id: field = 3field;
+recipient: address = aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8;
+amount: u64 = 50000u64;
+payment_period: u32 = 202412u32;
+category_hash: field = 444555666field;
+
+// create_dao_treasury inputs
+[create_dao_treasury]
+dao_id: field = 4field;
+initial_balance: u64 = 5000000u64;
+governance_token_supply: u64 = 1000000u64;
+proposal_threshold: u64 = 100000u64;
+view_key: field = 777888999field;
+
+// submit_treasury_proposal inputs
+[submit_treasury_proposal]
+proposal_id: field = 5field;
+proposal_type: u8 = 1u8;
+amount: u64 = 200000u64;
+execution_deadline: u32 = 1000u32;
+
+// vote_on_proposal inputs
+[vote_on_proposal]
+vote_weight: u64 = 50000u64;
+vote_for: bool = true;
+
+// execute_proposal inputs
+[execute_proposal]
+proposal_threshold: u64 = 100000u64;
+
+// update_allocation_performance inputs
+[update_allocation_performance]
+actual_yield: u64 = 4500u64;
+performance_hash: field = 999888777field;
+
+// withdraw_from_multisig inputs
+[withdraw_from_multisig]
+amount: u64 = 25000u64;
+recipient: address = aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8;
+signature_hash: field = 123123123field;

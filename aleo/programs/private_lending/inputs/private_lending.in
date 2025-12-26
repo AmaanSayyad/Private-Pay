@@ -1,0 +1,49 @@
+// Sample inputs for Private Lending testing
+
+[deposit]
+pool_id: field = 1111111111field;
+amount: u64 = 10000u64;
+base_interest_rate: u64 = 500u64; // 5% APR
+
+[borrow]
+pool_id: field = 1111111111field;
+borrow_amount: u64 = 5000u64;
+collateral: Collateral = Collateral {
+    owner: aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8,
+    pool_id: 1111111111field,
+    token_type: 2222222222field,
+    amount: 8000u64,
+    value_usd: 8000u64,
+    liquidation_threshold: 8000u64,
+    deposit_block: 100u32,
+};
+credit_proof: field = 9999999999field;
+loan_term: u32 = 5256u32; // ~3 months
+
+[repay]
+position: BorrowPosition = BorrowPosition {
+    owner: aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8,
+    pool_id: 1111111111field,
+    borrowed_amount: 5000u64,
+    collateral_amount: 8000u64,
+    interest_rate: 800u64,
+    last_update: 100u32,
+    accrued_interest: 100u64,
+    liquidation_threshold: 8000u64,
+    borrow_block: 100u32,
+    due_block: 5356u32,
+};
+repay_amount: u64 = 1000u64;
+
+[withdraw]
+position: LendingPosition = LendingPosition {
+    owner: aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8,
+    pool_id: 1111111111field,
+    principal: 10000u64,
+    accrued_interest: 500u64,
+    last_update: 100u32,
+    interest_rate: 500u64,
+    shares: 10000u64,
+    deposit_block: 100u32,
+};
+withdraw_amount: u64 = 2000u64;

@@ -1,0 +1,6 @@
+{
+    "program": "zk_credit.aleo",
+    "version": "0.0.0",
+    "description": "Zero-knowledge credit scoring and undercollateralized lending",
+    "license": "MIT"
+}

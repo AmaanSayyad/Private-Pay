@@ -1,0 +1,6 @@
+{
+    "program": "private_lending.aleo",
+    "version": "0.0.0",
+    "description": "Privacy-preserving lending pools with encrypted positions",
+    "license": "MIT"
+}

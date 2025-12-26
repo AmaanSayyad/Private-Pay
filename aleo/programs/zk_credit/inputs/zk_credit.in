@@ -1,0 +1,31 @@
+// Sample inputs for ZK Credit System testing
+
+[initialize_credit_score]
+initial_score: u64 = 720u64;
+verification_proof: field = 1234567890field;
+
+[verify_creditworthiness]
+credit_score: CreditScore = CreditScore {
+    owner: aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8,
+    score: 720u64,
+    last_updated: 100u32,
+    verification_proof: 1234567890field,
+    credit_history_hash: 9876543210field,
+    payment_count: 5u64,
+    default_count: 0u64,
+};
+min_score_required: u64 = 650u64;
+
+[issue_loan]
+credit_proof: CreditProof = CreditProof {
+    owner: aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8,
+    min_score_met: true,
+    proof_hash: 1111111111field,
+    verification_block: 100u32,
+    valid_until: 200u32,
+};
+principal: u64 = 10000u64;
+interest_rate: u64 = 500u64; // 5% APR
+term: u32 = 5256u32; // ~3 months
+collateral_ratio: u64 = 7500u64; // 75% collateral
+lender: address = aleo1s3ws5tra87fjycnjrwsjcrnw2qxr8jfqqdugnf0xzqqw29q9m5pqem2u4t;

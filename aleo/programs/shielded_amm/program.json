@@ -1,0 +1,6 @@
+{
+    "program": "shielded_amm.aleo",
+    "version": "0.0.0",
+    "description": "Automated market maker with encrypted liquidity positions",
+    "license": "MIT"
+}

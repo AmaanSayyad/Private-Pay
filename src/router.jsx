@@ -41,6 +41,13 @@ const SolanaZcashBridgePage = lazy(() => import("./pages/SolanaZcashBridgePage.j
 const FhenixPaymentsPage = lazy(() => import("./pages/FhenixPayments.jsx"));
 // Aleo Zero-Knowledge Privacy
 const AleoPage = lazy(() => import("./pages/AleoPage.jsx"));
+// Aleo DeFi Pages
+const AleoDarkPoolPage = lazy(() => import("./pages/AleoDarkPoolPage.jsx"));
+const AleoAMMPage = lazy(() => import("./pages/AleoAMMPage.jsx"));
+const AleoCreditPage = lazy(() => import("./pages/AleoCreditPage.jsx"));
+const AleoLendingPage = lazy(() => import("./pages/AleoLendingPage.jsx"));
+const AleoVaultsPage = lazy(() => import("./pages/AleoVaultsPage.jsx"));
+const AleoTreasuryPage = lazy(() => import("./pages/AleoTreasuryPage.jsx"));
 import AleoErrorBoundary from "./components/aleo/AleoErrorBoundary.jsx";
 
 // Loading component
@@ -273,6 +280,67 @@ export const router = createBrowserRouter([
       {
         path: "/aleo",
         element: <AleoRoute routeName="Aleo" />,
+      },
+      // Aleo DeFi Routes
+      {
+        path: "/aleo/darkpool",
+        element: (
+          <AleoErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <LazyRoute Component={AleoDarkPoolPage} routeName="Aleo Dark Pool" />
+            </Suspense>
+          </AleoErrorBoundary>
+        ),
+      },
+      {
+        path: "/aleo/amm",
+        element: (
+          <AleoErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <LazyRoute Component={AleoAMMPage} routeName="Aleo AMM" />
+            </Suspense>
+          </AleoErrorBoundary>
+        ),
+      },
+      {
+        path: "/aleo/credit",
+        element: (
+          <AleoErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <LazyRoute Component={AleoCreditPage} routeName="Aleo Credit" />
+            </Suspense>
+          </AleoErrorBoundary>
+        ),
+      },
+      {
+        path: "/aleo/lending",
+        element: (
+          <AleoErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <LazyRoute Component={AleoLendingPage} routeName="Aleo Lending" />
+            </Suspense>
+          </AleoErrorBoundary>
+        ),
+      },
+      {
+        path: "/aleo/vaults",
+        element: (
+          <AleoErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <LazyRoute Component={AleoVaultsPage} routeName="Aleo Vaults" />
+            </Suspense>
+          </AleoErrorBoundary>
+        ),
+      },
+      {
+        path: "/aleo/treasury",
+        element: (
+          <AleoErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <LazyRoute Component={AleoTreasuryPage} routeName="Aleo Treasury" />
+            </Suspense>
+          </AleoErrorBoundary>
+        ),
       },
     ],
   },

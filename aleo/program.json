@@ -1,0 +1,6 @@
+{
+    "program": "aleo_private_defi.aleo",
+    "version": "0.0.0",
+    "description": "Privacy-preserving DeFi suite for Aleo blockchain",
+    "license": "MIT"
+}

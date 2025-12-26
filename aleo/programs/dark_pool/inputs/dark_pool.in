@@ -1,0 +1,13 @@
+// Test inputs for dark_pool.aleo
+
+[place_order]
+token_in: 1field
+token_out: 2field
+amount_in: 1000u64
+min_amount_out: 950u64
+expiry: 1000u32
+
+[add_liquidity]
+token: 1field
+amount: 10000u64
+pool_id: 1field

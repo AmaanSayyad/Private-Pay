@@ -1,0 +1,6 @@
+{
+    "program": "compliance_module.aleo",
+    "version": "0.0.0",
+    "description": "Compliance Module Program for selective disclosure, KYC verification, jurisdiction checking, and suspicious activity detection with privacy protection",
+    "license": "MIT"
+}

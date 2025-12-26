@@ -1,0 +1,21 @@
+﻿{
+    "deployedPrograms":  {
+                             "dark_pool":  {
+                                               "status":  "ready_to_deploy",
+                                               "path":  "aleo\\programs\\dark_pool",
+                                               "command":  "leo deploy --network testnet"
+                                           }
+                         },
+    "failureCount":  6,
+    "timestamp":  "2025-12-25 18:54:39",
+    "failedPrograms":  [
+                           "shielded_amm",
+                           "zk_credit",
+                           "private_lending",
+                           "cross_chain_vault",
+                           "treasury_management",
+                           "compliance_module"
+                       ],
+    "successCount":  1,
+    "totalPrograms":  7
+}

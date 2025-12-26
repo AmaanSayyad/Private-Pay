@@ -1,0 +1,71 @@
+// Input file for compliance_module.aleo
+
+// create_kyc_verification inputs
+[create_kyc_verification]
+verification_id: field = 1field;
+identity_hash: field = 123456789field;
+verification_level: u8 = 2u8;
+expiry_timestamp: u32 = 2000u32;
+issuer_signature: field = 987654321field;
+
+// verify_kyc_status inputs
+[verify_kyc_status]
+required_level: u8 = 1u8;
+
+// create_jurisdiction_check inputs
+[create_jurisdiction_check]
+check_id: field = 2field;
+jurisdiction_hash: field = 555666777field;
+compliance_level: u8 = 3u8;
+verification_proof: field = 111222333field;
+
+// verify_jurisdiction_compliance inputs
+[verify_jurisdiction_compliance]
+required_compliance_level: u8 = 2u8;
+
+// authorize_auditor inputs
+[authorize_auditor]
+auditor_id: field = 3field;
+authorization_level: u8 = 2u8;
+scope_hash: field = 444555666field;
+expiry_timestamp: u32 = 3000u32;
+public_key: field = 777888999field;
+
+// create_selective_disclosure inputs
+[create_selective_disclosure]
+disclosure_id: field = 4field;
+data_hash: field = 999888777field;
+disclosure_scope: field = 666555444field;
+encryption_key: field = 333222111field;
+
+// flag_suspicious_activity inputs
+[flag_suspicious_activity]
+activity_id: field = 5field;
+transaction_hash: field = 147258369field;
+risk_score: u8 = 7u8;
+pattern_hash: field = 369258147field;
+
+// investigate_suspicious_activity inputs
+[investigate_suspicious_activity]
+investigation_hash: field = 159357246field;
+
+// generate_compliance_report inputs
+[generate_compliance_report]
+report_id: field = 6field;
+reporting_period: u32 = 202412u32;
+total_transactions: u64 = 10000u64;
+flagged_transactions: u64 = 25u64;
+compliance_score: u8 = 95u8;
+report_hash: field = 753951864field;
+auditor_access_key: field = 864159753field;
+
+// update_kyc_verification inputs
+[update_kyc_verification]
+new_verification_level: u8 = 3u8;
+new_expiry: u32 = 4000u32;
+update_signature: field = 456789123field;
+
+// batch_verify_compliance inputs
+[batch_verify_compliance]
+required_kyc_level: u8 = 2u8;
+required_compliance_level: u8 = 2u8;

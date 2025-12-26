@@ -1,0 +1,247 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {"name": "gateway_", "type": "address"},
+      {"name": "gasService_", "type": "address"},
+      {"name": "initialOwner", "type": "address"}
+    ]
+  },
+  {
+    "type": "function",
+    "name": "lockForAleoVault",
+    "inputs": [
+      {"name": "token", "type": "address"},
+      {"name": "amount", "type": "uint256"},
+      {"name": "targetChain", "type": "string"},
+      {"name": "aleoVaultId", "type": "bytes32"},
+      {"name": "aleoStrategyId", "type": "bytes32"}
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "unlockFromAleoVault",
+    "inputs": [
+      {"name": "user", "type": "address"},
+      {"name": "token", "type": "address"},
+      {"name": "amount", "type": "uint256"},
+      {"name": "requestId", "type": "bytes32"},
+      {"name": "withdrawalProof", "type": "bytes"}
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "generateReserveProof",
+    "inputs": [
+      {"name": "token", "type": "address"}
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {"name": "token", "type": "address"},
+          {"name": "totalReserves", "type": "uint256"},
+          {"name": "totalLocked", "type": "uint256"},
+          {"name": "totalUnlocked", "type": "uint256"},
+          {"name": "proofHash", "type": "bytes32"},
+          {"name": "timestamp", "type": "uint256"}
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "verifyReserveProof",
+    "inputs": [
+      {
+        "name": "proof",
+        "type": "tuple",
+        "components": [
+          {"name": "token", "type": "address"},
+          {"name": "totalReserves", "type": "uint256"},
+          {"name": "totalLocked", "type": "uint256"},
+          {"name": "totalUnlocked", "type": "uint256"},
+          {"name": "proofHash", "type": "bytes32"},
+          {"name": "timestamp", "type": "uint256"}
+        ]
+      }
+    ],
+    "outputs": [{"name": "", "type": "bool"}],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getBridgeRequest",
+    "inputs": [
+      {"name": "requestId", "type": "bytes32"}
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {"name": "user", "type": "address"},
+          {"name": "token", "type": "address"},
+          {"name": "amount", "type": "uint256"},
+          {"name": "targetChain", "type": "string"},
+          {"name": "aleoVaultId", "type": "bytes32"},
+          {"name": "aleoStrategyId", "type": "bytes32"},
+          {"name": "timestamp", "type": "uint256"},
+          {"name": "status", "type": "uint8"}
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isRequestProcessed",
+    "inputs": [
+      {"name": "requestId", "type": "bytes32"}
+    ],
+    "outputs": [{"name": "", "type": "bool"}],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getTokenReserves",
+    "inputs": [
+      {"name": "token", "type": "address"}
+    ],
+    "outputs": [{"name": "", "type": "uint256"}],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getTotalLocked",
+    "inputs": [
+      {"name": "token", "type": "address"}
+    ],
+    "outputs": [{"name": "", "type": "uint256"}],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getTotalUnlocked",
+    "inputs": [
+      {"name": "token", "type": "address"}
+    ],
+    "outputs": [{"name": "", "type": "uint256"}],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "setTrustedAleoBridge",
+    "inputs": [
+      {"name": "chainName", "type": "string"},
+      {"name": "contractAddress", "type": "string"}
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setMinimumAmount",
+    "inputs": [
+      {"name": "token", "type": "address"},
+      {"name": "amount", "type": "uint256"}
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setBridgeFee",
+    "inputs": [
+      {"name": "newFeeBps", "type": "uint256"}
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setFeeRecipient",
+    "inputs": [
+      {"name": "newRecipient", "type": "address"}
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "pause",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "unpause",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "AssetLocked",
+    "inputs": [
+      {"name": "user", "type": "address", "indexed": true},
+      {"name": "token", "type": "address", "indexed": true},
+      {"name": "amount", "type": "uint256", "indexed": false},
+      {"name": "targetChain", "type": "string", "indexed": false},
+      {"name": "requestId", "type": "bytes32", "indexed": true},
+      {"name": "aleoVaultId", "type": "bytes32", "indexed": false},
+      {"name": "aleoStrategyId", "type": "bytes32", "indexed": false}
+    ]
+  },
+  {
+    "type": "event",
+    "name": "AssetUnlocked",
+    "inputs": [
+      {"name": "user", "type": "address", "indexed": true},
+      {"name": "token", "type": "address", "indexed": true},
+      {"name": "amount", "type": "uint256", "indexed": false},
+      {"name": "requestId", "type": "bytes32", "indexed": true}
+    ]
+  },
+  {
+    "type": "event",
+    "name": "ReserveProofGenerated",
+    "inputs": [
+      {"name": "token", "type": "address", "indexed": true},
+      {"name": "totalReserves", "type": "uint256", "indexed": false},
+      {"name": "proofHash", "type": "bytes32", "indexed": false},
+      {"name": "timestamp", "type": "uint256", "indexed": false}
+    ]
+  },
+  {
+    "type": "event",
+    "name": "BridgeRequestProcessed",
+    "inputs": [
+      {"name": "requestId", "type": "bytes32", "indexed": true},
+      {"name": "status", "type": "uint8", "indexed": false}
+    ]
+  },
+  {
+    "type": "event",
+    "name": "TrustedAleoBridgeSet",
+    "inputs": [
+      {"name": "chainName", "type": "string", "indexed": true},
+      {"name": "contractAddress", "type": "string", "indexed": false}
+    ]
+  },
+  {
+    "type": "event",
+    "name": "MinimumAmountSet",
+    "inputs": [
+      {"name": "token", "type": "address", "indexed": true},
+      {"name": "amount", "type": "uint256", "indexed": false}
+    ]
+  }
+]

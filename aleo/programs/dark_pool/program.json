@@ -1,0 +1,6 @@
+{
+    "program": "dark_pool.aleo",
+    "version": "0.0.0",
+    "description": "Private order matching and dark pool trading",
+    "license": "MIT"
+}

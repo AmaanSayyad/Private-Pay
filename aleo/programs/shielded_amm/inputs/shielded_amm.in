@@ -1,0 +1,13 @@
+// Test inputs for shielded_amm.aleo
+
+[swap]
+token_in: 1field
+token_out: 2field
+amount_in: 1000u64
+min_amount_out: 950u64
+pool_id: 1field
+
+[add_liquidity]
+pool_id: 1field
+token_a_amount: 10000u64
+token_b_amount: 10000u64

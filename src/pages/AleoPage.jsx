@@ -257,6 +257,144 @@ export default function AleoPage() {
                         </Card>
                     </div>
 
+                    {/* DeFi Features Grid */}
+                    <div className="w-full">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-4">Aleo DeFi Features</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Dark Pool */}
+                            <Card
+                                isPressable
+                                onPress={() => window.location.href = '/aleo/darkpool'}
+                                className="bg-gradient-to-br from-purple-500 to-purple-700 border-0 shadow-lg rounded-2xl hover:scale-105 transition-transform"
+                            >
+                                <CardBody className="p-6">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                            <Shield className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-bold text-white mb-1">Dark Pool</h3>
+                                            <p className="text-xs text-white/80">Private order execution</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-white/70 leading-relaxed">
+                                        Trade with complete privacy using encrypted orders
+                                    </p>
+                                </CardBody>
+                            </Card>
+
+                            {/* Shielded AMM */}
+                            <Card
+                                isPressable
+                                onPress={() => window.location.href = '/aleo/amm'}
+                                className="bg-gradient-to-br from-blue-500 to-blue-700 border-0 shadow-lg rounded-2xl hover:scale-105 transition-transform"
+                            >
+                                <CardBody className="p-6">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                            <Zap className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-bold text-white mb-1">Shielded AMM</h3>
+                                            <p className="text-xs text-white/80">Private token swaps</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-white/70 leading-relaxed">
+                                        Swap tokens with zero-knowledge privacy
+                                    </p>
+                                </CardBody>
+                            </Card>
+
+                            {/* ZK Credit */}
+                            <Card
+                                isPressable
+                                onPress={() => window.location.href = '/aleo/credit'}
+                                className="bg-gradient-to-br from-purple-500 to-purple-700 border-0 shadow-lg rounded-2xl hover:scale-105 transition-transform"
+                            >
+                                <CardBody className="p-6">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                            <CheckCircle className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-bold text-white mb-1">ZK Credit</h3>
+                                            <p className="text-xs text-white/80">Private credit score</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-white/70 leading-relaxed">
+                                        Build credit while maintaining privacy
+                                    </p>
+                                </CardBody>
+                            </Card>
+
+                            {/* Private Lending */}
+                            <Card
+                                isPressable
+                                onPress={() => window.location.href = '/aleo/lending'}
+                                className="bg-gradient-to-br from-green-500 to-green-700 border-0 shadow-lg rounded-2xl hover:scale-105 transition-transform"
+                            >
+                                <CardBody className="p-6">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                            <BarChart3 className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-bold text-white mb-1">Private Lending</h3>
+                                            <p className="text-xs text-white/80">Supply & borrow</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-white/70 leading-relaxed">
+                                        Earn yield or borrow with privacy
+                                    </p>
+                                </CardBody>
+                            </Card>
+
+                            {/* Cross-Chain Vaults */}
+                            <Card
+                                isPressable
+                                onPress={() => window.location.href = '/aleo/vaults'}
+                                className="bg-gradient-to-br from-purple-500 to-purple-700 border-0 shadow-lg rounded-2xl hover:scale-105 transition-transform"
+                            >
+                                <CardBody className="p-6">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                            <Lock className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-bold text-white mb-1">Vaults</h3>
+                                            <p className="text-xs text-white/80">Yield farming</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-white/70 leading-relaxed">
+                                        Cross-chain yield strategies up to 28.7% APY
+                                    </p>
+                                </CardBody>
+                            </Card>
+
+                            {/* Treasury */}
+                            <Card
+                                isPressable
+                                onPress={() => window.location.href = '/aleo/treasury'}
+                                className="bg-gradient-to-br from-blue-500 to-blue-700 border-0 shadow-lg rounded-2xl hover:scale-105 transition-transform"
+                            >
+                                <CardBody className="p-6">
+                                    <div className="flex items-start gap-3 mb-3">
+                                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                            <Wallet className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-bold text-white mb-1">Treasury</h3>
+                                            <p className="text-xs text-white/80">Multi-sig management</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-white/70 leading-relaxed">
+                                        Institutional fund management with privacy
+                                    </p>
+                                </CardBody>
+                            </Card>
+                        </div>
+                    </div>
+
                     {/* Private Transfer */}
                     <Card className="bg-white border border-gray-200 shadow-md rounded-2xl">
                         <CardBody className="p-6">

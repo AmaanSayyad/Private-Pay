@@ -1,0 +1,6 @@
+{
+    "program": "cross_chain_vault.aleo",
+    "version": "0.0.0",
+    "description": "Cross-chain vault program for private yield farming across multiple blockchain networks",
+    "license": "MIT"
+}

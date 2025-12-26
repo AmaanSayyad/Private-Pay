@@ -1,0 +1,63 @@
+// Input file for cross_chain_vault.aleo
+
+[deposit_bridged]
+bridged_asset: BridgedAsset = BridgedAsset {
+    owner: aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8,
+    source_chain: 1field,
+    source_token: 2field,
+    amount: 1000000u64,
+    bridge_proof: 12345field,
+    bridge_nonce: 67890field
+};
+vault_id: field = 100field;
+strategy_id: field = 200field;
+
+[compound_yield]
+position: VaultPosition = VaultPosition {
+    owner: aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8,
+    vault_id: 100field,
+    deposited_amount: 1000000u64,
+    shares: 1000000u64,
+    entry_price: 1000000u64,
+    last_reward_checkpoint: 0u64,
+    strategy_id: 200field
+};
+yield_record: YieldRecord = YieldRecord {
+    owner: aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8,
+    vault_id: 100field,
+    yield_amount: 50000u64,
+    yield_token: 2field,
+    timestamp: 1000u32,
+    compound_eligible: true
+};
+
+[withdraw_to_chain]
+position: VaultPosition = VaultPosition {
+    owner: aleo1qnr4dkkvkgfqph0vzc3y6z2eu975wnpz2925ntjccd5cfqxtyu8sta57j8,
+    vault_id: 100field,
+    deposited_amount: 1050000u64,
+    shares: 1050000u64,
+    entry_price: 1000000u64,
+    last_reward_checkpoint: 1000u64,
+    strategy_id: 200field
+};
+withdraw_amount: u64 = 500000u64;
+target_chain: field = 3field;
+target_address: field = 999field;
+
+[create_yield_record]
+vault_id: field = 100field;
+yield_amount: u64 = 50000u64;
+yield_token: field = 2field;
+compound_eligible: bool = true;
+
+[generate_reserve_proof]
+vault_id: field = 100field;
+total_deposits: u64 = 5000000u64;
+total_shares: u64 = 5000000u64;
+total_yield: u64 = 250000u64;
+
+[calculate_share_price]
+total_deposits: u64 = 5000000u64;
+total_shares: u64 = 5000000u64;
+total_yield: u64 = 250000u64;
