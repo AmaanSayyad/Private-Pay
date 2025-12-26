@@ -2,13 +2,13 @@
 // Unified transaction handling for all Aleo DeFi operations
 // All operations execute real Credits transfers to demonstrate on-chain activity
 
-import { WalletAdapterNetwork } from '@demox-labs/aleo-wallet-adapter-base';
+import { Transaction, WalletAdapterNetwork } from '@demox-labs/aleo-wallet-adapter-base';
 
 const TREASURY_ADDRESS = 'aleo1lnvreh0hvs8celqfndmp7sjezz0fl588cadrrtakgxxzdmr6euyq60funr';
 
 /**
  * Create a standard Aleo transaction for Leo Wallet
- * Using the exact format that works with manual transfers
+ * Using Transaction.createTransaction for proper format compatibility
  * @param {string} senderAddress - Sender's Aleo address
  * @param {string} recipientAddress - Recipient's Aleo address
  * @param {number} amount - Amount in credits (will be converted to microcredits)
@@ -18,34 +18,41 @@ export function createAleoTransaction(senderAddress, recipientAddress = TREASURY
     // Convert to microcredits (1 credit = 1,000,000 microcredits)
     const microcredits = Math.max(Math.floor(amount * 1_000_000), 100000);
     
-    // Fee: 287500 microcredits (standard fee for transfer_public)
-    const fee = 287500;
+    // Fee in microcredits
+    const fee = 300000; // 0.3 ALEO
+    
+    // Total required: amount + fee
+    const totalRequired = (microcredits + fee) / 1_000_000;
     
     console.log(`[Aleo] Creating transfer_public transaction:`, {
         sender: senderAddress,
         receiver: recipientAddress,
         amount: `${microcredits} microcredits (${microcredits / 1_000_000} ALEO)`,
         fee: `${fee} microcredits (${fee / 1_000_000} ALEO)`,
-        total: `${(microcredits + fee) / 1_000_000} ALEO`,
-        network: 'TestnetBeta',
-        privateFee: false
+        totalRequired: `${totalRequired} ALEO`,
+        network: 'TestnetBeta'
     });
     
-    // Create transaction object directly (matching Leo Wallet's expected format)
-    // Based on: https://docs.leo.app/aleo-wallet-adapter/#requesting-transactions
+    // Build transaction object manually to ensure correct format
+    // Based on wallet adapter Transaction class structure
     const transaction = {
         address: senderAddress,
-        chainId: WalletAdapterNetwork.TestnetBeta,
+        chainId: 'testnetbeta',
         transitions: [
             {
                 program: 'credits.aleo',
                 functionName: 'transfer_public',
-                inputs: [recipientAddress, `${microcredits}u64`]
+                inputs: [
+                    recipientAddress,
+                    `${microcredits}u64`
+                ]
             }
         ],
         fee: fee,
-        privateFee: false  // CRITICAL: Pay fee from PUBLIC balance
+        feePrivate: false
     };
+    
+    console.log(`[Aleo] Transaction created:`, JSON.stringify(transaction, null, 2));
     
     return transaction;
 }
@@ -58,18 +65,20 @@ export function createAleoTransaction(senderAddress, recipientAddress = TREASURY
  * @param {number} interval - Polling interval in ms
  * @returns {Promise<Object>} Transaction status with on-chain txId
  */
-async function pollTransactionStatus(transactionStatus, requestId, maxAttempts = 20, interval = 2000) {
+async function pollTransactionStatus(transactionStatus, requestId, maxAttempts = 30, interval = 2000) {
     let lastStatus = null;
+    let lastStatusObj = null;
     let failedCount = 0;
     
     for (let i = 0; i < maxAttempts; i++) {
         try {
             const status = await transactionStatus(requestId);
-            lastStatus = status;
-            console.log(`[Aleo] Transaction status (attempt ${i + 1}):`, status);
+            lastStatusObj = status;
+            console.log(`[Aleo] Transaction status (attempt ${i + 1}):`, JSON.stringify(status));
             
             // Handle different status formats (string or object)
             const statusStr = typeof status === 'string' ? status : status?.status;
+            lastStatus = statusStr;
             
             // Check if we have a finalized transaction
             if (statusStr === 'Finalized') {
@@ -81,16 +90,21 @@ async function pollTransactionStatus(transactionStatus, requestId, maxAttempts =
                 };
             }
             
-            // Check for failure - stop polling immediately
+            // Check for failure - get detailed error
             if (statusStr === 'Failed' || statusStr === 'Rejected') {
                 failedCount++;
+                const errorMsg = typeof status === 'object' 
+                    ? (status.error || status.message || status.reason || JSON.stringify(status))
+                    : 'Transaction failed';
+                console.error(`[Aleo] Transaction failed (attempt ${i + 1}):`, errorMsg);
+                
                 // If failed 3 times in a row, stop polling
                 if (failedCount >= 3) {
-                    console.log(`[Aleo] Transaction failed after ${i + 1} attempts`);
+                    console.log(`[Aleo] Transaction failed after ${i + 1} attempts. Error:`, errorMsg);
                     return {
                         success: false,
                         status: statusStr,
-                        error: typeof status === 'object' ? status.error : 'Transaction failed on network',
+                        error: errorMsg,
                     };
                 }
             } else {
@@ -111,6 +125,7 @@ async function pollTransactionStatus(transactionStatus, requestId, maxAttempts =
         status: lastStatus || 'Timeout',
         transactionId: null,
         requestId,
+        lastStatusObj,
     };
 }
 
@@ -142,6 +157,11 @@ export async function executeAleoOperation(requestTransaction, publicKey, operat
 
     // Get recipient address (default to treasury)
     const recipient = params.recipient || TREASURY_ADDRESS;
+    
+    // Validate recipient address format
+    if (!recipient.startsWith('aleo1') || recipient.length !== 63) {
+        throw new Error(`Invalid recipient address format. Expected aleo1... (63 chars), got: ${recipient.substring(0, 20)}...`);
+    }
 
     const transaction = createAleoTransaction(publicKey, recipient, amount);
     const submitTimestamp = Date.now();
@@ -149,10 +169,20 @@ export async function executeAleoOperation(requestTransaction, publicKey, operat
     console.log(`[Aleo] Executing ${operationType}:`, JSON.stringify(transaction, null, 2));
     console.log(`[Aleo] Transaction object type:`, typeof transaction);
     console.log(`[Aleo] Transaction keys:`, Object.keys(transaction));
+    console.log(`[Aleo] IMPORTANT: Make sure you have at least ${amount + 0.5} ALEO in PUBLIC balance!`);
     
     // requestTransaction returns a request ID (UUID), not the on-chain tx ID
-    const requestId = await requestTransaction(transaction);
-    console.log(`[Aleo] Request ID received:`, requestId);
+    let requestId;
+    try {
+        requestId = await requestTransaction(transaction);
+        console.log(`[Aleo] Request ID received:`, requestId);
+    } catch (error) {
+        console.error(`[Aleo] requestTransaction failed:`, error);
+        if (error.message?.includes('insufficient') || error.message?.includes('balance')) {
+            throw new Error('Insufficient public balance. Please make sure you have enough ALEO in your PUBLIC balance (not private records).');
+        }
+        throw error;
+    }
     
     let finalTxId = requestId;
     let txStatus = 'Submitted';
@@ -195,7 +225,18 @@ export async function executeAleoOperation(requestTransaction, publicKey, operat
     
     // If transaction failed, throw error so UI can handle it
     if (!result.success) {
-        const error = new Error(txError || 'Transaction failed on network');
+        let errorMessage = txError || 'Transaction failed on network';
+        
+        // Add helpful context for common errors
+        if (errorMessage.includes('Failed') || errorMessage === 'Transaction failed on network') {
+            errorMessage = `Transaction failed. This usually means:\n` +
+                `1. Insufficient PUBLIC balance (you need ${amount + 0.5} ALEO minimum)\n` +
+                `2. Network congestion - try again later\n` +
+                `3. Invalid transaction parameters\n\n` +
+                `Make sure your ALEO is in PUBLIC balance, not private records.`;
+        }
+        
+        const error = new Error(errorMessage);
         error.result = result;
         throw error;
     }
