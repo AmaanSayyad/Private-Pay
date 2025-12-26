@@ -17,7 +17,8 @@ export default function AleoProvider({ children }) {
             new LeoWalletAdapter({
                 appName: 'PrivatePay',
                 decryptPermission: DecryptPermission.UponRequest,
-                network: WalletAdapterNetwork.Testnet,
+                // Use TestnetBeta to match Leo Wallet's current network
+                network: WalletAdapterNetwork.TestnetBeta,
             }),
         ],
         []

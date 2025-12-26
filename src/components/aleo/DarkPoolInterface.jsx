@@ -1,12 +1,13 @@
 // DarkPoolInterface Component
 // Private order management interface for dark pool trading
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardBody, CardHeader, Button, Input, Select, SelectItem, Chip, Tooltip, Progress } from '@nextui-org/react';
-import { TrendingUp, TrendingDown, Lock, Eye, EyeOff, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAleoWallet } from '../../hooks/useAleoWallet';
-import { DarkPoolService } from '../../lib/aleo/darkpool';
+import { useState, useEffect } from 'react';
+import { Card, CardBody, CardHeader, Button, Input, Select, SelectItem, Chip } from '@nextui-org/react';
+import { TrendingUp, TrendingDown, Lock, Eye, EyeOff, AlertCircle, CheckCircle2, ExternalLink, Wallet } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { useWallet } from '@demox-labs/aleo-wallet-adapter-react';
+import { WalletMultiButton } from '@demox-labs/aleo-wallet-adapter-reactui';
+import { executeAleoOperation, OPERATION_TYPES, getTransactionHistory } from '../../lib/aleo/aleoTransactionHelper';
 import toast from 'react-hot-toast';
 
 const ORDER_TYPES = [
@@ -16,13 +17,8 @@ const ORDER_TYPES = [
     { value: 'stop_loss', label: 'Stop Loss' },
 ];
 
-const ORDER_SIDES = [
-    { value: 'buy', label: 'Buy', color: 'success' },
-    { value: 'sell', label: 'Sell', color: 'danger' },
-];
-
 export default function DarkPoolInterface() {
-    const { connected, executeTransition, onProofProgress } = useAleoWallet();
+    const { connected, publicKey, requestTransaction, transactionStatus } = useWallet();
     const [orderType, setOrderType] = useState('market');
     const [orderSide, setOrderSide] = useState('buy');
     const [tokenPair, setTokenPair] = useState('ALEO/USDC');
@@ -30,57 +26,34 @@ export default function DarkPoolInterface() {
     const [price, setPrice] = useState('');
     const [isPrivate, setIsPrivate] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [proofProgress, setProofProgress] = useState(null);
     const [myOrders, setMyOrders] = useState([]);
+    const [lastTx, setLastTx] = useState(null);
 
-    // Subscribe to proof progress
-    useEffect(() => {
-        if (!connected) return;
-
-        const unsubscribe = onProofProgress((progress) => {
-            setProofProgress(progress);
-        });
-
-        return unsubscribe;
-    }, [connected, onProofProgress]);
-
-    // Load user's orders
+    // Load orders from history
     useEffect(() => {
         if (connected) {
             loadMyOrders();
         }
     }, [connected]);
 
-    const loadMyOrders = async () => {
-        try {
-            // This would fetch actual orders from the blockchain
-            // For now, we'll use mock data
-            const mockOrders = [
-                {
-                    id: '1',
-                    type: 'limit',
-                    side: 'buy',
-                    pair: 'ALEO/USDC',
-                    amount: '100',
-                    price: '0.50',
-                    status: 'open',
-                    timestamp: Date.now() - 3600000,
-                },
-                {
-                    id: '2',
-                    type: 'market',
-                    side: 'sell',
-                    pair: 'ALEO/USDC',
-                    amount: '50',
-                    price: '0.52',
-                    status: 'filled',
-                    timestamp: Date.now() - 7200000,
-                },
-            ];
-            setMyOrders(mockOrders);
-        } catch (error) {
-            console.error('[DarkPool] Load orders error:', error);
-        }
+    const loadMyOrders = () => {
+        const history = getTransactionHistory();
+        const darkPoolOrders = history
+            .filter(tx => tx.operationType?.startsWith('dark_pool'))
+            .slice(0, 10)
+            .map((tx, i) => ({
+                id: tx.txHash?.substring(0, 10) || `order_${i}`,
+                type: tx.params?.orderType || 'market',
+                side: tx.params?.side || 'buy',
+                pair: tx.params?.pair || 'ALEO/USDC',
+                amount: tx.params?.amount || '0',
+                price: tx.params?.price || '0',
+                status: 'filled',
+                timestamp: tx.timestamp,
+                txHash: tx.txHash,
+                explorerLink: tx.explorerLink
+            }));
+        setMyOrders(darkPoolOrders);
     };
 
     const handleSubmitOrder = async () => {
@@ -96,49 +69,63 @@ export default function DarkPoolInterface() {
 
         try {
             setIsSubmitting(true);
+            toast.loading('Submitting order...', { id: 'order-loading' });
 
-            // Prepare order inputs
-            const inputs = [
-                tokenPair,
-                orderSide,
-                `${parseFloat(amount)}u64`,
-                orderType === 'limit' ? `${parseFloat(price)}u64` : '0u64',
-                isPrivate ? 'true' : 'false',
-            ];
-
-            // Execute place_order transition
-            const result = await executeTransition(
-                'dark_pool.aleo',
-                'place_order',
-                inputs,
-                { waitForConfirmation: true }
+            const result = await executeAleoOperation(
+                requestTransaction,
+                publicKey,
+                OPERATION_TYPES.PLACE_ORDER,
+                {
+                    orderType,
+                    side: orderSide,
+                    pair: tokenPair,
+                    amount,
+                    price: price || 'market',
+                    isPrivate
+                },
+                transactionStatus // Pass transactionStatus for polling
             );
 
-            toast.success('Order placed successfully!');
+            toast.dismiss('order-loading');
+            setLastTx(result);
+            
+            if (result.isRealTxId) {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Order confirmed on-chain!</p>
+                        <p className="text-xs text-gray-600">TX: {result.txHash.substring(0, 20)}...</p>
+                        <a 
+                            href={result.explorerLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-500 underline flex items-center gap-1"
+                        >
+                            View on Explorer <ExternalLink size={12} />
+                        </a>
+                    </div>
+                );
+            } else {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Order submitted!</p>
+                        <p className="text-xs text-gray-600">Waiting for confirmation...</p>
+                    </div>
+                );
+            }
 
-            // Reload orders
-            await loadMyOrders();
-
-            // Reset form
+            loadMyOrders();
             setAmount('');
             setPrice('');
         } catch (error) {
+            toast.dismiss('order-loading');
             console.error('[DarkPool] Submit order error:', error);
-            toast.error(error.message || 'Failed to place order');
+            if (error.message?.includes('rejected') || error.message?.includes('cancelled')) {
+                toast.error('Transaction cancelled');
+            } else {
+                toast.error(error.message || 'Failed to place order');
+            }
         } finally {
             setIsSubmitting(false);
-        }
-    };
-
-    const handleCancelOrder = async (orderId) => {
-        try {
-            const inputs = [orderId];
-            await executeTransition('dark_pool.aleo', 'cancel_order', inputs);
-            toast.success('Order cancelled');
-            await loadMyOrders();
-        } catch (error) {
-            console.error('[DarkPool] Cancel order error:', error);
-            toast.error('Failed to cancel order');
         }
     };
 
@@ -186,9 +173,7 @@ export default function DarkPoolInterface() {
                                 selectedKeys={[orderType]}
                                 onChange={(e) => setOrderType(e.target.value)}
                                 className="w-full"
-                                classNames={{
-                                    trigger: "rounded-xl border-gray-200",
-                                }}
+                                classNames={{ trigger: "rounded-xl border-gray-200" }}
                             >
                                 {ORDER_TYPES.map((type) => (
                                     <SelectItem key={type.value} value={type.value}>
@@ -201,18 +186,24 @@ export default function DarkPoolInterface() {
                         <div>
                             <label className="text-sm font-medium text-gray-700 mb-2 block">Side</label>
                             <div className="flex gap-2">
-                                {ORDER_SIDES.map((side) => (
-                                    <Button
-                                        key={side.value}
-                                        onClick={() => setOrderSide(side.value)}
-                                        color={orderSide === side.value ? side.color : 'default'}
-                                        variant={orderSide === side.value ? 'solid' : 'flat'}
-                                        className="flex-1 rounded-xl font-semibold"
-                                        startContent={side.value === 'buy' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                                    >
-                                        {side.label}
-                                    </Button>
-                                ))}
+                                <Button
+                                    onClick={() => setOrderSide('buy')}
+                                    color={orderSide === 'buy' ? 'success' : 'default'}
+                                    variant={orderSide === 'buy' ? 'solid' : 'flat'}
+                                    className="flex-1 rounded-xl font-semibold"
+                                    startContent={<TrendingUp size={16} />}
+                                >
+                                    Buy
+                                </Button>
+                                <Button
+                                    onClick={() => setOrderSide('sell')}
+                                    color={orderSide === 'sell' ? 'danger' : 'default'}
+                                    variant={orderSide === 'sell' ? 'solid' : 'flat'}
+                                    className="flex-1 rounded-xl font-semibold"
+                                    startContent={<TrendingDown size={16} />}
+                                >
+                                    Sell
+                                </Button>
                             </div>
                         </div>
                     </div>
@@ -240,9 +231,7 @@ export default function DarkPoolInterface() {
                                 value={amount}
                                 onChange={(e) => setAmount(e.target.value)}
                                 placeholder="0.0"
-                                classNames={{
-                                    inputWrapper: "rounded-xl border-gray-200",
-                                }}
+                                classNames={{ inputWrapper: "rounded-xl border-gray-200" }}
                             />
                         </div>
 
@@ -254,9 +243,7 @@ export default function DarkPoolInterface() {
                                     value={price}
                                     onChange={(e) => setPrice(e.target.value)}
                                     placeholder="0.0"
-                                    classNames={{
-                                        inputWrapper: "rounded-xl border-gray-200",
-                                    }}
+                                    classNames={{ inputWrapper: "rounded-xl border-gray-200" }}
                                 />
                             </div>
                         )}
@@ -269,45 +256,55 @@ export default function DarkPoolInterface() {
                             <div>
                                 <h4 className="text-sm font-bold text-purple-900">Private Order</h4>
                                 <p className="text-xs text-purple-700 mt-1 leading-relaxed">
-                                    Your order details will be encrypted using zero-knowledge proofs. Only matched orders will be revealed.
+                                    Your order details will be encrypted using zero-knowledge proofs.
                                 </p>
                             </div>
                         </div>
                     )}
 
-                    {/* Proof Progress */}
-                    <AnimatePresence>
-                        {proofProgress && proofProgress.status === 'generating' && (
-                            <motion.div
-                                initial={{ opacity: 0, y: -10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="space-y-2"
-                            >
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-700 font-medium">{proofProgress.message}</span>
-                                    <span className="text-purple-600 font-bold">{proofProgress.progress}%</span>
+                    {/* Last Transaction */}
+                    {lastTx && (
+                        <div className={`p-4 rounded-xl border ${lastTx.isRealTxId ? 'bg-green-50 border-green-100' : 'bg-yellow-50 border-yellow-100'}`}>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className={`w-5 h-5 ${lastTx.isRealTxId ? 'text-green-600' : 'text-yellow-600'}`} />
+                                    <span className={`text-sm font-bold ${lastTx.isRealTxId ? 'text-green-900' : 'text-yellow-900'}`}>
+                                        {lastTx.isRealTxId ? 'Transaction Confirmed' : 'Transaction Submitted'}
+                                    </span>
                                 </div>
-                                <Progress
-                                    value={proofProgress.progress}
-                                    color="secondary"
-                                    className="h-2"
-                                />
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                                <a
+                                    href={lastTx.explorerLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`text-xs underline flex items-center gap-1 ${lastTx.isRealTxId ? 'text-green-700' : 'text-yellow-700'}`}
+                                >
+                                    {lastTx.isRealTxId ? `${lastTx.txHash?.substring(0, 15)}...` : 'View Address'} <ExternalLink size={12} />
+                                </a>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Submit Button */}
-                    <Button
-                        onClick={handleSubmitOrder}
-                        isLoading={isSubmitting}
-                        isDisabled={!connected || isSubmitting}
-                        color={orderSide === 'buy' ? 'success' : 'danger'}
-                        className="w-full h-12 rounded-xl font-bold text-base"
-                        startContent={!isSubmitting && (orderSide === 'buy' ? <TrendingUp size={20} /> : <TrendingDown size={20} />)}
-                    >
-                        {isSubmitting ? 'Placing Order...' : `Place ${orderSide === 'buy' ? 'Buy' : 'Sell'} Order`}
-                    </Button>
+                    {!connected ? (
+                        <div className="space-y-3">
+                            <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 flex items-center gap-3">
+                                <Wallet className="w-5 h-5 text-purple-600" />
+                                <p className="text-sm text-purple-700">Connect your wallet to place orders</p>
+                            </div>
+                            <WalletMultiButton className="!w-full !bg-purple-600 hover:!bg-purple-700 !text-white !font-bold !h-12 !rounded-xl" />
+                        </div>
+                    ) : (
+                        <Button
+                            onClick={handleSubmitOrder}
+                            isLoading={isSubmitting}
+                            isDisabled={isSubmitting || !amount}
+                            color={orderSide === 'buy' ? 'success' : 'danger'}
+                            className="w-full h-12 rounded-xl font-bold text-base"
+                            startContent={!isSubmitting && (orderSide === 'buy' ? <TrendingUp size={20} /> : <TrendingDown size={20} />)}
+                        >
+                            {isSubmitting ? 'Placing Order...' : `Place ${orderSide === 'buy' ? 'Buy' : 'Sell'} Order`}
+                        </Button>
+                    )}
                 </CardBody>
             </Card>
 
@@ -353,20 +350,19 @@ export default function DarkPoolInterface() {
                                                 size="sm"
                                                 color={getStatusColor(order.status)}
                                                 variant="flat"
-                                                startContent={order.status === 'filled' ? <CheckCircle2 size={12} /> : <Clock size={12} />}
+                                                startContent={<CheckCircle2 size={12} />}
                                             >
                                                 {order.status}
                                             </Chip>
-                                            {order.status === 'open' && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="flat"
-                                                    color="danger"
-                                                    onClick={() => handleCancelOrder(order.id)}
-                                                    className="rounded-lg"
+                                            {order.explorerLink && (
+                                                <a
+                                                    href={order.explorerLink}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-500"
                                                 >
-                                                    Cancel
-                                                </Button>
+                                                    <ExternalLink size={16} />
+                                                </a>
                                             )}
                                         </div>
                                     </div>

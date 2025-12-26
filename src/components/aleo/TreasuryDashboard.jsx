@@ -1,19 +1,24 @@
 // TreasuryDashboard Component
 // Institutional treasury management with multi-sig and compliance
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardBody, CardHeader, Button, Chip, Progress, Tooltip, Tabs, Tab } from '@nextui-org/react';
-import { Briefcase, Users, Shield, TrendingUp, DollarSign, FileText, Eye, EyeOff, RefreshCw } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAleoWallet } from '../../hooks/useAleoWallet';
+import { useState, useEffect } from 'react';
+import { Card, CardBody, CardHeader, Button, Chip, Progress, Tooltip, Tabs, Tab, Input } from '@nextui-org/react';
+import { Briefcase, Users, Shield, TrendingUp, DollarSign, FileText, Eye, EyeOff, RefreshCw, CheckCircle2, ExternalLink, Send, Wallet } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { useWallet } from '@demox-labs/aleo-wallet-adapter-react';
+import { WalletMultiButton } from '@demox-labs/aleo-wallet-adapter-reactui';
+import { executeAleoOperation, OPERATION_TYPES, getTransactionHistory } from '../../lib/aleo/aleoTransactionHelper';
 import toast from 'react-hot-toast';
 
 export default function TreasuryDashboard() {
-    const { connected } = useAleoWallet();
+    const { connected, publicKey, requestTransaction, transactionStatus } = useWallet();
     const [treasuryData, setTreasuryData] = useState(null);
     const [isPrivate, setIsPrivate] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
+    const [depositAmount, setDepositAmount] = useState('');
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [lastTx, setLastTx] = useState(null);
 
     useEffect(() => {
         if (connected) {
@@ -25,7 +30,22 @@ export default function TreasuryDashboard() {
         try {
             setIsLoading(true);
 
-            // Mock treasury data
+            // Get transaction history for recent activity
+            const history = getTransactionHistory();
+            const treasuryTxs = history
+                .filter(tx => tx.operationType?.startsWith('treasury'))
+                .slice(0, 5)
+                .map(tx => ({
+                    id: tx.txHash?.substring(0, 10) || 'tx',
+                    type: tx.params?.type || 'Deposit',
+                    amount: parseFloat(tx.params?.amount || 0) * 1000,
+                    status: 'completed',
+                    date: tx.timestamp,
+                    signatures: 3,
+                    txHash: tx.txHash,
+                    explorerLink: tx.explorerLink
+                }));
+
             const mockData = {
                 totalAssets: 5250000,
                 totalLiabilities: 1200000,
@@ -36,56 +56,148 @@ export default function TreasuryDashboard() {
                 investments: 2800000,
                 signers: 5,
                 requiredSignatures: 3,
-                pendingTransactions: 3,
+                pendingTransactions: treasuryTxs.filter(t => t.status === 'pending').length,
                 allocations: [
                     { category: 'Operations', amount: 1200000, percentage: 23 },
                     { category: 'Investments', amount: 2800000, percentage: 53 },
                     { category: 'Reserves', amount: 1250000, percentage: 24 },
                 ],
-                recentActivity: [
-                    {
-                        id: '1',
-                        type: 'Payroll',
-                        amount: 85000,
-                        status: 'completed',
-                        date: Date.now() - 86400000,
-                        signatures: 3,
-                    },
-                    {
-                        id: '2',
-                        type: 'Investment',
-                        amount: 250000,
-                        status: 'pending',
-                        date: Date.now() - 172800000,
-                        signatures: 2,
-                    },
-                    {
-                        id: '3',
-                        type: 'Withdrawal',
-                        amount: 50000,
-                        status: 'pending',
-                        date: Date.now() - 259200000,
-                        signatures: 1,
-                    },
+                recentActivity: treasuryTxs.length > 0 ? treasuryTxs : [
+                    { id: '1', type: 'Payroll', amount: 85000, status: 'completed', date: Date.now() - 86400000, signatures: 3 },
+                    { id: '2', type: 'Investment', amount: 250000, status: 'pending', date: Date.now() - 172800000, signatures: 2 },
                 ],
             };
 
             setTreasuryData(mockData);
         } catch (error) {
             console.error('[TreasuryDashboard] Load error:', error);
-            toast.error('Failed to load treasury data');
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleRefresh = async () => {
-        await loadTreasuryData();
-        toast.success('Treasury data refreshed');
+    const handleDeposit = async () => {
+        if (!connected) {
+            toast.error('Please connect your wallet');
+            return;
+        }
+
+        if (!depositAmount || parseFloat(depositAmount) <= 0) {
+            toast.error('Please enter a valid amount');
+            return;
+        }
+
+        try {
+            setIsProcessing(true);
+            toast.loading('Submitting deposit...', { id: 'deposit-loading' });
+
+            const result = await executeAleoOperation(
+                requestTransaction,
+                publicKey,
+                OPERATION_TYPES.DEPOSIT,
+                {
+                    type: 'Deposit',
+                    amount: depositAmount,
+                    category: 'Treasury'
+                },
+                transactionStatus
+            );
+
+            toast.dismiss('deposit-loading');
+            setLastTx(result);
+            
+            if (result.isRealTxId) {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Deposit confirmed!</p>
+                        <p className="text-xs text-gray-600">TX: {result.txHash.substring(0, 20)}...</p>
+                        <a href={result.explorerLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 underline flex items-center gap-1">
+                            View on Explorer <ExternalLink size={12} />
+                        </a>
+                    </div>
+                );
+            } else {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Deposit submitted!</p>
+                        <p className="text-xs text-gray-600">Waiting for confirmation...</p>
+                    </div>
+                );
+            }
+
+            setDepositAmount('');
+            loadTreasuryData();
+        } catch (error) {
+            toast.dismiss('deposit-loading');
+            console.error('[Treasury] Deposit error:', error);
+            if (error.message?.includes('rejected') || error.message?.includes('cancelled')) {
+                toast.error('Transaction cancelled');
+            } else {
+                toast.error(error.message || 'Deposit failed');
+            }
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleGenerateReport = async () => {
+        if (!connected) {
+            toast.error('Please connect your wallet');
+            return;
+        }
+
+        try {
+            setIsProcessing(true);
+            toast.loading('Generating report...', { id: 'report-loading' });
+
+            const result = await executeAleoOperation(
+                requestTransaction,
+                publicKey,
+                OPERATION_TYPES.APPROVE_TX,
+                {
+                    type: 'Compliance Report',
+                    reportType: 'quarterly',
+                    timestamp: Date.now()
+                },
+                transactionStatus
+            );
+
+            toast.dismiss('report-loading');
+            setLastTx(result);
+            
+            if (result.isRealTxId) {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Report confirmed!</p>
+                        <p className="text-xs text-gray-600">TX: {result.txHash.substring(0, 20)}...</p>
+                        <a href={result.explorerLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 underline flex items-center gap-1">
+                            View on Explorer <ExternalLink size={12} />
+                        </a>
+                    </div>
+                );
+            } else {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Report submitted!</p>
+                        <p className="text-xs text-gray-600">Waiting for confirmation...</p>
+                    </div>
+                );
+            }
+        } catch (error) {
+            toast.dismiss('report-loading');
+            console.error('[Treasury] Report error:', error);
+            if (error.message?.includes('rejected') || error.message?.includes('cancelled')) {
+                toast.error('Transaction cancelled');
+            } else {
+                toast.error('Failed to generate report');
+            }
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const formatCurrency = (value) => {
-        return isPrivate ? '•••••' : `$${value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+        return isPrivate ? '•••••' : `$${value.toLocaleString()}`;
     };
 
     const getStatusColor = (status) => {
@@ -100,12 +212,15 @@ export default function TreasuryDashboard() {
     if (!connected) {
         return (
             <Card className="bg-white border border-gray-200 shadow-lg rounded-2xl">
-                <CardBody className="p-12 text-center">
-                    <Shield className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">Connect Wallet</h3>
-                    <p className="text-sm text-gray-500">
-                        Connect your wallet to access treasury management
-                    </p>
+                <CardBody className="p-12 text-center space-y-6">
+                    <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto">
+                        <Wallet className="w-8 h-8 text-blue-600" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">Connect Wallet</h3>
+                        <p className="text-sm text-gray-500">Connect your wallet to access treasury management</p>
+                    </div>
+                    <WalletMultiButton className="!bg-blue-600 hover:!bg-blue-700 !text-white !font-bold !h-12 !rounded-xl !px-8" />
                 </CardBody>
             </Card>
         );
@@ -126,50 +241,22 @@ export default function TreasuryDashboard() {
         <div className="w-full space-y-6">
             {/* Header Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* Total Assets */}
                 <Card className="bg-gradient-to-br from-blue-500 to-blue-700 border-0 shadow-lg rounded-2xl">
                     <CardBody className="p-6">
                         <div className="flex items-center justify-between mb-2">
                             <p className="text-blue-100 text-sm font-medium">Total Assets</p>
-                            <Button
-                                isIconOnly
-                                size="sm"
-                                variant="light"
-                                onClick={() => setIsPrivate(!isPrivate)}
-                                className="text-white"
-                            >
+                            <Button isIconOnly size="sm" variant="light" onClick={() => setIsPrivate(!isPrivate)} className="text-white">
                                 {isPrivate ? <EyeOff size={16} /> : <Eye size={16} />}
                             </Button>
                         </div>
-                        <AnimatePresence mode="wait">
-                            <motion.h2
-                                key={isPrivate ? 'hidden' : 'visible'}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="text-3xl font-black text-white"
-                            >
-                                {formatCurrency(treasuryData.totalAssets)}
-                            </motion.h2>
-                        </AnimatePresence>
+                        <h2 className="text-3xl font-black text-white">{formatCurrency(treasuryData.totalAssets)}</h2>
                     </CardBody>
                 </Card>
 
-                {/* Net Worth */}
                 <Card className="bg-gradient-to-br from-green-500 to-green-700 border-0 shadow-lg rounded-2xl">
                     <CardBody className="p-6">
                         <p className="text-green-100 text-sm font-medium mb-2">Net Worth</p>
-                        <AnimatePresence mode="wait">
-                            <motion.h2
-                                key={isPrivate ? 'hidden' : 'visible'}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="text-3xl font-black text-white"
-                            >
-                                {formatCurrency(treasuryData.netWorth)}
-                            </motion.h2>
-                        </AnimatePresence>
+                        <h2 className="text-3xl font-black text-white">{formatCurrency(treasuryData.netWorth)}</h2>
                         <div className="flex items-center gap-1 mt-2">
                             <TrendingUp className="w-4 h-4 text-green-100" />
                             <span className="text-sm text-green-100 font-medium">+12.5%</span>
@@ -177,34 +264,18 @@ export default function TreasuryDashboard() {
                     </CardBody>
                 </Card>
 
-                {/* Monthly Revenue */}
                 <Card className="bg-gradient-to-br from-purple-500 to-purple-700 border-0 shadow-lg rounded-2xl">
                     <CardBody className="p-6">
                         <p className="text-purple-100 text-sm font-medium mb-2">Monthly Revenue</p>
-                        <AnimatePresence mode="wait">
-                            <motion.h2
-                                key={isPrivate ? 'hidden' : 'visible'}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="text-3xl font-black text-white"
-                            >
-                                {formatCurrency(treasuryData.monthlyRevenue)}
-                            </motion.h2>
-                        </AnimatePresence>
+                        <h2 className="text-3xl font-black text-white">{formatCurrency(treasuryData.monthlyRevenue)}</h2>
                     </CardBody>
                 </Card>
 
-                {/* Multi-Sig Status */}
                 <Card className="bg-gradient-to-br from-orange-500 to-orange-700 border-0 shadow-lg rounded-2xl">
                     <CardBody className="p-6">
                         <p className="text-orange-100 text-sm font-medium mb-2">Multi-Sig</p>
-                        <h2 className="text-3xl font-black text-white">
-                            {treasuryData.requiredSignatures}/{treasuryData.signers}
-                        </h2>
-                        <p className="text-sm text-orange-100 mt-2">
-                            {treasuryData.pendingTransactions} pending
-                        </p>
+                        <h2 className="text-3xl font-black text-white">{treasuryData.requiredSignatures}/{treasuryData.signers}</h2>
+                        <p className="text-sm text-orange-100 mt-2">{treasuryData.pendingTransactions} pending</p>
                     </CardBody>
                 </Card>
             </div>
@@ -222,25 +293,14 @@ export default function TreasuryDashboard() {
                         </div>
                     </div>
                     <Tooltip content="Refresh data">
-                        <Button
-                            isIconOnly
-                            size="sm"
-                            variant="flat"
-                            onClick={handleRefresh}
-                            className="rounded-xl"
-                        >
+                        <Button isIconOnly size="sm" variant="flat" onClick={loadTreasuryData} className="rounded-xl">
                             <RefreshCw size={18} />
                         </Button>
                     </Tooltip>
                 </CardHeader>
 
                 <CardBody className="p-6">
-                    <Tabs
-                        selectedKey={activeTab}
-                        onSelectionChange={setActiveTab}
-                        color="primary"
-                        variant="underlined"
-                    >
+                    <Tabs selectedKey={activeTab} onSelectionChange={setActiveTab} color="primary" variant="underlined">
                         {/* Overview Tab */}
                         <Tab key="overview" title="Overview">
                             <div className="pt-6 space-y-6">
@@ -249,60 +309,62 @@ export default function TreasuryDashboard() {
                                     <h4 className="text-sm font-bold text-gray-900 mb-4">Asset Allocation</h4>
                                     <div className="space-y-3">
                                         {treasuryData.allocations.map((allocation, index) => (
-                                            <motion.div
-                                                key={allocation.category}
-                                                initial={{ opacity: 0, x: -20 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: index * 0.1 }}
-                                            >
+                                            <motion.div key={allocation.category} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.1 }}>
                                                 <div className="flex items-center justify-between mb-2">
                                                     <span className="text-sm text-gray-700">{allocation.category}</span>
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-bold text-gray-900">
-                                                            {formatCurrency(allocation.amount)}
-                                                        </span>
-                                                        <Chip size="sm" variant="flat">
-                                                            {allocation.percentage}%
-                                                        </Chip>
+                                                        <span className="text-sm font-bold text-gray-900">{formatCurrency(allocation.amount)}</span>
+                                                        <Chip size="sm" variant="flat">{allocation.percentage}%</Chip>
                                                     </div>
                                                 </div>
-                                                <Progress
-                                                    value={allocation.percentage}
-                                                    color="primary"
-                                                    className="h-2"
-                                                />
+                                                <Progress value={allocation.percentage} color="primary" className="h-2" />
                                             </motion.div>
                                         ))}
                                     </div>
                                 </div>
 
-                                {/* Financial Metrics */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-4 bg-gray-50 rounded-xl">
-                                        <p className="text-xs text-gray-500 mb-1">Cash Reserves</p>
-                                        <p className="text-2xl font-bold text-gray-900">
-                                            {formatCurrency(treasuryData.cashReserves)}
-                                        </p>
-                                    </div>
-                                    <div className="p-4 bg-gray-50 rounded-xl">
-                                        <p className="text-xs text-gray-500 mb-1">Investments</p>
-                                        <p className="text-2xl font-bold text-gray-900">
-                                            {formatCurrency(treasuryData.investments)}
-                                        </p>
-                                    </div>
-                                    <div className="p-4 bg-gray-50 rounded-xl">
-                                        <p className="text-xs text-gray-500 mb-1">Monthly Expenses</p>
-                                        <p className="text-2xl font-bold text-red-600">
-                                            {formatCurrency(treasuryData.monthlyExpenses)}
-                                        </p>
-                                    </div>
-                                    <div className="p-4 bg-gray-50 rounded-xl">
-                                        <p className="text-xs text-gray-500 mb-1">Net Income</p>
-                                        <p className="text-2xl font-bold text-green-600">
-                                            {formatCurrency(treasuryData.monthlyRevenue - treasuryData.monthlyExpenses)}
-                                        </p>
+                                {/* Deposit Section */}
+                                <div className="p-4 bg-gray-50 rounded-xl space-y-4">
+                                    <h4 className="text-sm font-bold text-gray-900">Deposit to Treasury</h4>
+                                    <div className="flex gap-3">
+                                        <Input
+                                            type="number"
+                                            value={depositAmount}
+                                            onChange={(e) => setDepositAmount(e.target.value)}
+                                            placeholder="0.0"
+                                            endContent={<span className="text-sm text-gray-500">ALEO</span>}
+                                            classNames={{ inputWrapper: "rounded-xl border-gray-200" }}
+                                            className="flex-1"
+                                        />
+                                        <Button
+                                            onClick={handleDeposit}
+                                            isLoading={isProcessing}
+                                            isDisabled={!depositAmount || isProcessing}
+                                            color="primary"
+                                            className="rounded-xl font-bold"
+                                            startContent={!isProcessing && <Send size={16} />}
+                                        >
+                                            Deposit
+                                        </Button>
                                     </div>
                                 </div>
+
+                                {/* Last Transaction */}
+                                {lastTx && (
+                                    <div className={`p-4 rounded-xl border ${lastTx.isRealTxId ? 'bg-green-50 border-green-100' : 'bg-yellow-50 border-yellow-100'}`}>
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 className={`w-5 h-5 ${lastTx.isRealTxId ? 'text-green-600' : 'text-yellow-600'}`} />
+                                                <span className={`text-sm font-bold ${lastTx.isRealTxId ? 'text-green-900' : 'text-yellow-900'}`}>
+                                                    {lastTx.isRealTxId ? 'Transaction Confirmed' : 'Transaction Submitted'}
+                                                </span>
+                                            </div>
+                                            <a href={lastTx.explorerLink} target="_blank" rel="noopener noreferrer" className={`text-xs underline flex items-center gap-1 ${lastTx.isRealTxId ? 'text-green-700' : 'text-yellow-700'}`}>
+                                                {lastTx.isRealTxId ? `${lastTx.txHash?.substring(0, 15)}...` : 'View Address'} <ExternalLink size={12} />
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </Tab>
 
@@ -322,26 +384,23 @@ export default function TreasuryDashboard() {
                                                 <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center">
                                                     {activity.type === 'Payroll' && <Users className="w-5 h-5 text-blue-600" />}
                                                     {activity.type === 'Investment' && <TrendingUp className="w-5 h-5 text-green-600" />}
+                                                    {activity.type === 'Deposit' && <DollarSign className="w-5 h-5 text-purple-600" />}
                                                     {activity.type === 'Withdrawal' && <DollarSign className="w-5 h-5 text-orange-600" />}
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-bold text-gray-900">{activity.type}</p>
-                                                    <p className="text-xs text-gray-500">
-                                                        {new Date(activity.date).toLocaleDateString()}
-                                                    </p>
+                                                    <p className="text-xs text-gray-500">{new Date(activity.date).toLocaleDateString()}</p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-lg font-bold text-gray-900">
-                                                    {formatCurrency(activity.amount)}
-                                                </p>
+                                                <p className="text-lg font-bold text-gray-900">{formatCurrency(activity.amount)}</p>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <Chip size="sm" color={getStatusColor(activity.status)} variant="flat">
-                                                        {activity.status}
-                                                    </Chip>
-                                                    <Chip size="sm" variant="bordered" className="text-xs">
-                                                        {activity.signatures}/{treasuryData.requiredSignatures} sigs
-                                                    </Chip>
+                                                    <Chip size="sm" color={getStatusColor(activity.status)} variant="flat">{activity.status}</Chip>
+                                                    {activity.explorerLink && (
+                                                        <a href={activity.explorerLink} target="_blank" rel="noopener noreferrer" className="text-blue-500">
+                                                            <ExternalLink size={14} />
+                                                        </a>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -357,9 +416,7 @@ export default function TreasuryDashboard() {
                                     <Shield className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
                                     <div>
                                         <h4 className="text-sm font-bold text-green-900 mb-1">Compliance Status: Active</h4>
-                                        <p className="text-xs text-green-700 leading-relaxed">
-                                            All regulatory requirements are met. Last audit: December 2025
-                                        </p>
+                                        <p className="text-xs text-green-700 leading-relaxed">All regulatory requirements are met. Last audit: December 2025</p>
                                     </div>
                                 </div>
 
@@ -381,12 +438,14 @@ export default function TreasuryDashboard() {
                                 </div>
 
                                 <Button
+                                    onClick={handleGenerateReport}
+                                    isLoading={isProcessing}
                                     color="primary"
                                     variant="flat"
                                     className="w-full rounded-xl font-semibold"
-                                    startContent={<FileText size={16} />}
+                                    startContent={!isProcessing && <FileText size={16} />}
                                 >
-                                    Generate Compliance Report
+                                    {isProcessing ? 'Generating...' : 'Generate Compliance Report'}
                                 </Button>
                             </div>
                         </Tab>
@@ -401,7 +460,6 @@ export default function TreasuryDashboard() {
                     <h4 className="text-sm font-bold text-purple-900 mb-1">Privacy-Preserving Treasury</h4>
                     <p className="text-xs text-purple-700 leading-relaxed">
                         All treasury operations use zero-knowledge proofs for privacy. Multi-signature requirements ensure security.
-                        Selective disclosure allows compliance while maintaining confidentiality.
                     </p>
                 </div>
             </div>

@@ -194,7 +194,7 @@ export class AleoSDK {
     constructor(wallet = null) {
         this.wallet = wallet;
         this.network = CURRENT_NETWORK;
-        this.endpoint = ALEO_ENDPOINTS[CURRENT_NETWORK.toUpperCase()];
+        this.endpoint = ALEO_ENDPOINTS[CURRENT_NETWORK.toUpperCase()] || ALEO_ENDPOINTS.TESTNET_BETA;
         this.proofProgress = new ProofProgress();
         this.recordManager = new RecordManager();
         this.viewKeyManager = new ViewKeyManager();
@@ -256,8 +256,8 @@ export class AleoSDK {
 
             this.proofProgress.update(50, 'generating', 'Signing transaction...');
 
-            // Execute transaction through wallet
-            const txId = await this.wallet.signAndSendTransaction(transaction);
+            // Execute transaction through wallet (Leo Wallet uses requestTransaction)
+            const txId = await this.wallet.requestTransaction(transaction);
 
             this.proofProgress.update(75, 'generating', 'Broadcasting transaction...');
 

@@ -197,9 +197,9 @@ export class TransactionWrapper {
     const startTime = Date.now();
     
     try {
-      // If wallet has signAndSendTransaction method, use it
-      if (this.wallet?.signAndSendTransaction) {
-        const txId = await this.wallet.signAndSendTransaction(tx);
+      // Leo Wallet adapter uses requestTransaction
+      if (this.wallet?.requestTransaction) {
+        const txId = await this.wallet.requestTransaction(tx);
         return this.createResult(txId, startTime, operationType);
       }
 

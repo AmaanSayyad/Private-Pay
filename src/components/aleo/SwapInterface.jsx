@@ -1,12 +1,13 @@
 // SwapInterface Component
 // Shielded AMM swap interface for private token exchanges
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardBody, CardHeader, Button, Input, Chip, Tooltip, Progress } from '@nextui-org/react';
-import { ArrowDownUp, Settings, Info, Zap, Shield, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Card, CardBody, CardHeader, Button, Input, Chip, Progress } from '@nextui-org/react';
+import { ArrowDownUp, Settings, Info, Zap, Shield, CheckCircle2, ExternalLink, Wallet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAleoWallet } from '../../hooks/useAleoWallet';
-import { calculateSlippage, calculatePriceImpact } from '../../lib/aleo/utils';
+import { useWallet } from '@demox-labs/aleo-wallet-adapter-react';
+import { WalletMultiButton } from '@demox-labs/aleo-wallet-adapter-reactui';
+import { executeAleoOperation, OPERATION_TYPES } from '../../lib/aleo/aleoTransactionHelper';
 import toast from 'react-hot-toast';
 
 const TOKENS = [
@@ -17,7 +18,7 @@ const TOKENS = [
 ];
 
 export default function SwapInterface() {
-    const { connected, executeTransition, onProofProgress } = useAleoWallet();
+    const { connected, publicKey, requestTransaction, transactionStatus } = useWallet();
     const [fromToken, setFromToken] = useState('ALEO');
     const [toToken, setToToken] = useState('USDC');
     const [fromAmount, setFromAmount] = useState('');
@@ -25,36 +26,17 @@ export default function SwapInterface() {
     const [slippage, setSlippage] = useState('0.5');
     const [isPrivate, setIsPrivate] = useState(true);
     const [isSwapping, setIsSwapping] = useState(false);
-    const [proofProgress, setProofProgress] = useState(null);
     const [showSettings, setShowSettings] = useState(false);
-    const [priceImpact, setPriceImpact] = useState(0);
+    const [lastTx, setLastTx] = useState(null);
 
-    // Subscribe to proof progress
-    useEffect(() => {
-        if (!connected) return;
-        const unsubscribe = onProofProgress((progress) => {
-            setProofProgress(progress);
-        });
-        return unsubscribe;
-    }, [connected, onProofProgress]);
-
-    // Calculate output amount and price impact
+    // Calculate output amount
     useEffect(() => {
         if (fromAmount && parseFloat(fromAmount) > 0) {
-            // Simulate AMM calculation (constant product formula)
-            // In reality, this would query the actual pool reserves
-            const mockRate = 0.52; // 1 ALEO = 0.52 USDC
+            const mockRate = 0.52;
             const calculatedAmount = parseFloat(fromAmount) * mockRate;
             setToAmount(calculatedAmount.toFixed(6));
-
-            // Calculate price impact (mock)
-            const mockReserveFrom = 100000;
-            const mockReserveTo = 52000;
-            const impact = calculatePriceImpact(parseFloat(fromAmount), mockReserveFrom, mockReserveTo);
-            setPriceImpact(impact);
         } else {
             setToAmount('');
-            setPriceImpact(0);
         }
     }, [fromAmount, fromToken, toToken]);
 
@@ -78,42 +60,63 @@ export default function SwapInterface() {
 
         try {
             setIsSwapping(true);
+            toast.loading('Submitting swap...', { id: 'swap-loading' });
 
-            // Prepare swap inputs
-            const inputs = [
-                fromToken,
-                toToken,
-                `${parseFloat(fromAmount)}u64`,
-                `${parseFloat(toAmount)}u64`,
-                `${parseFloat(slippage)}u64`,
-                isPrivate ? 'true' : 'false',
-            ];
-
-            // Execute swap transition
-            const result = await executeTransition(
-                'shielded_amm.aleo',
-                'swap',
-                inputs,
-                { waitForConfirmation: true }
+            const result = await executeAleoOperation(
+                requestTransaction,
+                publicKey,
+                OPERATION_TYPES.SWAP,
+                {
+                    fromToken,
+                    toToken,
+                    fromAmount,
+                    toAmount,
+                    slippage,
+                    isPrivate
+                },
+                transactionStatus
             );
 
-            toast.success('Swap completed successfully!');
+            toast.dismiss('swap-loading');
+            setLastTx(result);
+            
+            if (result.isRealTxId) {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Swap confirmed!</p>
+                        <p className="text-xs text-gray-600">TX: {result.txHash.substring(0, 20)}...</p>
+                        <a 
+                            href={result.explorerLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-500 underline flex items-center gap-1"
+                        >
+                            View on Explorer <ExternalLink size={12} />
+                        </a>
+                    </div>
+                );
+            } else {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Swap submitted!</p>
+                        <p className="text-xs text-gray-600">Waiting for confirmation...</p>
+                    </div>
+                );
+            }
 
-            // Reset form
             setFromAmount('');
             setToAmount('');
         } catch (error) {
+            toast.dismiss('swap-loading');
             console.error('[Swap] Error:', error);
-            toast.error(error.message || 'Swap failed');
+            if (error.message?.includes('rejected') || error.message?.includes('cancelled')) {
+                toast.error('Transaction cancelled');
+            } else {
+                toast.error(error.message || 'Swap failed');
+            }
         } finally {
             setIsSwapping(false);
         }
-    };
-
-    const getPriceImpactColor = () => {
-        if (priceImpact < 1) return 'text-green-600';
-        if (priceImpact < 3) return 'text-yellow-600';
-        return 'text-red-600';
     };
 
     return (
@@ -131,25 +134,11 @@ export default function SwapInterface() {
                     </div>
                     <div className="flex items-center gap-2">
                         {isPrivate && (
-                            <Tooltip content="Private swap enabled">
-                                <Chip
-                                    size="sm"
-                                    color="success"
-                                    variant="flat"
-                                    startContent={<Shield size={12} />}
-                                    className="font-bold"
-                                >
-                                    PRIVATE
-                                </Chip>
-                            </Tooltip>
+                            <Chip size="sm" color="success" variant="flat" startContent={<Shield size={12} />} className="font-bold">
+                                PRIVATE
+                            </Chip>
                         )}
-                        <Button
-                            isIconOnly
-                            size="sm"
-                            variant="flat"
-                            onClick={() => setShowSettings(!showSettings)}
-                            className="rounded-xl"
-                        >
+                        <Button isIconOnly size="sm" variant="flat" onClick={() => setShowSettings(!showSettings)} className="rounded-xl">
                             <Settings size={18} />
                         </Button>
                     </div>
@@ -166,9 +155,7 @@ export default function SwapInterface() {
                                 className="p-4 bg-gray-50 rounded-xl space-y-4"
                             >
                                 <div>
-                                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                                        Slippage Tolerance (%)
-                                    </label>
+                                    <label className="text-sm font-medium text-gray-700 mb-2 block">Slippage Tolerance (%)</label>
                                     <div className="flex gap-2">
                                         {['0.1', '0.5', '1.0'].map((value) => (
                                             <Button
@@ -182,19 +169,8 @@ export default function SwapInterface() {
                                                 {value}%
                                             </Button>
                                         ))}
-                                        <Input
-                                            type="number"
-                                            value={slippage}
-                                            onChange={(e) => setSlippage(e.target.value)}
-                                            className="w-24"
-                                            classNames={{
-                                                inputWrapper: "rounded-lg h-8",
-                                            }}
-                                            endContent={<span className="text-xs text-gray-500">%</span>}
-                                        />
                                     </div>
                                 </div>
-
                                 <div className="flex items-center justify-between">
                                     <span className="text-sm font-medium text-gray-700">Privacy Mode</span>
                                     <Button
@@ -287,77 +263,62 @@ export default function SwapInterface() {
                                 </span>
                             </div>
                             <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-500">Price Impact</span>
-                                <span className={`font-medium ${getPriceImpactColor()}`}>
-                                    {priceImpact.toFixed(2)}%
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-500">Slippage Tolerance</span>
                                 <span className="text-gray-900 font-medium">{slippage}%</span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-500">Minimum Received</span>
-                                <span className="text-gray-900 font-medium">
-                                    {(parseFloat(toAmount) * (1 - parseFloat(slippage) / 100)).toFixed(6)} {toToken}
-                                </span>
                             </div>
                         </motion.div>
                     )}
 
-                    {/* Price Impact Warning */}
-                    {priceImpact > 3 && (
-                        <div className="p-4 bg-red-50 rounded-xl border border-red-100 flex items-start gap-3">
-                            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                            <div>
-                                <h4 className="text-sm font-bold text-red-900">High Price Impact</h4>
-                                <p className="text-xs text-red-700 mt-1 leading-relaxed">
-                                    This trade will significantly impact the pool price. Consider splitting into smaller trades.
-                                </p>
+                    {/* Last Transaction */}
+                    {lastTx && (
+                        <div className={`p-4 rounded-xl border ${lastTx.isRealTxId ? 'bg-green-50 border-green-100' : 'bg-yellow-50 border-yellow-100'}`}>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className={`w-5 h-5 ${lastTx.isRealTxId ? 'text-green-600' : 'text-yellow-600'}`} />
+                                    <span className={`text-sm font-bold ${lastTx.isRealTxId ? 'text-green-900' : 'text-yellow-900'}`}>
+                                        {lastTx.isRealTxId ? 'Swap Confirmed' : 'Swap Submitted'}
+                                    </span>
+                                </div>
+                                <a
+                                    href={lastTx.explorerLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`text-xs underline flex items-center gap-1 ${lastTx.isRealTxId ? 'text-green-700' : 'text-yellow-700'}`}
+                                >
+                                    {lastTx.isRealTxId ? `${lastTx.txHash?.substring(0, 15)}...` : 'View Address'} <ExternalLink size={12} />
+                                </a>
                             </div>
                         </div>
                     )}
 
-                    {/* Proof Progress */}
-                    <AnimatePresence>
-                        {proofProgress && proofProgress.status === 'generating' && (
-                            <motion.div
-                                initial={{ opacity: 0, y: -10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="space-y-2"
-                            >
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-700 font-medium">{proofProgress.message}</span>
-                                    <span className="text-blue-600 font-bold">{proofProgress.progress}%</span>
-                                </div>
-                                <Progress
-                                    value={proofProgress.progress}
-                                    color="primary"
-                                    className="h-2"
-                                />
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
                     {/* Swap Button */}
-                    <Button
-                        onClick={handleSwap}
-                        isLoading={isSwapping}
-                        isDisabled={!connected || isSwapping || !fromAmount || parseFloat(fromAmount) <= 0}
-                        color="primary"
-                        className="w-full h-12 rounded-xl font-bold text-base"
-                        startContent={!isSwapping && <Zap size={20} />}
-                    >
-                        {isSwapping ? 'Swapping...' : 'Swap'}
-                    </Button>
+                    {!connected ? (
+                        <div className="space-y-3">
+                            <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex items-center gap-3">
+                                <Wallet className="w-5 h-5 text-blue-600" />
+                                <p className="text-sm text-blue-700">Connect your wallet to swap tokens</p>
+                            </div>
+                            <WalletMultiButton className="!w-full !bg-blue-600 hover:!bg-blue-700 !text-white !font-bold !h-12 !rounded-xl" />
+                        </div>
+                    ) : (
+                        <Button
+                            onClick={handleSwap}
+                            isLoading={isSwapping}
+                            isDisabled={isSwapping || !fromAmount || parseFloat(fromAmount) <= 0}
+                            color="primary"
+                            className="w-full h-12 rounded-xl font-bold text-base"
+                            startContent={!isSwapping && <Zap size={20} />}
+                        >
+                            {isSwapping ? 'Swapping...' : 'Swap'}
+                        </Button>
+                    )}
 
                     {/* Privacy Notice */}
                     {isPrivate && (
                         <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-2">
                             <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                             <p className="text-xs text-blue-700 leading-relaxed">
-                                Private swap uses zero-knowledge proofs to hide your trading activity while ensuring correct execution.
+                                Private swap uses zero-knowledge proofs to hide your trading activity.
                             </p>
                         </div>
                     )}

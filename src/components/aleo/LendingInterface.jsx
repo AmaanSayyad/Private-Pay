@@ -1,11 +1,13 @@
 // LendingInterface Component
 // Private lending and borrowing interface
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardBody, CardHeader, Button, Input, Tabs, Tab, Chip, Progress, Tooltip } from '@nextui-org/react';
-import { Coins, TrendingUp, Shield, Info, AlertCircle, CheckCircle2, DollarSign } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAleoWallet } from '../../hooks/useAleoWallet';
+import { useState, useEffect } from 'react';
+import { Card, CardBody, CardHeader, Button, Input, Tabs, Tab, Chip, Progress } from '@nextui-org/react';
+import { Coins, TrendingUp, Info, CheckCircle2, DollarSign, ExternalLink, Wallet } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { useWallet } from '@demox-labs/aleo-wallet-adapter-react';
+import { WalletMultiButton } from '@demox-labs/aleo-wallet-adapter-reactui';
+import { executeAleoOperation, OPERATION_TYPES, getTransactionHistory } from '../../lib/aleo/aleoTransactionHelper';
 import toast from 'react-hot-toast';
 
 const LENDING_POOLS = [
@@ -32,66 +34,48 @@ const LENDING_POOLS = [
 ];
 
 export default function LendingInterface() {
-    const { connected, executeTransition, onProofProgress } = useAleoWallet();
+    const { connected, publicKey, requestTransaction, transactionStatus } = useWallet();
     const [activeTab, setActiveTab] = useState('supply');
     const [selectedPool, setSelectedPool] = useState(LENDING_POOLS[0]);
     const [amount, setAmount] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
-    const [proofProgress, setProofProgress] = useState(null);
-    const [userPositions, setUserPositions] = useState({
-        supplied: [],
-        borrowed: [],
-    });
-    const [collateralRatio, setCollateralRatio] = useState(0);
+    const [lastTx, setLastTx] = useState(null);
+    const [userPositions, setUserPositions] = useState({ supplied: [], borrowed: [] });
 
-    // Subscribe to proof progress
-    useEffect(() => {
-        if (!connected) return;
-        const unsubscribe = onProofProgress((progress) => {
-            setProofProgress(progress);
-        });
-        return unsubscribe;
-    }, [connected, onProofProgress]);
-
-    // Load user positions
     useEffect(() => {
         if (connected) {
             loadUserPositions();
         }
     }, [connected]);
 
-    const loadUserPositions = async () => {
-        try {
-            // Mock user positions
-            const mockPositions = {
-                supplied: [
-                    {
-                        pool: 'ALEO',
-                        amount: 1000,
-                        apy: 5.2,
-                        earned: 52,
-                    },
-                ],
-                borrowed: [
-                    {
-                        pool: 'USDC',
-                        amount: 500,
-                        apy: 6.2,
-                        collateral: 1200,
-                        healthFactor: 2.4,
-                    },
-                ],
-            };
+    const loadUserPositions = () => {
+        const history = getTransactionHistory();
+        const supplies = history
+            .filter(tx => tx.operationType === OPERATION_TYPES.SUPPLY)
+            .slice(0, 5)
+            .map(tx => ({
+                pool: tx.params?.pool || 'ALEO',
+                amount: tx.params?.amount || '0',
+                apy: 5.2,
+                earned: (parseFloat(tx.params?.amount || 0) * 0.052).toFixed(2),
+                txHash: tx.txHash,
+                explorerLink: tx.explorerLink
+            }));
+        
+        const borrows = history
+            .filter(tx => tx.operationType === OPERATION_TYPES.BORROW)
+            .slice(0, 5)
+            .map(tx => ({
+                pool: tx.params?.pool || 'USDC',
+                amount: tx.params?.amount || '0',
+                apy: 6.2,
+                collateral: (parseFloat(tx.params?.amount || 0) * 1.5).toFixed(2),
+                healthFactor: 2.4,
+                txHash: tx.txHash,
+                explorerLink: tx.explorerLink
+            }));
 
-            setUserPositions(mockPositions);
-
-            // Calculate collateral ratio
-            const totalCollateral = mockPositions.borrowed.reduce((sum, pos) => sum + pos.collateral, 0);
-            const totalBorrowed = mockPositions.borrowed.reduce((sum, pos) => sum + pos.amount, 0);
-            setCollateralRatio(totalBorrowed > 0 ? (totalCollateral / totalBorrowed) * 100 : 0);
-        } catch (error) {
-            console.error('[Lending] Load positions error:', error);
-        }
+        setUserPositions({ supplied: supplies, borrowed: borrows });
     };
 
     const handleSupply = async () => {
@@ -107,25 +91,52 @@ export default function LendingInterface() {
 
         try {
             setIsProcessing(true);
+            toast.loading('Submitting supply...', { id: 'supply-loading' });
 
-            const inputs = [
-                selectedPool.id,
-                `${parseFloat(amount)}u64`,
-            ];
-
-            await executeTransition(
-                'private_lending.aleo',
-                'deposit',
-                inputs,
-                { waitForConfirmation: true }
+            const result = await executeAleoOperation(
+                requestTransaction,
+                publicKey,
+                OPERATION_TYPES.SUPPLY,
+                {
+                    pool: selectedPool.asset,
+                    amount,
+                    apy: selectedPool.supplyAPY
+                },
+                transactionStatus
             );
 
-            toast.success('Supply successful!');
+            toast.dismiss('supply-loading');
+            setLastTx(result);
+            
+            if (result.isRealTxId) {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Supply confirmed!</p>
+                        <p className="text-xs text-gray-600">TX: {result.txHash.substring(0, 20)}...</p>
+                        <a href={result.explorerLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 underline flex items-center gap-1">
+                            View on Explorer <ExternalLink size={12} />
+                        </a>
+                    </div>
+                );
+            } else {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Supply submitted!</p>
+                        <p className="text-xs text-gray-600">Waiting for confirmation...</p>
+                    </div>
+                );
+            }
+
             setAmount('');
-            await loadUserPositions();
+            loadUserPositions();
         } catch (error) {
+            toast.dismiss('supply-loading');
             console.error('[Lending] Supply error:', error);
-            toast.error(error.message || 'Supply failed');
+            if (error.message?.includes('rejected') || error.message?.includes('cancelled')) {
+                toast.error('Transaction cancelled');
+            } else {
+                toast.error(error.message || 'Supply failed');
+            }
         } finally {
             setIsProcessing(false);
         }
@@ -144,56 +155,61 @@ export default function LendingInterface() {
 
         try {
             setIsProcessing(true);
+            toast.loading('Submitting borrow...', { id: 'borrow-loading' });
 
-            const inputs = [
-                selectedPool.id,
-                `${parseFloat(amount)}u64`,
-                `${parseFloat(amount) * 1.5}u64`, // 150% collateral
-            ];
-
-            await executeTransition(
-                'private_lending.aleo',
-                'borrow',
-                inputs,
-                { waitForConfirmation: true }
+            const result = await executeAleoOperation(
+                requestTransaction,
+                publicKey,
+                OPERATION_TYPES.BORROW,
+                {
+                    pool: selectedPool.asset,
+                    amount,
+                    collateral: (parseFloat(amount) * 1.5).toFixed(2),
+                    apy: selectedPool.borrowAPY
+                },
+                transactionStatus
             );
 
-            toast.success('Borrow successful!');
+            toast.dismiss('borrow-loading');
+            setLastTx(result);
+            
+            if (result.isRealTxId) {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Borrow confirmed!</p>
+                        <p className="text-xs text-gray-600">TX: {result.txHash.substring(0, 20)}...</p>
+                        <a href={result.explorerLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 underline flex items-center gap-1">
+                            View on Explorer <ExternalLink size={12} />
+                        </a>
+                    </div>
+                );
+            } else {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Borrow submitted!</p>
+                        <p className="text-xs text-gray-600">Waiting for confirmation...</p>
+                    </div>
+                );
+            }
+
             setAmount('');
-            await loadUserPositions();
+            loadUserPositions();
         } catch (error) {
+            toast.dismiss('borrow-loading');
             console.error('[Lending] Borrow error:', error);
-            toast.error(error.message || 'Borrow failed');
+            if (error.message?.includes('rejected') || error.message?.includes('cancelled')) {
+                toast.error('Transaction cancelled');
+            } else {
+                toast.error(error.message || 'Borrow failed');
+            }
         } finally {
             setIsProcessing(false);
         }
     };
 
-    const handleRepay = async (position) => {
-        try {
-            const inputs = [
-                position.pool,
-                `${position.amount}u64`,
-            ];
-
-            await executeTransition(
-                'private_lending.aleo',
-                'repay',
-                inputs,
-                { waitForConfirmation: true }
-            );
-
-            toast.success('Repayment successful!');
-            await loadUserPositions();
-        } catch (error) {
-            console.error('[Lending] Repay error:', error);
-            toast.error('Repayment failed');
-        }
-    };
-
-    const getHealthFactorColor = (healthFactor) => {
-        if (healthFactor >= 2) return 'success';
-        if (healthFactor >= 1.5) return 'warning';
+    const getHealthFactorColor = (hf) => {
+        if (hf >= 2) return 'success';
+        if (hf >= 1.5) return 'warning';
         return 'danger';
     };
 
@@ -222,16 +238,15 @@ export default function LendingInterface() {
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
                                 onClick={() => setSelectedPool(pool)}
-                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedPool.id === pool.id
+                                className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                    selectedPool.id === pool.id
                                         ? 'border-green-500 bg-green-50'
                                         : 'border-gray-200 bg-gray-50 hover:border-gray-300'
-                                    }`}
+                                }`}
                             >
                                 <div className="flex items-center justify-between mb-3">
                                     <h4 className="text-lg font-bold text-gray-900">{pool.asset}</h4>
-                                    {selectedPool.id === pool.id && (
-                                        <CheckCircle2 className="w-5 h-5 text-green-600" />
-                                    )}
+                                    {selectedPool.id === pool.id && <CheckCircle2 className="w-5 h-5 text-green-600" />}
                                 </div>
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
@@ -247,11 +262,7 @@ export default function LendingInterface() {
                                             <span>Utilization</span>
                                             <span>{pool.utilizationRate}%</span>
                                         </div>
-                                        <Progress
-                                            value={pool.utilizationRate}
-                                            color="primary"
-                                            className="h-1.5"
-                                        />
+                                        <Progress value={pool.utilizationRate} color="primary" className="h-1.5" />
                                     </div>
                                 </div>
                             </motion.div>
@@ -264,30 +275,21 @@ export default function LendingInterface() {
                         onSelectionChange={setActiveTab}
                         color="success"
                         variant="bordered"
-                        classNames={{
-                            tabList: "rounded-xl",
-                            tab: "rounded-lg",
-                        }}
+                        classNames={{ tabList: "rounded-xl", tab: "rounded-lg" }}
                     >
                         <Tab key="supply" title="Supply">
                             <div className="pt-6 space-y-4">
                                 <div>
-                                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                                        Amount to Supply
-                                    </label>
+                                    <label className="text-sm font-medium text-gray-700 mb-2 block">Amount to Supply</label>
                                     <Input
                                         type="number"
                                         value={amount}
                                         onChange={(e) => setAmount(e.target.value)}
                                         placeholder="0.0"
                                         endContent={<span className="text-sm text-gray-500">{selectedPool.asset}</span>}
-                                        classNames={{
-                                            inputWrapper: "rounded-xl border-gray-200",
-                                        }}
+                                        classNames={{ inputWrapper: "rounded-xl border-gray-200" }}
                                     />
-                                    <p className="text-xs text-gray-500 mt-2">
-                                        Balance: 1,234.56 {selectedPool.asset}
-                                    </p>
+                                    <p className="text-xs text-gray-500 mt-2">Balance: 1,234.56 {selectedPool.asset}</p>
                                 </div>
 
                                 <div className="p-4 bg-green-50 rounded-xl space-y-2">
@@ -305,6 +307,21 @@ export default function LendingInterface() {
                                     )}
                                 </div>
 
+                                {/* Last Transaction */}
+                                {lastTx && lastTx.operationType === OPERATION_TYPES.SUPPLY && (
+                                    <div className="p-4 bg-green-50 rounded-xl border border-green-100">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                                                <span className="text-sm font-bold text-green-900">Supply Confirmed</span>
+                                            </div>
+                                            <a href={lastTx.explorerLink} target="_blank" rel="noopener noreferrer" className="text-xs text-green-700 underline flex items-center gap-1">
+                                                {lastTx.txHash?.substring(0, 15)}... <ExternalLink size={12} />
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <Button
                                     onClick={handleSupply}
                                     isLoading={isProcessing}
@@ -315,28 +332,31 @@ export default function LendingInterface() {
                                 >
                                     {isProcessing ? 'Supplying...' : 'Supply'}
                                 </Button>
+                                {!connected && (
+                                    <div className="space-y-3 mt-4">
+                                        <div className="p-3 bg-green-50 rounded-xl border border-green-100 flex items-center gap-2">
+                                            <Wallet className="w-4 h-4 text-green-600" />
+                                            <p className="text-xs text-green-700">Connect wallet to supply</p>
+                                        </div>
+                                        <WalletMultiButton className="!w-full !bg-green-600 hover:!bg-green-700 !text-white !font-bold !h-10 !rounded-xl !text-sm" />
+                                    </div>
+                                )}
                             </div>
                         </Tab>
 
                         <Tab key="borrow" title="Borrow">
                             <div className="pt-6 space-y-4">
                                 <div>
-                                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                                        Amount to Borrow
-                                    </label>
+                                    <label className="text-sm font-medium text-gray-700 mb-2 block">Amount to Borrow</label>
                                     <Input
                                         type="number"
                                         value={amount}
                                         onChange={(e) => setAmount(e.target.value)}
                                         placeholder="0.0"
                                         endContent={<span className="text-sm text-gray-500">{selectedPool.asset}</span>}
-                                        classNames={{
-                                            inputWrapper: "rounded-xl border-gray-200",
-                                        }}
+                                        classNames={{ inputWrapper: "rounded-xl border-gray-200" }}
                                     />
-                                    <p className="text-xs text-gray-500 mt-2">
-                                        Available to borrow: 500.00 {selectedPool.asset}
-                                    </p>
+                                    <p className="text-xs text-gray-500 mt-2">Available to borrow: 500.00 {selectedPool.asset}</p>
                                 </div>
 
                                 <div className="p-4 bg-orange-50 rounded-xl space-y-2">
@@ -348,9 +368,7 @@ export default function LendingInterface() {
                                         <>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-600">Required Collateral (150%)</span>
-                                                <span className="text-gray-900 font-bold">
-                                                    {(parseFloat(amount) * 1.5).toFixed(2)} ALEO
-                                                </span>
+                                                <span className="text-gray-900 font-bold">{(parseFloat(amount) * 1.5).toFixed(2)} ALEO</span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-gray-600">Yearly Interest</span>
@@ -365,9 +383,24 @@ export default function LendingInterface() {
                                 <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-2">
                                     <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                                     <p className="text-xs text-blue-700 leading-relaxed">
-                                        Maintain a health factor above 1.5 to avoid liquidation. Your position is private and secured by zero-knowledge proofs.
+                                        Maintain a health factor above 1.5 to avoid liquidation. Your position is private.
                                     </p>
                                 </div>
+
+                                {/* Last Transaction */}
+                                {lastTx && lastTx.operationType === OPERATION_TYPES.BORROW && (
+                                    <div className="p-4 bg-green-50 rounded-xl border border-green-100">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                                                <span className="text-sm font-bold text-green-900">Borrow Confirmed</span>
+                                            </div>
+                                            <a href={lastTx.explorerLink} target="_blank" rel="noopener noreferrer" className="text-xs text-green-700 underline flex items-center gap-1">
+                                                {lastTx.txHash?.substring(0, 15)}... <ExternalLink size={12} />
+                                            </a>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <Button
                                     onClick={handleBorrow}
@@ -379,38 +412,24 @@ export default function LendingInterface() {
                                 >
                                     {isProcessing ? 'Borrowing...' : 'Borrow'}
                                 </Button>
+                                {!connected && (
+                                    <div className="space-y-3 mt-4">
+                                        <div className="p-3 bg-orange-50 rounded-xl border border-orange-100 flex items-center gap-2">
+                                            <Wallet className="w-4 h-4 text-orange-600" />
+                                            <p className="text-xs text-orange-700">Connect wallet to borrow</p>
+                                        </div>
+                                        <WalletMultiButton className="!w-full !bg-orange-600 hover:!bg-orange-700 !text-white !font-bold !h-10 !rounded-xl !text-sm" />
+                                    </div>
+                                )}
                             </div>
                         </Tab>
                     </Tabs>
-
-                    {/* Proof Progress */}
-                    <AnimatePresence>
-                        {proofProgress && proofProgress.status === 'generating' && (
-                            <motion.div
-                                initial={{ opacity: 0, y: -10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="space-y-2"
-                            >
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-700 font-medium">{proofProgress.message}</span>
-                                    <span className="text-green-600 font-bold">{proofProgress.progress}%</span>
-                                </div>
-                                <Progress
-                                    value={proofProgress.progress}
-                                    color="success"
-                                    className="h-2"
-                                />
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
                 </CardBody>
             </Card>
 
             {/* User Positions */}
             {connected && (userPositions.supplied.length > 0 || userPositions.borrowed.length > 0) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Supplied Positions */}
                     {userPositions.supplied.length > 0 && (
                         <Card className="bg-white border border-gray-200 shadow-lg rounded-2xl">
                             <CardHeader className="p-6 border-b border-gray-100">
@@ -421,9 +440,7 @@ export default function LendingInterface() {
                                     <div key={index} className="p-4 bg-green-50 rounded-xl">
                                         <div className="flex items-center justify-between mb-2">
                                             <h4 className="text-sm font-bold text-gray-900">{position.pool}</h4>
-                                            <Chip size="sm" color="success" variant="flat">
-                                                {position.apy}% APY
-                                            </Chip>
+                                            <Chip size="sm" color="success" variant="flat">{position.apy}% APY</Chip>
                                         </div>
                                         <div className="space-y-1">
                                             <div className="flex justify-between text-sm">
@@ -435,13 +452,17 @@ export default function LendingInterface() {
                                                 <span className="text-green-600 font-medium">+{position.earned} {position.pool}</span>
                                             </div>
                                         </div>
+                                        {position.explorerLink && (
+                                            <a href={position.explorerLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 underline flex items-center gap-1 mt-2">
+                                                View TX <ExternalLink size={10} />
+                                            </a>
+                                        )}
                                     </div>
                                 ))}
                             </CardBody>
                         </Card>
                     )}
 
-                    {/* Borrowed Positions */}
                     {userPositions.borrowed.length > 0 && (
                         <Card className="bg-white border border-gray-200 shadow-lg rounded-2xl">
                             <CardHeader className="p-6 border-b border-gray-100">
@@ -452,11 +473,7 @@ export default function LendingInterface() {
                                     <div key={index} className="p-4 bg-orange-50 rounded-xl space-y-3">
                                         <div className="flex items-center justify-between">
                                             <h4 className="text-sm font-bold text-gray-900">{position.pool}</h4>
-                                            <Chip
-                                                size="sm"
-                                                color={getHealthFactorColor(position.healthFactor)}
-                                                variant="flat"
-                                            >
+                                            <Chip size="sm" color={getHealthFactorColor(position.healthFactor)} variant="flat">
                                                 HF: {position.healthFactor.toFixed(2)}
                                             </Chip>
                                         </div>
@@ -469,20 +486,12 @@ export default function LendingInterface() {
                                                 <span className="text-gray-600">Collateral</span>
                                                 <span className="text-gray-900 font-medium">{position.collateral} ALEO</span>
                                             </div>
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-600">APY</span>
-                                                <span className="text-orange-600 font-medium">{position.apy}%</span>
-                                            </div>
                                         </div>
-                                        <Button
-                                            size="sm"
-                                            color="warning"
-                                            variant="flat"
-                                            onClick={() => handleRepay(position)}
-                                            className="w-full rounded-lg font-semibold"
-                                        >
-                                            Repay
-                                        </Button>
+                                        {position.explorerLink && (
+                                            <a href={position.explorerLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 underline flex items-center gap-1">
+                                                View TX <ExternalLink size={10} />
+                                            </a>
+                                        )}
                                     </div>
                                 ))}
                             </CardBody>

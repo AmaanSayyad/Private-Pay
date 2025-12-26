@@ -132,7 +132,8 @@ export function useAleoWallet() {
         }
 
         try {
-            const txId = await wallet.signAndSendTransaction(transaction);
+            // Leo Wallet uses requestTransaction, not signAndSendTransaction
+            const txId = await wallet.requestTransaction(transaction);
 
             // Add to transaction history
             const newTransaction = {

@@ -68,6 +68,11 @@ export default defineConfig(({ mode }) => {
         "@cosmjs/amino",
         "@cosmjs/proto-signing",
         "@cosmjs/stargate",
+        // Include Aleo wallet adapter packages to prevent duplicate React instances
+        "@demox-labs/aleo-wallet-adapter-react",
+        "@demox-labs/aleo-wallet-adapter-reactui",
+        "@demox-labs/aleo-wallet-adapter-leo",
+        "@demox-labs/aleo-wallet-adapter-base",
       ],
       esbuildOptions: {
         define: {
@@ -89,7 +94,12 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
         // Override nested readable-stream in ripemd160/hash-base
         "readable-stream": "readable-stream",
+        // Ensure single React instance to fix useContext null errors
+        "react": path.resolve(__dirname, "./node_modules/react"),
+        "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
       },
+      // Dedupe React to prevent multiple instances
+      dedupe: ['react', 'react-dom'],
     },
     build: {
       target: 'esnext',

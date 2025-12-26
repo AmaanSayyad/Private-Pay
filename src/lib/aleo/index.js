@@ -2,10 +2,13 @@
 // Main entry point for Aleo blockchain interactions
 
 // Import and export the main SDK
-export { AleoSDK, aleoSDK, ProofProgress, RecordManager, ViewKeyManager } from './sdk.js';
+export { AleoSDK, aleoSDK, ProofProgress, RecordManager, ViewKeyManager, initializeAleoSDK } from './sdk.js';
 
 // Import and export Transaction Wrapper (core for real transactions)
 export { TransactionWrapper, transactionWrapper, txUtils } from './transactionWrapper.js';
+
+// Import and export Transaction Helper (simplified for UI components)
+export { createAleoTransaction, executeAleoOperation, getTransactionHistory, OPERATION_TYPES, TREASURY_ADDRESS } from './aleoTransactionHelper.js';
 
 // Import and export existing services (updated to use Transaction Wrapper)
 export { DarkPoolService } from './darkpool.js';

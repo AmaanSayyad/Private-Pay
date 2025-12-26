@@ -1,11 +1,13 @@
 // CreditScoreDisplay Component
 // Display and manage ZK credit score with privacy controls
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardBody, CardHeader, Button, Chip, Progress, Tooltip, Switch } from '@nextui-org/react';
-import { Shield, Eye, EyeOff, TrendingUp, Award, Lock, Info, RefreshCw } from 'lucide-react';
+import { Shield, Eye, EyeOff, TrendingUp, Award, Lock, Info, RefreshCw, CheckCircle2, ExternalLink, Wallet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAleoWallet } from '../../hooks/useAleoWallet';
+import { useWallet } from '@demox-labs/aleo-wallet-adapter-react';
+import { WalletMultiButton } from '@demox-labs/aleo-wallet-adapter-reactui';
+import { executeAleoOperation, OPERATION_TYPES } from '../../lib/aleo/aleoTransactionHelper';
 import toast from 'react-hot-toast';
 
 const CREDIT_TIERS = [
@@ -16,12 +18,13 @@ const CREDIT_TIERS = [
 ];
 
 export default function CreditScoreDisplay() {
-    const { connected, executeTransition } = useAleoWallet();
+    const { connected, publicKey, requestTransaction, transactionStatus } = useWallet();
     const [creditScore, setCreditScore] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [isGeneratingProof, setIsGeneratingProof] = useState(false);
     const [zkProofEnabled, setZkProofEnabled] = useState(true);
-    const [creditHistory, setCreditHistory] = useState([]);
+    const [lastTx, setLastTx] = useState(null);
 
     useEffect(() => {
         if (connected) {
@@ -32,31 +35,18 @@ export default function CreditScoreDisplay() {
     const loadCreditScore = async () => {
         try {
             setIsLoading(true);
-
-            // In production, this would query the actual credit score from the blockchain
-            // For now, we'll simulate it
+            // Mock credit score
             const mockScore = {
                 score: 720,
                 lastUpdated: Date.now(),
                 totalLoans: 5,
                 onTimePayments: 5,
                 utilizationRate: 35,
-                accountAge: 180, // days
+                accountAge: 180,
             };
-
             setCreditScore(mockScore);
-
-            // Mock credit history
-            const mockHistory = [
-                { date: Date.now() - 86400000 * 30, score: 700, event: 'On-time payment' },
-                { date: Date.now() - 86400000 * 60, score: 680, event: 'New loan opened' },
-                { date: Date.now() - 86400000 * 90, score: 690, event: 'On-time payment' },
-            ];
-
-            setCreditHistory(mockHistory);
         } catch (error) {
             console.error('[CreditScore] Load error:', error);
-            toast.error('Failed to load credit score');
         } finally {
             setIsLoading(false);
         }
@@ -74,23 +64,57 @@ export default function CreditScoreDisplay() {
         }
 
         try {
-            // Generate ZK proof of creditworthiness without revealing exact score
-            const inputs = [
-                `${creditScore.score}u64`,
-                '650u64', // Minimum threshold
-            ];
+            setIsGeneratingProof(true);
+            toast.loading('Generating ZK proof...', { id: 'proof-loading' });
 
-            await executeTransition(
-                'zk_credit.aleo',
-                'verify_creditworthiness',
-                inputs,
-                { waitForConfirmation: true }
+            const result = await executeAleoOperation(
+                requestTransaction,
+                publicKey,
+                OPERATION_TYPES.GENERATE_PROOF,
+                {
+                    score: creditScore.score,
+                    threshold: 650,
+                    proofType: 'creditworthiness'
+                },
+                transactionStatus
             );
 
-            toast.success('ZK proof generated successfully!');
+            toast.dismiss('proof-loading');
+            setLastTx(result);
+            
+            if (result.isRealTxId) {
+                toast.success(
+                    <div>
+                        <p className="font-bold">ZK Proof confirmed!</p>
+                        <p className="text-xs text-gray-600">TX: {result.txHash.substring(0, 20)}...</p>
+                        <a 
+                            href={result.explorerLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-500 underline flex items-center gap-1"
+                        >
+                            View on Explorer <ExternalLink size={12} />
+                        </a>
+                    </div>
+                );
+            } else {
+                toast.success(
+                    <div>
+                        <p className="font-bold">Proof submitted!</p>
+                        <p className="text-xs text-gray-600">Waiting for confirmation...</p>
+                    </div>
+                );
+            }
         } catch (error) {
+            toast.dismiss('proof-loading');
             console.error('[CreditScore] Generate proof error:', error);
-            toast.error('Failed to generate proof');
+            if (error.message?.includes('rejected') || error.message?.includes('cancelled')) {
+                toast.error('Transaction cancelled');
+            } else {
+                toast.error('Failed to generate proof');
+            }
+        } finally {
+            setIsGeneratingProof(false);
         }
     };
 
@@ -105,12 +129,15 @@ export default function CreditScoreDisplay() {
     if (!connected) {
         return (
             <Card className="bg-white border border-gray-200 shadow-lg rounded-2xl">
-                <CardBody className="p-12 text-center">
-                    <Lock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">Connect Wallet</h3>
-                    <p className="text-sm text-gray-500">
-                        Connect your wallet to view your ZK credit score
-                    </p>
+                <CardBody className="p-12 text-center space-y-6">
+                    <div className="w-16 h-16 rounded-2xl bg-purple-100 flex items-center justify-center mx-auto">
+                        <Wallet className="w-8 h-8 text-purple-600" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">Connect Wallet</h3>
+                        <p className="text-sm text-gray-500">Connect your wallet to view your ZK credit score</p>
+                    </div>
+                    <WalletMultiButton className="!bg-purple-600 hover:!bg-purple-700 !text-white !font-bold !h-12 !rounded-xl !px-8" />
                 </CardBody>
             </Card>
         );
@@ -127,9 +154,7 @@ export default function CreditScoreDisplay() {
         );
     }
 
-    if (!creditScore) {
-        return null;
-    }
+    if (!creditScore) return null;
 
     const tier = getCreditTier(creditScore.score);
 
@@ -149,24 +174,12 @@ export default function CreditScoreDisplay() {
                     </div>
                     <div className="flex items-center gap-2">
                         <Tooltip content={isVisible ? 'Hide score' : 'Show score'}>
-                            <Button
-                                isIconOnly
-                                size="sm"
-                                variant="flat"
-                                onClick={() => setIsVisible(!isVisible)}
-                                className="rounded-xl"
-                            >
+                            <Button isIconOnly size="sm" variant="flat" onClick={() => setIsVisible(!isVisible)} className="rounded-xl">
                                 {isVisible ? <EyeOff size={18} /> : <Eye size={18} />}
                             </Button>
                         </Tooltip>
                         <Tooltip content="Refresh score">
-                            <Button
-                                isIconOnly
-                                size="sm"
-                                variant="flat"
-                                onClick={handleRefresh}
-                                className="rounded-xl"
-                            >
+                            <Button isIconOnly size="sm" variant="flat" onClick={handleRefresh} className="rounded-xl">
                                 <RefreshCw size={18} />
                             </Button>
                         </Tooltip>
@@ -188,12 +201,7 @@ export default function CreditScoreDisplay() {
                                         <div className={`text-6xl font-black bg-gradient-to-r ${tier.gradient} bg-clip-text text-transparent mb-2`}>
                                             {creditScore.score}
                                         </div>
-                                        <Chip
-                                            color={tier.color}
-                                            variant="flat"
-                                            className="font-bold"
-                                            startContent={<TrendingUp size={14} />}
-                                        >
+                                        <Chip color={tier.color} variant="flat" className="font-bold" startContent={<TrendingUp size={14} />}>
                                             {tier.label}
                                         </Chip>
                                     </motion.div>
@@ -212,16 +220,13 @@ export default function CreditScoreDisplay() {
                             </AnimatePresence>
                         </div>
 
-                        {/* Score Progress Bar */}
                         {isVisible && (
                             <div className="space-y-2">
                                 <Progress
                                     value={getScorePercentage(creditScore.score)}
                                     color={tier.color}
                                     className="h-3"
-                                    classNames={{
-                                        indicator: `bg-gradient-to-r ${tier.gradient}`,
-                                    }}
+                                    classNames={{ indicator: `bg-gradient-to-r ${tier.gradient}` }}
                                 />
                                 <div className="flex justify-between text-xs text-gray-500">
                                     <span>300</span>
@@ -253,6 +258,28 @@ export default function CreditScoreDisplay() {
                         </div>
                     )}
 
+                    {/* Last Transaction */}
+                    {lastTx && (
+                        <div className={`p-4 rounded-xl border ${lastTx.isRealTxId ? 'bg-green-50 border-green-100' : 'bg-yellow-50 border-yellow-100'}`}>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className={`w-5 h-5 ${lastTx.isRealTxId ? 'text-green-600' : 'text-yellow-600'}`} />
+                                    <span className={`text-sm font-bold ${lastTx.isRealTxId ? 'text-green-900' : 'text-yellow-900'}`}>
+                                        {lastTx.isRealTxId ? 'Proof Confirmed' : 'Proof Submitted'}
+                                    </span>
+                                </div>
+                                <a
+                                    href={lastTx.explorerLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`text-xs underline flex items-center gap-1 ${lastTx.isRealTxId ? 'text-green-700' : 'text-yellow-700'}`}
+                                >
+                                    {lastTx.isRealTxId ? `${lastTx.txHash?.substring(0, 15)}...` : 'View Address'} <ExternalLink size={12} />
+                                </a>
+                            </div>
+                        </div>
+                    )}
+
                     {/* ZK Proof Section */}
                     <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 space-y-4">
                         <div className="flex items-start gap-3">
@@ -263,23 +290,19 @@ export default function CreditScoreDisplay() {
                                     Prove your creditworthiness without revealing your exact score
                                 </p>
                             </div>
-                            <Switch
-                                size="sm"
-                                isSelected={zkProofEnabled}
-                                onValueChange={setZkProofEnabled}
-                                color="secondary"
-                            />
+                            <Switch size="sm" isSelected={zkProofEnabled} onValueChange={setZkProofEnabled} color="secondary" />
                         </div>
 
                         {zkProofEnabled && (
                             <Button
                                 onClick={handleGenerateProof}
+                                isLoading={isGeneratingProof}
                                 color="secondary"
                                 variant="flat"
                                 className="w-full rounded-xl font-semibold"
-                                startContent={<Lock size={16} />}
+                                startContent={!isGeneratingProof && <Lock size={16} />}
                             >
-                                Generate ZK Proof
+                                {isGeneratingProof ? 'Generating...' : 'Generate ZK Proof'}
                             </Button>
                         )}
                     </div>
@@ -288,44 +311,11 @@ export default function CreditScoreDisplay() {
                     <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-2">
                         <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                         <p className="text-xs text-blue-700 leading-relaxed">
-                            Your credit score is calculated using on-chain payment history and is stored privately using zero-knowledge proofs.
+                            Your credit score is calculated using on-chain payment history and stored privately using zero-knowledge proofs.
                         </p>
                     </div>
                 </CardBody>
             </Card>
-
-            {/* Credit History */}
-            {isVisible && creditHistory.length > 0 && (
-                <Card className="bg-white border border-gray-200 shadow-lg rounded-2xl">
-                    <CardHeader className="p-6 border-b border-gray-100">
-                        <h3 className="text-lg font-bold text-gray-900">Credit History</h3>
-                    </CardHeader>
-                    <CardBody className="p-6">
-                        <div className="space-y-3">
-                            {creditHistory.map((item, index) => (
-                                <motion.div
-                                    key={index}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: index * 0.1 }}
-                                    className="flex items-center justify-between p-4 bg-gray-50 rounded-xl"
-                                >
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900">{item.event}</p>
-                                        <p className="text-xs text-gray-500">
-                                            {new Date(item.date).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-lg font-bold text-gray-900">{item.score}</p>
-                                        <p className="text-xs text-gray-500">Score</p>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    </CardBody>
-                </Card>
-            )}
         </div>
     );
 }

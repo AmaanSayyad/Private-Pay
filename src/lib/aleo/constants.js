@@ -3,19 +3,29 @@
 // Network Configuration
 export const ALEO_NETWORKS = {
   TESTNET: 'testnet',
+  TESTNET_BETA: 'testnetbeta',
   MAINNET: 'mainnet',
 };
 
-export const CURRENT_NETWORK = ALEO_NETWORKS.TESTNET;
+// Use testnetbeta to match Leo Wallet's current network
+export const CURRENT_NETWORK = ALEO_NETWORKS.TESTNET_BETA;
 
 // API Endpoints
 export const ALEO_ENDPOINTS = {
   TESTNET: {
+    api: 'https://api.explorer.provable.com/v1/testnet',
     RPC: 'https://api.explorer.provable.com/v1/testnet',
     EXPLORER: 'https://explorer.provable.com/testnet',
     FAUCET: 'https://faucet.aleo.org',
   },
+  TESTNET_BETA: {
+    api: 'https://api.explorer.provable.com/v1/testnet',
+    RPC: 'https://api.explorer.provable.com/v1/testnet',
+    EXPLORER: 'https://explorer.aleo.org',
+    FAUCET: 'https://faucet.aleo.org',
+  },
   MAINNET: {
+    api: 'https://api.explorer.provable.com/v1/mainnet',
     RPC: 'https://api.explorer.provable.com/v1/mainnet',
     EXPLORER: 'https://explorer.provable.com/mainnet',
   },
