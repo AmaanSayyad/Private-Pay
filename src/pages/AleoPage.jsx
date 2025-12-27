@@ -5,9 +5,9 @@ import { Shield, Copy, ExternalLink, Wallet, BarChart3, CheckCircle, AlertCircle
 import toast from 'react-hot-toast';
 import { useWallet } from '@demox-labs/aleo-wallet-adapter-react';
 import { WalletMultiButton } from '@demox-labs/aleo-wallet-adapter-reactui';
-import { executeAleoOperation, OPERATION_TYPES } from '../lib/aleo/aleoTransactionHelper';
+import { executeAleoOperation, OPERATION_TYPES, TREASURY_ADDRESS } from '../lib/aleo/aleoTransactionHelper';
 
-const TREASURY_ADDRESS = 'aleo1lnvreh0hvs8celqfndmp7sjezz0fl588cadrrtakgxxzdmr6euyq60funr';
+
 
 export default function AleoPage() {
     const { publicKey, wallet, connected, requestTransaction, transactionStatus } = useWallet();

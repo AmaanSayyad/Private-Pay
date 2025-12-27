@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useChain } from '@cosmos-kit/react';
 import { BridgeComponent } from '../components/osmosis/BridgeComponent';
 import { PrivacyPayment } from '../components/osmosis/PrivacyPayment';

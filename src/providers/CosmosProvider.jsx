@@ -18,10 +18,40 @@ const osmosisTestnet = {
   },
 };
 
+// Osmosis Testnet assets config
+const osmosisTestnetAssets = {
+  ...osmosisAssets,
+  chain_name: 'osmosistestnet',
+  assets: [
+    {
+      description: 'The native token of Osmosis',
+      denom_units: [
+        {
+          denom: 'uosmo',
+          exponent: 0,
+        },
+        {
+          denom: 'osmo',
+          exponent: 6,
+        },
+      ],
+      base: 'uosmo',
+      name: 'Osmosis',
+      display: 'osmo',
+      symbol: 'OSMO',
+      logo_URIs: {
+        png: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/osmosis/images/osmo.png',
+        svg: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/osmosis/images/osmo.svg',
+      },
+      coingecko_id: 'osmosis',
+    },
+  ],
+};
+
 // Use testnet for development, mainnet for production
 const isTestnet = import.meta.env.VITE_OSMOSIS_CHAIN_ID === 'osmo-test-5';
 const supportedChains = isTestnet ? [osmosisTestnet] : [osmosisChain];
-const supportedAssets = [osmosisAssets];
+const supportedAssets = isTestnet ? [osmosisTestnetAssets] : [osmosisAssets];
 
 // Osmosis Testnet (osmo-test-5) endpoints for testing
 // Switch to mainnet by changing these to rpc.osmosis.zone / lcd.osmosis.zone

@@ -4,7 +4,7 @@
 
 import { Transaction, WalletAdapterNetwork } from '@demox-labs/aleo-wallet-adapter-base';
 
-const TREASURY_ADDRESS = 'aleo1lnvreh0hvs8celqfndmp7sjezz0fl588cadrrtakgxxzdmr6euyq60funr';
+export const TREASURY_ADDRESS = 'aleo1lnvreh0hvs8celqfndmp7sjezz0fl588cadrrtakgxxzdmr6euyq60funr';
 
 /**
  * Create a standard Aleo transaction for Leo Wallet

@@ -6,8 +6,12 @@ import { ArrowLeftRight, Shield, CheckCircle2, Loader2, ExternalLink } from 'luc
 import toast from 'react-hot-toast';
 import { bridgeService } from '../../lib/osmosis/bridgeService.js';
 
+// Check if testnet
+const isTestnet = import.meta.env.VITE_OSMOSIS_CHAIN_ID === 'osmo-test-5';
+const chainName = isTestnet ? 'osmosistestnet' : 'osmosis';
+
 export const BridgeComponent = () => {
-  const { address, getSigningStargateClient } = useChain('osmosis');
+  const { address, getSigningStargateClient } = useChain(chainName);
   const [amount, setAmount] = useState('');
   const [zcashAddress, setZcashAddress] = useState('');
   const [isBridging, setIsBridging] = useState(false);

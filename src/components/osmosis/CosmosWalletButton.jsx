@@ -1,8 +1,12 @@
 import React from 'react';
 import { useChain } from '@cosmos-kit/react';
 
+// Check if testnet
+const isTestnet = import.meta.env.VITE_OSMOSIS_CHAIN_ID === 'osmo-test-5';
+const chainName = isTestnet ? 'osmosistestnet' : 'osmosis';
+
 export function CosmosWalletButton() {
-  const { status, username, address, connect, disconnect, wallet } = useChain('osmosis');
+  const { status, username, address, connect, disconnect, wallet } = useChain(chainName);
 
   if (status === 'Connected') {
     return (
